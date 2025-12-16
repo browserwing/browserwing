@@ -88,7 +88,8 @@ func (h *Handler) BrowserStatus(c *gin.Context) {
 // OpenBrowserPage 在浏览器中打开页面
 func (h *Handler) OpenBrowserPage(c *gin.Context) {
 	var req struct {
-		URL string `json:"url" binding:"required"`
+		URL      string `json:"url" binding:"required"`
+		Language string `json:"language"` // 前端当前语言
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -101,7 +102,7 @@ func (h *Handler) OpenBrowserPage(c *gin.Context) {
 		return
 	}
 
-	if err := h.browserManager.OpenPage(req.URL); err != nil {
+	if err := h.browserManager.OpenPage(req.URL, req.Language); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.openPageFailed"})
 		return
 	}

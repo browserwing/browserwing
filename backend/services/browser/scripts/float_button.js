@@ -17,7 +17,7 @@ function createFloatingRecordButton() {
 	
 	var title = document.createElement('div');
 	title.style.cssText = 'color: #1f2937 !important;font-size: 14px !important;font-weight: 600 !important;opacity: 1 !important;visibility: visible !important;';
-	title.textContent = 'Browserwing Pilot';
+	title.textContent = '{{TITLE}}';
 	
 	header.appendChild(title);
 	
@@ -36,7 +36,7 @@ function createFloatingRecordButton() {
 	
 	var btnText = document.createElement('span');
 	btnText.style.cssText = 'opacity: 1 !important;visibility: visible !important;';
-	btnText.textContent = '开始录制页面';
+	btnText.textContent = '{{START_RECORD}}';
 	
 	startBtn.appendChild(icon);
 	startBtn.appendChild(btnText);

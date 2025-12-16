@@ -37,6 +37,7 @@ type Recorder struct {
 	lastSyncedCount int
 	apiServerPort   string       // API 服务器端口
 	llmManager      *llm.Manager // LLM 管理器
+	language        string       // 当前语言设置
 }
 
 // NewRecorder 创建录制器
@@ -62,7 +63,7 @@ func (r *Recorder) SetAPIServerPort(port string) {
 }
 
 // StartRecording 开始录制
-func (r *Recorder) StartRecording(ctx context.Context, page *rod.Page, url string) error {
+func (r *Recorder) StartRecording(ctx context.Context, page *rod.Page, url string, language string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -70,13 +71,19 @@ func (r *Recorder) StartRecording(ctx context.Context, page *rod.Page, url strin
 		return fmt.Errorf("recording is already in progress")
 	}
 
+	// 设置语言
+	if language == "" {
+		language = "zh-CN" // 默认简体中文
+	}
+	r.language = language
+
 	r.isRecording = true
 	r.startTime = time.Now()
 	r.startURL = url
 	r.actions = make([]models.ScriptAction, 0)
 	r.page = page
 
-	logger.Info(ctx, "Preparing to inject recording script into page...")
+	logger.Info(ctx, "Preparing to inject recording script into page (language: %s)...", language)
 
 	// 等待页面完全加载
 	if err := page.WaitLoad(); err != nil {
@@ -110,8 +117,11 @@ func (r *Recorder) StartRecording(ctx context.Context, page *rod.Page, url strin
 		logger.Warn(ctx, "Failed to set recording mode flag: %v", err)
 	}
 
+	// 替换录制脚本中的多语言占位符
+	localizedRecorderScript := ReplaceI18nPlaceholders(recorderScript, r.language, RecorderI18n)
+
 	// 注入录制脚本 - 使用立即执行函数表达式
-	_, err = page.Eval(`() => { ` + recorderScript + ` return true; }`)
+	_, err = page.Eval(`() => { ` + localizedRecorderScript + ` return true; }`)
 	if err != nil {
 		r.isRecording = false
 		logger.Error(ctx, "Failed to inject script, error details: %v", err)
@@ -125,7 +135,7 @@ func (r *Recorder) StartRecording(ctx context.Context, page *rod.Page, url strin
 		return fmt.Errorf("failed to inject recording script: %w", err)
 	}
 
-	logger.Info(ctx, "✓ Recording script injected successfully")
+	logger.Info(ctx, "✓ Recording script injected successfully (language: %s)", r.language)
 
 	// 验证注入是否成功
 	checkResult, checkErr := page.Eval(`() => window.__browserwingRecorder__`)

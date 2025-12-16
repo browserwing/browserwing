@@ -38,7 +38,7 @@ if (window.__browserwingRecorder__) {
 		statusDot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#dc2626;animation:pulse 2s cubic-bezier(0.4,0,0.6,1) infinite;';		var statusText = document.createElement('div');
 			statusText.id = '__browserwing_status_text__';
 			statusText.style.cssText = 'color:#1f2937;font-size:14px;font-weight:600;';
-			statusText.textContent = '脚本录制中';
+			statusText.textContent = '{{RECORDING_STATUS}}';
 			
 			headerLeft.appendChild(statusDot);
 			headerLeft.appendChild(statusText);
@@ -46,7 +46,7 @@ if (window.__browserwingRecorder__) {
 			var actionCount = document.createElement('div');
 			actionCount.id = '__browserwing_action_count__';
 			actionCount.style.cssText = 'color:#6b7280;font-size:13px;font-weight:500;';
-			actionCount.textContent = '0 步骤';
+			actionCount.textContent = '{{STEPS_COUNT}}';
 			
 			header.appendChild(headerLeft);
 			header.appendChild(actionCount);
@@ -58,7 +58,7 @@ if (window.__browserwingRecorder__) {
 		var extractBtn = document.createElement('button');
 		extractBtn.id = '__browserwing_extract_btn__';
 		extractBtn.style.cssText = 'flex:1;padding:5px 12px;background:white;color:#374151;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
-		extractBtn.textContent = '数据抓取';
+		extractBtn.textContent = '{{DATA_EXTRACT}}';
 		extractBtn.onmouseover = function() {
 			if (!window.__extractMode__) {
 				this.style.background = '#f9fafb';
@@ -80,7 +80,7 @@ if (window.__browserwingRecorder__) {
 		var aiExtractBtn = document.createElement('button');
 		aiExtractBtn.id = '__browserwing_ai_extract_btn__';
 		aiExtractBtn.style.cssText = 'flex:1;padding:5px 12px;background:#1f2937;color:white;border:1px solid #1f2937;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
-		aiExtractBtn.textContent = 'AI提取';
+		aiExtractBtn.textContent = '{{AI_EXTRACT}}';
 		aiExtractBtn.onmouseover = function() {
 			this.style.background = '#111827';
 			this.style.borderColor = '#111827';
@@ -97,15 +97,15 @@ if (window.__browserwingRecorder__) {
 		
 		var aiFormFillBtn = document.createElement('button');
 		aiFormFillBtn.id = '__browserwing_ai_formfill_btn__';
-		aiFormFillBtn.style.cssText = 'flex:1;padding:5px 12px;background:#059669;color:white;border:1px solid #1f2937;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
-		aiFormFillBtn.textContent = 'AI填充';
+		aiFormFillBtn.style.cssText = 'flex:1;padding:5px 12px;background:#6b7280;color:white;border:1px solid #6b7280;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
+		aiFormFillBtn.textContent = '{{AI_FORMFILL}}';
 		aiFormFillBtn.onmouseover = function() {
-			this.style.background = '#111827';
-			this.style.borderColor = '#111827';
+			this.style.background = '#4b5563';
+			this.style.borderColor = '#4b5563';
 		};
 		aiFormFillBtn.onmouseout = function() {
-			this.style.background = '#1f2937';
-			this.style.borderColor = '#1f2937';
+			this.style.background = '#6b7280';
+			this.style.borderColor = '#6b7280';
 		};
 		aiFormFillBtn.onclick = function() {
 			if (!panel.__isDragging) {
@@ -121,14 +121,12 @@ if (window.__browserwingRecorder__) {
 		actionList.id = '__browserwing_action_list__';
 		actionList.style.cssText = 'max-height:240px;overflow-y:auto;padding:8px;background:white;';
 		
-		var emptyState = document.createElement('div');
-		emptyState.id = '__browserwing_empty_state__';
-		emptyState.style.cssText = 'padding:24px;text-align:center;color:#6b7280;font-size:13px;';
-		emptyState.textContent = '还没有录制的步骤';
-		
-		actionList.appendChild(emptyState);
-		
-		// 创建当前操作提示区域
+	var emptyState = document.createElement('div');
+	emptyState.id = '__browserwing_empty_state__';
+	emptyState.style.cssText = 'padding:24px;text-align:center;color:#6b7280;font-size:13px;';
+	emptyState.textContent = '{{EMPTY_STEPS}}';
+	
+	actionList.appendChild(emptyState);		// 创建当前操作提示区域
 		var currentAction = document.createElement('div');
 		currentAction.id = '__browserwing_current_action__';
 		currentAction.style.cssText = 'display:none;padding:12px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;color:#374151;font-size:12px;line-height:1.5;';
@@ -185,31 +183,29 @@ if (window.__browserwingRecorder__) {
 		stopRecordingArea.id = '__browserwing_stop_recording_area__';
 		stopRecordingArea.style.cssText = 'padding:12px 16px;background:white;border-top:1px solid #e5e7eb;';
 		
-		var stopRecordingBtn = document.createElement('button');
-		stopRecordingBtn.id = '__browserwing_stop_recording_btn__';
-		stopRecordingBtn.style.cssText = 'width:100%;padding:10px 16px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;';
-		stopRecordingBtn.textContent = '结束录制';
-		stopRecordingBtn.onmouseover = function() {
-			this.style.background = '#b91c1c';
+	var stopRecordingBtn = document.createElement('button');
+	stopRecordingBtn.id = '__browserwing_stop_recording_btn__';
+	stopRecordingBtn.style.cssText = 'width:100%;padding:10px 16px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;';
+	stopRecordingBtn.textContent = '{{STOP_RECORDING}}';
+	stopRecordingBtn.onmouseover = function() {
+		this.style.background = '#b91c1c';
+	};
+	stopRecordingBtn.onmouseout = function() {
+		this.style.background = '#dc2626';
+	};
+	stopRecordingBtn.onclick = async function() {
+		// 使用轮询方式通知后端停止录制,而不是直接调用API
+		window.__stopRecordingRequest__ = {
+			timestamp: Date.now(),
+			action: 'stop'
 		};
-		stopRecordingBtn.onmouseout = function() {
-			this.style.background = '#dc2626';
-		};
-		stopRecordingBtn.onclick = async function() {
-			// 使用轮询方式通知后端停止录制,而不是直接调用API
-			window.__stopRecordingRequest__ = {
-				timestamp: Date.now(),
-				action: 'stop'
-			};
-			console.log('[BrowserWing] Recording stop request set');
-			
-			// 禁用按钮,防止重复点击
-			this.disabled = true;
-			this.textContent = '正在停止...';
-			this.style.background = '#9ca3af';
-		};
+		console.log('[BrowserWing] Recording stop request set');
 		
-		stopRecordingArea.appendChild(stopRecordingBtn);
+		// 禁用按钮,防止重复点击
+		this.disabled = true;
+		this.textContent = '{{STOPPING}}';
+		this.style.background = '#9ca3af';
+	};		stopRecordingArea.appendChild(stopRecordingBtn);
 		panel.appendChild(stopRecordingArea);
 		
 		// 创建抓取类型选择菜单
@@ -218,9 +214,9 @@ if (window.__browserwingRecorder__) {
 		menu.style.cssText = 'display:none;position:fixed;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:1000000;padding:4px;min-width:160px;';
 		
 		var menuItems = [
-			{type: 'text', label: '抓取文本'},
-			{type: 'html', label: '抓取HTML'},
-			{type: 'attribute', label: '抓取属性'}
+			{type: 'text', label: '{{EXTRACT_TEXT}}'},
+			{type: 'html', label: '{{EXTRACT_HTML}}'},
+			{type: 'attribute', label: '{{EXTRACT_ATTRIBUTE}}'}
 		];
 		
 		for (var i = 0; i < menuItems.length; i++) {
@@ -316,11 +312,11 @@ if (window.__browserwingRecorder__) {
 		
 		var loadingText = document.createElement('div');
 		loadingText.style.cssText = 'color:#1f2937;font-size:16px;font-weight:600;margin-bottom:8px;';
-		loadingText.textContent = message || 'AI 正在生成提取代码...';
+		loadingText.textContent = message || '{{AI_GENERATING}}';
 		
 		var loadingTip = document.createElement('div');
 		loadingTip.style.cssText = 'color:#6b7280;font-size:13px;';
-		loadingTip.textContent = '请稍候，这可能需要几秒钟';
+		loadingTip.textContent = '{{PLEASE_WAIT}}';
 		
 		loadingBox.appendChild(spinner);
 		loadingBox.appendChild(loadingText);
@@ -361,7 +357,7 @@ if (window.__browserwingRecorder__) {
 	var updateActionCount = function() {
 		if (!window.__recorderUI__) return;
 		var count = window.__recordedActions__.length;
-		window.__recorderUI__.actionCount.textContent = count + ' 步骤';
+		window.__recorderUI__.actionCount.textContent = count + ' {{STEPS_UNIT}}';
 	};
 	
 	// 添加动作到列表
@@ -417,7 +413,7 @@ if (window.__browserwingRecorder__) {
 		
 		// 特殊处理 sleep action
 		if (action.type === 'sleep' && action.duration) {
-			detailText = '⏱ 等待 ' + (action.duration / 1000).toFixed(1) + ' 秒';
+			detailText = '⏱ {{WAIT_PREFIX}}' + (action.duration / 1000).toFixed(1) + ' {{SECONDS_UNIT}}';
 			if (action.description) {
 				detailText = action.description;
 			}
@@ -481,7 +477,7 @@ if (window.__browserwingRecorder__) {
 		
 		if (window.__extractMode__) {
 			// 开启抓取模式
-			ui.extractBtn.textContent = '退出抓取';
+			ui.extractBtn.textContent = '{{EXIT_EXTRACT}}';
 			ui.extractBtn.style.background = '#1f2937';
 			ui.extractBtn.style.color = 'white';
 			ui.extractBtn.style.borderColor = '#1f2937';
@@ -492,11 +488,11 @@ if (window.__browserwingRecorder__) {
 				this.style.background = '#1f2937';
 			};
 			document.body.style.cursor = 'crosshair';
-			showCurrentAction('数据抓取模式已开启。点击元素抓取数据，右键选择抓取类型。');
+			showCurrentAction('{{EXTRACT_MODE_ENABLED}}');
 			console.log('[BrowserWing] Extract mode enabled');
 		} else {
 			// 关闭抓取模式
-			ui.extractBtn.textContent = '数据抓取';
+			ui.extractBtn.textContent = '{{DATA_EXTRACT}}';
 			ui.extractBtn.style.background = 'white';
 			ui.extractBtn.style.color = '#374151';
 			ui.extractBtn.style.borderColor = '#d1d5db';
@@ -530,7 +526,7 @@ if (window.__browserwingRecorder__) {
 			}
 			
 			// 开启 AI 填充表单模式
-			ui.aiFormFillBtn.textContent = '退出填充';
+			ui.aiFormFillBtn.textContent = '{{EXIT_AI_FORMFILL}}';
 			ui.aiFormFillBtn.style.background = '#047857';
 			ui.aiFormFillBtn.onmouseover = function() {
 				this.style.background = '#065f46';
@@ -539,11 +535,11 @@ if (window.__browserwingRecorder__) {
 				this.style.background = '#047857';
 			};
 			document.body.style.cursor = 'crosshair';
-			showCurrentAction('AI填充表单模式已开启。点击要填充的表单容器或表单元素。');
+			showCurrentAction('{{AI_FORMFILL_MODE_ENABLED}}');
 			console.log('[BrowserWing] AI Form Fill mode enabled');
 		} else {
 			// 关闭 AI 填充表单模式
-			ui.aiFormFillBtn.textContent = 'AI填充';
+			ui.aiFormFillBtn.textContent = '{{AI_FORMFILL}}';
 			ui.aiFormFillBtn.style.background = '#059669';
 			ui.aiFormFillBtn.style.borderColor = '#059669';
 			ui.aiFormFillBtn.onmouseover = function() {
@@ -576,7 +572,7 @@ if (window.__browserwingRecorder__) {
 			}
 			
 			// 开启 AI 提取模式
-			ui.aiExtractBtn.textContent = '退出提取';
+			ui.aiExtractBtn.textContent = '{{EXIT_AI_EXTRACT}}';
 			ui.aiExtractBtn.style.background = '#111827';
 			ui.aiExtractBtn.onmouseover = function() {
 				this.style.background = '#030712';
@@ -585,11 +581,11 @@ if (window.__browserwingRecorder__) {
 				this.style.background = '#111827';
 			};
 			document.body.style.cursor = 'crosshair';
-			showCurrentAction('AI提取模式已开启。点击要提取数据的容器元素（如列表容器）。');
+			showCurrentAction('{{AI_EXTRACT_MODE_ENABLED}}');
 			console.log('[BrowserWing] AI Extract mode enabled');
 		} else {
 			// 关闭 AI 提取模式
-			ui.aiExtractBtn.textContent = 'AI提取';
+			ui.aiExtractBtn.textContent = '{{AI_EXTRACT}}';
 			ui.aiExtractBtn.style.background = '#1f2937';
 			ui.aiExtractBtn.style.borderColor = '#1f2937';
 			ui.aiExtractBtn.onmouseover = function() {
@@ -617,7 +613,7 @@ if (window.__browserwingRecorder__) {
 		window.__selectedElement__ = element;
 		
 		// 显示全屏 Loading
-		showFullPageLoading('AI 正在分析表单结构...');
+		showFullPageLoading('{{AI_ANALYZING_FORM}}');
 		
 		try {
 			// 查找表单元素（可能点击的是表单本身或表单内的元素）
@@ -636,7 +632,7 @@ if (window.__browserwingRecorder__) {
 			// 更新 loading 提示
 			if (window.__loadingOverlay__) {
 				var loadingText = window.__loadingOverlay__.querySelector('div > div:nth-child(2)');
-				if (loadingText) loadingText.textContent = 'AI 正在生成填充代码...';
+				if (loadingText) loadingText.textContent = '{{AI_GENERATING_FILL}}';
 			}
 			
 			console.log('[BrowserWing] Submitting AI form fill request via polling...');
@@ -645,7 +641,7 @@ if (window.__browserwingRecorder__) {
 			window.__aiExtractionRequest__ = {
 				type: 'formfill',
 				html: cleanedHtml,
-				description: '自动填充这个表单，生成合理的测试数据'
+				description: '{{FORMFILL_PROMPT}}'
 			};
 			
 			// 轮询等待后端处理结果
@@ -666,18 +662,18 @@ if (window.__browserwingRecorder__) {
 					} else if (elapsedTime >= maxWaitTime) {
 						clearInterval(pollTimer);
 						delete window.__aiExtractionRequest__;
-						reject(new Error('AI 请求超时'));
+						reject(new Error('{{AI_TIMEOUT}}'));
 					}
 				}, pollInterval);
 			});
 			
 			// 检查响应是否成功
 			if (!result.success) {
-				throw new Error(result.error || 'AI 生成表单填充代码失败');
+				throw new Error(result.error || '{{AI_FORMFILL_FAILED}}');
 			}
 			
 			if (!result.javascript) {
-				throw new Error('未收到生成的代码');
+				throw new Error('{{NO_CODE_RECEIVED}}');
 			}
 			
 			console.log('[BrowserWing] AI form fill successful, code length:', result.javascript.length);
@@ -694,7 +690,7 @@ if (window.__browserwingRecorder__) {
 				js_code: result.javascript,
 				variable_name: variableName,
 				tagName: formElement.tagName ? formElement.tagName.toLowerCase() : '',
-				description: 'AI生成的表单填充代码'
+				description: '{{AI_FORMFILL_DESC}}'
 			};
 			
 			recordAction(action);
@@ -702,7 +698,7 @@ if (window.__browserwingRecorder__) {
 			// 移除 Loading
 			removeFullPageLoading();
 			
-			showCurrentAction('AI 表单填充代码已生成并添加到脚本。使用模型: ' + (result.used_model || 'unknown'));
+			showCurrentAction('{{AI_FORMFILL_SUCCESS}}' + (result.used_model || 'unknown'));
 			console.log('[BrowserWing] AI form fill code added:', variableName);
 			
 			// 自动退出 AI 填充表单模式
@@ -721,7 +717,7 @@ if (window.__browserwingRecorder__) {
 			delete window.__aiFormFillResponse__;
 			
 			console.error('[BrowserWing] AI form fill error:', error);
-			showCurrentAction('AI 表单填充失败: ' + error.message);
+			showCurrentAction('{{AI_FORMFILL_ERROR}}' + error.message);
 		}
 	};
 	
@@ -735,24 +731,22 @@ if (window.__browserwingRecorder__) {
 		window.__selectedElement__ = element;
 		
 		// 显示全屏 Loading
-		showFullPageLoading('AI 正在分析页面结构...');
+		showFullPageLoading('{{AI_ANALYZING_PAGE}}');
 		
 		try {
 			// 清理和优化 HTML
 			var cleanedHtml = cleanAndSampleHTML(element);
 			
-			// 更新 loading 提示
-			if (window.__loadingOverlay__) {
-				var loadingText = window.__loadingOverlay__.querySelector('div > div:nth-child(2)');
-				if (loadingText) loadingText.textContent = 'AI 正在生成提取代码...';
-			}
-			
-			console.log('[BrowserWing] Submitting AI extraction request via polling...');
-			
-			// 设置请求到全局变量，让后端轮询处理（避免 CSP 问题）
+		// 更新 loading 提示
+		if (window.__loadingOverlay__) {
+			var loadingText = window.__loadingOverlay__.querySelector('div > div:nth-child(2)');
+			if (loadingText) loadingText.textContent = '{{AI_GENERATING}}';
+		}
+		
+		console.log('[BrowserWing] Submitting AI extraction request via polling...');			// 设置请求到全局变量，让后端轮询处理（避免 CSP 问题）
 			window.__aiExtractionRequest__ = {
 				html: cleanedHtml,
-				description: '提取这个容器中的所有列表项数据，包括标题、链接、图片等字段'
+				description: '{{EXTRACT_PROMPT}}'
 			};
 			
 			// 轮询等待后端处理结果
@@ -773,7 +767,7 @@ if (window.__browserwingRecorder__) {
 					if (elapsedTime >= maxWaitTime) {
 						// 超时清理请求，防止后端后续处理
 						delete window.__aiExtractionRequest__;
-						reject(new Error('AI 请求超时'));
+						reject(new Error('{{AI_TIMEOUT}}'));
 						return;
 					}
 					
@@ -785,7 +779,7 @@ if (window.__browserwingRecorder__) {
 			
 			// 检查响应是否成功
 			if (!result.success) {
-				throw new Error(result.error || 'AI 生成代码失败');
+				throw new Error(result.error || '{{AI_EXTRACT_FAILED}}');
 			}
 			
 			if (!result.javascript) {
@@ -806,7 +800,7 @@ if (window.__browserwingRecorder__) {
 				js_code: result.javascript,
 				variable_name: variableName,
 				tagName: element.tagName ? element.tagName.toLowerCase() : '',
-				description: 'AI生成的结构化数据提取'
+				description: '{{AI_EXTRACT_DESC}}'
 			};
 			
 			recordAction(action);
@@ -814,7 +808,7 @@ if (window.__browserwingRecorder__) {
 			// 移除 Loading
 			removeFullPageLoading();
 			
-			showCurrentAction('AI 提取代码已生成并添加到脚本。使用模型: ' + (result.used_model || 'unknown'));
+			showCurrentAction('{{AI_EXTRACT_SUCCESS}}' + (result.used_model || 'unknown'));
 			console.log('[BrowserWing] AI extraction code added:', variableName);
 			
 			// 自动退出 AI 提取模式
@@ -833,7 +827,7 @@ if (window.__browserwingRecorder__) {
 			delete window.__aiExtractionResponse__;
 			
 			console.error('[BrowserWing] AI extraction error:', error);
-			showCurrentAction('AI 提取失败: ' + error.message);
+			showCurrentAction('{{AI_EXTRACT_ERROR}}' + error.message);
 		}
 	};
 	
@@ -1267,7 +1261,7 @@ if (window.__browserwingRecorder__) {
 					type: 'sleep',
 					timestamp: lastAction.timestamp + 1, // 紧跟在上一个操作之后
 					duration: sleepDuration,
-					description: '自动等待 ' + (sleepDuration / 1000).toFixed(1) + ' 秒'
+					description: '{{AUTO_WAIT}}' + (sleepDuration / 1000).toFixed(1) + ' {{SECONDS_UNIT}}'
 				};
 				
 				window.__recordedActions__.push(sleepAction);
@@ -1558,11 +1552,11 @@ if (window.__browserwingRecorder__) {
 							file_names: fileNames,
 							multiple: fileInput.multiple || false,
 							accept: fileInput.accept || '',
-							description: '选择了 ' + fileNames.length + ' 个文件: ' + fileNames.join(', ')
+							description: '{{FILES_SELECTED}}' + fileNames.length + ' {{FILES_COUNT}}' + fileNames.join(', ')
 						};
 						
 						recordAction(action);
-						showCurrentAction('上传文件: ' + fileNames.join(', '));
+						showCurrentAction('{{UPLOAD_FILE}}' + fileNames.join(', '));
 					} else {
 						console.log('[BrowserWing] No files selected');
 					}
@@ -1781,11 +1775,11 @@ if (window.__browserwingRecorder__) {
 						file_names: fileNames,
 						multiple: target.multiple || false,
 						accept: target.accept || '',
-						description: '选择了 ' + fileNames.length + ' 个文件: ' + fileNames.join(', ')
+						description: '{{FILES_SELECTED}}' + fileNames.length + ' {{FILES_COUNT}}' + fileNames.join(', ')
 					};
 					
 					recordAction(action);
-					showCurrentAction('上传文件: ' + fileNames.join(', '));
+					showCurrentAction('{{UPLOAD_FILE}}' + fileNames.join(', '));
 				}
 				return;
 			}
@@ -1854,7 +1848,7 @@ if (window.__browserwingRecorder__) {
 				
 				if (extractType === 'attribute') {
 					// 弹出对话框让用户输入属性名
-					var attrName = prompt('请输入要抓取的属性名（如 href, src, data-id）:', 'href');
+					var attrName = prompt('{{PROMPT_ATTRIBUTE}}', 'href');
 					if (attrName) {
 						recordExtractAction(ui.currentElement, extractType, attrName);
 					}

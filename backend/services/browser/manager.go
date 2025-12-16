@@ -43,6 +43,7 @@ type Manager struct {
 	lastRecordedActions    []models.ScriptAction   // 最后一次录制的动作(用于页面内停止录制)
 	lastRecordedStartURL   string                  // 最后一次录制的起始URL(用于页面内停止录制)
 	inPageRecordingStopped bool                    // 标记是否是页面内停止的录制
+	currentLanguage        string                  // 当前前端语言设置
 }
 
 // NewManager 创建浏览器管理器
@@ -365,7 +366,7 @@ func (m *Manager) Status() map[string]interface{} {
 }
 
 // OpenPage 打开一个新页面
-func (m *Manager) OpenPage(url string) error {
+func (m *Manager) OpenPage(url string, language string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -373,10 +374,16 @@ func (m *Manager) OpenPage(url string) error {
 		return fmt.Errorf("browser is not running")
 	}
 
+	// 保存当前语言设置,用于后续注入脚本时的文本替换
+	if language == "" {
+		language = "zh-CN" // 默认简体中文
+	}
+	m.currentLanguage = language
+
 	// 根据URL匹配配置
 	config := m.getConfigForURL(url)
 	ctx := context.Background()
-	logger.Info(ctx, fmt.Sprintf("URL: %s, using configuration: %s", url, config.Name))
+	logger.Info(ctx, fmt.Sprintf("URL: %s, using configuration: %s, language: %s", url, config.Name, language))
 
 	var page *rod.Page
 
@@ -436,11 +443,13 @@ func (m *Manager) OpenPage(url string) error {
 
 	// 注入浮动录制按钮
 	time.Sleep(500 * time.Millisecond) // 等待页面稳定
-	_, err := page.Eval(`() => { ` + floatButtonScript + ` return true; }`)
+	// 替换浮动按钮脚本中的多语言占位符
+	localizedFloatButtonScript := ReplaceI18nPlaceholders(floatButtonScript, m.currentLanguage, FloatButtonI18n)
+	_, err := page.Eval(`() => { ` + localizedFloatButtonScript + ` return true; }`)
 	if err != nil {
 		logger.Warn(ctx, "Failed to inject float button script: %v", err)
 	} else {
-		logger.Info(ctx, "✓ Float recording button injected successfully")
+		logger.Info(ctx, "✓ Float recording button injected successfully (language: %s)", m.currentLanguage)
 
 		// 设置 API 端口信息
 		if m.config.Server != nil && m.config.Server.Port != "" {
@@ -510,6 +519,13 @@ func (m *Manager) GetCurrentPageCookies() (interface{}, error) {
 // StartRecording 开始录制操作
 func (m *Manager) StartRecording(ctx context.Context) error {
 	m.mu.Lock()
+	currentLang := m.currentLanguage
+	if currentLang == "" {
+		currentLang = "zh-CN" // 默认简体中文
+	}
+	m.mu.Unlock()
+
+	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if !m.isRunning || m.browser == nil {
@@ -526,7 +542,7 @@ func (m *Manager) StartRecording(ctx context.Context) error {
 		return fmt.Errorf("failed to get page info: %w", err)
 	}
 
-	err = m.recorder.StartRecording(ctx, m.activePage, info.URL)
+	err = m.recorder.StartRecording(ctx, m.activePage, info.URL, currentLang)
 	if err != nil {
 		return err
 	}
@@ -788,8 +804,13 @@ func (m *Manager) checkInPageRecordingRequests(ctx context.Context, page *rod.Pa
 				// 获取当前页面URL
 				info, err := page.Info()
 				if err == nil {
+					// 获取当前语言设置
+					currentLang := m.currentLanguage
+					if currentLang == "" {
+						currentLang = "zh-CN"
+					}
 					// 开始录制
-					if err := m.recorder.StartRecording(ctx, page, info.URL); err != nil {
+					if err := m.recorder.StartRecording(ctx, page, info.URL, currentLang); err != nil {
 						logger.Error(ctx, "Failed to start recording from in-page request: %v", err)
 					} else {
 						logger.Info(ctx, "✓ Recording started from in-page button")

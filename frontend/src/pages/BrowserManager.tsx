@@ -160,7 +160,7 @@ export default function BrowserManager() {
 
     try {
       setOpeningPage(true)
-      const response = await api.openBrowserPage(targetUrl)
+      const response = await api.openBrowserPage(targetUrl, language)
       showMessage(t(response.data.message), 'success')
       // 将当前URL添加到历史记录
       saveToHistory(targetUrl)
@@ -454,7 +454,7 @@ export default function BrowserManager() {
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="text-sm text-gray-500">打开页面数</div>
+                <div className="text-sm text-gray-500">{t('browser.status.openpage')}</div>
                 <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   {status.pages_count ?? 0}
                 </div>

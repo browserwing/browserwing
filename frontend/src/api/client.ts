@@ -460,8 +460,9 @@ export const api = {
   getBrowserStatus: () =>
     client.get<any>('/browser/status'),
 
-  openBrowserPage: (url: string) =>
-    client.post<{ message: string; url: string }>('/browser/open', { url }),
+  openBrowserPage: (url: string, language?: string) =>
+    client.post<{ message: string; url: string }>('/browser/open', { url, language }),
+
 
   saveBrowserCookies: () =>
     client.post<{ message: string; count: number }>('/browser/cookies/save'),
