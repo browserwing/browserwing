@@ -86,7 +86,7 @@ func Load(path string) (*Config, error) {
 			Database: &DatabaseConfig{
 				Path: "./data/browserwing.db",
 			},
-			LLM:       &LLMConfig{},
+			LLMs:      make([]LLMConfig, 0),
 			AssetsDir: "./data",
 			Browser:   browserCfg,
 			Log: &logger.LoggerConfig{

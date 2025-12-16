@@ -226,12 +226,7 @@ export default function LLMManager() {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100"
               >
                 <optgroup label={t('llm.groupInternational')}>
-                  {PROVIDERS.filter(p => p.group === 'international').map(p => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </optgroup>
-                <optgroup label={t('llm.groupDomestic')}>
-                  {PROVIDERS.filter(p => p.group === 'domestic').map(p => (
+                  {PROVIDERS.filter(p => p.group === 'international' || p.group === 'domestic').map(p => (
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
                 </optgroup>

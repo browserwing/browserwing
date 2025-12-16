@@ -35,7 +35,7 @@ export default function BrowserManager() {
   const [recordingLoading, setRecordingLoading] = useState(false)
   const [executingScript, setExecutingScript] = useState(false)
   const [savingScript, setSavingScript] = useState(false)
-  const [openUrl, setOpenUrl] = useState('https://www.xiaohongshu.com')
+  const [openUrl, setOpenUrl] = useState('')
   const [message, setMessage] = useState('')
   const [showToast, setShowToast] = useState(false)
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info')
