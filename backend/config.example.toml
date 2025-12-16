@@ -1,0 +1,35 @@
+# browserwing 配置文件示例
+
+# 服务器配置
+[server]
+host = "0.0.0.0"
+port = "8080"
+
+# 数据库配置
+[database]
+path = "./data/browserwing.db"
+
+# LLM配置
+[llm]
+provider = "openai"  # 支持: openai, siliconflow 等
+api_key = "your-api-key-here"
+model = "gpt-3.5-turbo"
+
+# 浏览器配置
+[browser]
+headless = false  # 是否无头模式运行
+bin_path = ""  # 浏览器可执行文件路径，留空使用系统默认
+control_url = ""  # 远程调试URL，例如: "http://localhost:9222"
+# 用户数据目录：用于保存登录状态、Cookie、缓存等数据
+# ⚠️ 重要：必须设置此项才能保持登录状态！
+# Windows: "C:/Users/YourName/AppData/Local/browserwing/chrome_data"
+# Linux/Mac: "./chrome_user_data" 或 "/home/user/.browserwing/chrome_data"
+user_data_dir = "./chrome_user_data"
+
+# 资源目录配置
+assets_dir = "./assets"
+
+# 日志配置
+[log]
+level = "info"  # 日志级别: debug, info, warn, error
+file = "./logs/browserwing.log"

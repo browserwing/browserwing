@@ -1,0 +1,642 @@
+import { useState, useEffect, useRef } from 'react'
+import { Send, Loader2, Bot, Wrench, CheckCircle2, XCircle, Trash2, MessageSquarePlus, Copy, Check, ChevronDown } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import Toast from '../components/Toast'
+import MarkdownRenderer from '../components/MarkdownRenderer'
+import { useLanguage } from '../i18n'
+
+// 消息类型
+interface ToolCall {
+  tool_name: string
+  status: 'calling' | 'success' | 'error'
+  message?: string
+}
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: string
+  tool_calls?: ToolCall[]
+}
+
+interface ChatSession {
+  id: string
+  messages: ChatMessage[]
+  created_at: string
+  updated_at: string
+}
+
+interface StreamChunk {
+  type: 'message' | 'tool_call' | 'done' | 'error'
+  content?: string
+  tool_call?: ToolCall
+  error?: string
+  message_id?: string
+}
+
+export default function AgentChat() {
+  const { t } = useLanguage()
+  const navigate = useNavigate()
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null)
+  const [inputMessage, setInputMessage] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info')
+  const [mcpStatus, setMcpStatus] = useState<any>(null)
+  const [llmConfigs, setLlmConfigs] = useState<any[]>([])
+  const [selectedLlm, setSelectedLlm] = useState<string>('')
+  const [showLlmDropdown, setShowLlmDropdown] = useState(false)
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const llmDropdownRef = useRef<HTMLDivElement>(null)
+
+  // 自动滚动到底部
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [currentSession?.messages])
+
+  // 加载会话列表
+  const loadSessions = async () => {
+    try {
+      const response = await fetch('/api/v1/agent/sessions')
+      const data = await response.json()
+      const sessions = data.sessions || []
+      // 按更新时间降序排列（最新的在前面）
+      sessions.sort((a: ChatSession, b: ChatSession) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )
+      setSessions(sessions)
+    } catch (error) {
+      console.error('加载会话失败:', error)
+    }
+  }
+
+  // 加载 MCP 状态
+  const loadMCPStatus = async () => {
+    try {
+      const response = await fetch('/api/v1/agent/mcp/status')
+      const data = await response.json()
+      setMcpStatus(data)
+    } catch (error) {
+      console.error('加载 MCP 状态失败:', error)
+    }
+  }
+
+  // 加载 LLM 配置列表
+  const loadLLMConfigs = async () => {
+    try {
+      const response = await fetch('/api/v1/llm-configs')
+      const data = await response.json()
+      const configs = data.configs || []
+      setLlmConfigs(configs)
+      
+      // 设置默认选中的 LLM
+      const defaultConfig = configs.find((c: any) => c.is_default && c.is_active)
+      if (defaultConfig) {
+        setSelectedLlm(defaultConfig.id)
+      } else if (configs.length > 0) {
+        setSelectedLlm(configs[0].id)
+      }
+    } catch (error) {
+      console.error('加载 LLM 配置失败:', error)
+    }
+  }
+
+  useEffect(() => {
+    loadSessions()
+    loadMCPStatus()
+    loadLLMConfigs()
+    
+    // 定期刷新 MCP 状态
+    const interval = setInterval(loadMCPStatus, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // 点击外部关闭 LLM 下拉框
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (llmDropdownRef.current && !llmDropdownRef.current.contains(event.target as Node)) {
+        setShowLlmDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // 创建新会话
+  const createSession = async () => {
+    try {
+      const response = await fetch('/api/v1/agent/sessions', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      const newSession = data.session
+      
+      setSessions([newSession, ...sessions])
+      setCurrentSession(newSession)
+      
+      showToastMessage(t('agentChat.sessionCreated'), 'success')
+    } catch (error) {
+      console.error('创建会话失败:', error)
+      showToastMessage(t('agentChat.createSessionFailed'), 'error')
+    }
+  }
+
+  // 删除会话
+  const deleteSession = async (sessionId: string) => {
+    try {
+      await fetch(`/api/v1/agent/sessions/${sessionId}`, {
+        method: 'DELETE',
+      })
+      
+      setSessions(sessions.filter(s => s.id !== sessionId))
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null)
+      }
+      
+      showToastMessage(t('agentChat.sessionDeleted'), 'success')
+    } catch (error) {
+      console.error('删除会话失败:', error)
+      showToastMessage(t('agentChat.deleteSessionFailed'), 'error')
+    }
+  }
+
+  // 发送消息
+  const sendMessage = async () => {
+    if (!inputMessage.trim() || !currentSession || isStreaming) {
+      return
+    }
+
+    const userMessage = inputMessage.trim()
+    setInputMessage('')
+    setIsStreaming(true)
+
+    // 添加用户消息到界面
+    const tempUserMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date().toISOString(),
+    }
+
+    setCurrentSession({
+      ...currentSession,
+      messages: [...currentSession.messages, tempUserMsg],
+    })
+
+    // 创建临时助手消息
+    let assistantMsg: ChatMessage = {
+      id: '',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      tool_calls: [],
+    }
+
+    try {
+      const response = await fetch(`/api/v1/agent/sessions/${currentSession.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          llm_config_id: selectedLlm || undefined, // 传递选中的 LLM ID
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('发送消息失败')
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('无法获取响应流')
+      }
+
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) {
+            continue
+          }
+
+          try {
+            const chunk: StreamChunk = JSON.parse(line.substring(6))
+
+            switch (chunk.type) {
+              case 'message':
+                // 文本内容
+                if (chunk.message_id && !assistantMsg.id) {
+                  assistantMsg.id = chunk.message_id
+                }
+                assistantMsg.content += chunk.content || ''
+                
+                // 更新界面
+                setCurrentSession(prev => {
+                  if (!prev) return prev
+                  const messages = [...prev.messages]
+                  const lastMsg = messages[messages.length - 1]
+                  
+                  if (lastMsg?.role === 'assistant' && lastMsg.id === assistantMsg.id) {
+                    messages[messages.length - 1] = { ...assistantMsg }
+                  } else {
+                    messages.push({ ...assistantMsg })
+                  }
+                  
+                  return {
+                    ...prev,
+                    messages,
+                  }
+                })
+                break
+
+              case 'tool_call':
+                // 工具调用
+                if (chunk.tool_call) {
+                  const existingIndex = assistantMsg.tool_calls?.findIndex(
+                    tc => tc.tool_name === chunk.tool_call?.tool_name
+                  ) ?? -1
+
+                  console.log('更新工具调用:', chunk.tool_call)
+                  if (existingIndex >= 0 && assistantMsg.tool_calls) {
+                    assistantMsg.tool_calls[existingIndex] = chunk.tool_call
+                  } else {
+                    assistantMsg.tool_calls = [...(assistantMsg.tool_calls || []), chunk.tool_call]
+                  }
+
+                  // 更新界面
+                  setCurrentSession(prev => {
+                    if (!prev) return prev
+                    const messages = [...prev.messages]
+                    const lastMsg = messages[messages.length - 1]
+                    
+                    if (lastMsg?.role === 'assistant') {
+                      messages[messages.length - 1] = { ...assistantMsg }
+                    } else {
+                      messages.push({ ...assistantMsg })
+                    }
+                    
+                    return {
+                      ...prev,
+                      messages,
+                    }
+                  })
+                }
+                break
+
+              case 'done':
+                // 完成
+                setIsStreaming(false)
+                break
+
+              case 'error':
+                // 错误
+                showToastMessage(chunk.error || t('agentChat.sendMessageFailed'), 'error')
+                setIsStreaming(false)
+                break
+            }
+          } catch (e) {
+            console.error('解析流数据失败:', e)
+          }
+        }
+      }
+
+      // 重新加载会话以获取完整数据
+      const sessionResponse = await fetch(`/api/v1/agent/sessions/${currentSession.id}`)
+      const sessionData = await sessionResponse.json()
+      const updatedSession = sessionData.session
+      setCurrentSession(updatedSession)
+
+      // 更新会话列表中的该会话，并重新排序
+      setSessions(prevSessions => {
+        const updatedSessions = prevSessions.map(s => 
+          s.id === updatedSession.id ? updatedSession : s
+        )
+        // 按更新时间降序排列
+        return updatedSessions.sort((a, b) => 
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        )
+      })
+
+    } catch (error) {
+      console.error('发送消息失败:', error)
+      showToastMessage(t('agentChat.sendMessageFailed'), 'error')
+      setIsStreaming(false)
+    }
+  }
+
+  // 显示 Toast 消息
+  const showToastMessage = (message: string, type: 'success' | 'error' | 'info') => {
+    setToastMessage(message)
+    setToastType(type)
+    setShowToast(true)
+  }
+
+  // 处理输入框回车
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  // 格式化时间
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  // 复制消息内容
+  const copyMessage = async (content: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+      setTimeout(() => setCopiedMessageId(null), 2000)
+    } catch (error) {
+      console.error('复制失败:', error)
+      showToastMessage(t('agentChat.copyFailed'), 'error')
+    }
+  }
+
+  // 渲染工具调用状态
+  const renderToolCall = (toolCall: ToolCall) => {
+    const statusIcons = {
+      calling: <Loader2 className="w-4 h-4 animate-spin text-gray-600 dark:text-gray-400" />,
+      success: <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />,
+      error: <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />,
+    }
+
+    return (
+      <div
+        key={toolCall.tool_name}
+        className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm mt-2"
+      >
+        <Wrench className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+        <span className="text-gray-700 dark:text-gray-300">{toolCall.tool_name}</span>
+        {statusIcons[toolCall.status]}
+        {toolCall.message && (
+          <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">{toolCall.message}</span>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="border border-gray-300 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-900 h-[calc(100vh-11rem)] overflow-hidden">
+      {/* 顶部状态栏 */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Bot className="w-6 h-6 text-gray-900 dark:text-gray-100" />
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('agentChat.title')}</h1>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {/* MCP 状态 */}
+          {mcpStatus && (
+            <button
+              onClick={() => navigate('/tools')}
+              className="flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition-colors"
+            >
+              <div className={`w-2 h-2 rounded-full ${mcpStatus.connected ? 'bg-green-400' : 'bg-red-400'}`} />
+              <span className="text-gray-400 dark:text-gray-500">
+                {t('agentChat.tools')} ({mcpStatus.tool_count || 0})
+              </span>
+            </button>
+          )}
+
+          {/* 新建会话按钮 */}
+          <button
+            onClick={createSession}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+            <span>{t('agentChat.newSession')}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* 会话列表 */}
+        <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto flex-shrink-0">
+          <div className="p-4">
+            <h2 className="text-sm font-semibold text-gray-400 dark:text-gray-500 mb-3">{t('agentChat.sessionList')}</h2>
+            <div className="space-y-2">
+              {sessions.map(session => (
+                <div
+                  key={session.id}
+                  className={`p-3 rounded-lg cursor-pointer transition-colors group ${
+                    currentSession?.id === session.id
+                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                  onClick={() => setCurrentSession(session)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-base font-medium truncate">
+                        {session.messages[0]?.content?.substring(0, 30) || '新会话'}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        {session.messages.length} {t('agentChat.messages')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteSession(session.id)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 聊天区域 */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 min-h-0">
+          {currentSession ? (
+            <>
+              {/* 消息列表 */}
+              <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
+                <div className="max-w-8xl mx-auto space-y-6">
+                  {currentSession.messages.map(message => (
+                    <div
+                      key={message.id}
+                      className={`flex ${
+                        message.role === 'user' ? 'justify-end' : 'justify-start'
+                      }`}
+                    >
+                      <div className="relative group">
+                        <div
+                          className={`px-4 py-3 rounded-2xl max-w-2xl ${message.role === 'user'
+                            ? 'bg-gray-900 dark:bg-gray-900 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                          }`}
+                        >
+                          {/* 消息内容 - 支持 Markdown 渲染 */}
+                          {message.role === 'assistant' ? (
+                            <MarkdownRenderer 
+                              content={message.content || (isStreaming ? '...' : '')} 
+                              className="text-base"
+                            />
+                          ) : (
+                            <div className="whitespace-pre-wrap break-words text-base">
+                              {message.content}
+                            </div>
+                          )}
+
+                          {/* 工具调用状态 */}
+                          {message.tool_calls && message.tool_calls.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {message.tool_calls.map(renderToolCall)}
+                            </div>
+                          )}
+
+                          <div className="text-sm text-gray-400 dark:text-gray-500 mt-2">
+                            {formatTime(message.timestamp)}
+                          </div>
+                        </div>
+
+                        {/* 复制按钮 - 仅 AI 消息显示 */}
+                        {message.role === 'assistant' && message.content && (
+                          <button
+                            onClick={() => copyMessage(message.content, message.id)}
+                            className="absolute -bottom-2 right-2 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all shadow-sm"
+                            title={t('agentChat.copyMessage')}
+                          >
+                            {copiedMessageId === message.id ? (
+                              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            ) : (
+                              <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              {/* 输入区域 - 固定在底部 */}
+              <div className="px-6 py-3 bg-white dark:bg-gray-800 flex-shrink-0">
+                <div className="max-w-8xl mx-auto">
+                  <div className="flex items-center gap-3">
+                    {/* LLM 选择下拉框 */}
+                    <div className="relative" ref={llmDropdownRef}>
+                      <button
+                        onClick={() => setShowLlmDropdown(!showLlmDropdown)}
+                        className="flex items-center gap-2 px-3 h-[56px] bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm whitespace-nowrap"
+                        disabled={isStreaming}
+                      >
+                        <Bot className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                        <span className="text-gray-700 dark:text-gray-300 dark:text-gray-300">
+                          {llmConfigs.find(c => c.id === selectedLlm)?.model || t('agentChat.selectModel')}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      </button>
+
+                      {showLlmDropdown && (
+                        <div className="absolute bottom-full mb-2 left-0 w-64 bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-50 max-h-64 overflow-y-auto">
+                          {llmConfigs.filter(c => c.is_active).map(config => (
+                            <button
+                              key={config.id}
+                              onClick={() => {
+                                setSelectedLlm(config.id)
+                                setShowLlmDropdown(false)
+                              }}
+                              className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors ${
+                                selectedLlm === config.id ? 'bg-gray-100 dark:bg-gray-600' : ''
+                              }`}
+                            >
+                              <div className="font-medium text-gray-900 dark:text-gray-100">{config.model}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{config.provider}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 输入框 */}
+                    <div className="flex-1 flex items-center gap-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl px-4 py-2">
+                      <textarea
+                        ref={textareaRef}
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder={t('agentChat.inputPlaceholder')}
+                        className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none outline-none max-h-32 py-2 leading-6 text-base"
+                        rows={1}
+                        disabled={isStreaming}
+                      />
+                      <button
+                        onClick={sendMessage}
+                        disabled={!inputMessage.trim() || isStreaming}
+                        className="flex-shrink-0 p-2 bg-gray-900 dark:bg-gray-700 text-white rounded-xl hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isStreaming ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Send className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-2 text-center">
+                    {t('agentChat.disclaimer')}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+              <div className="text-center">
+                  <Bot className="w-16 h-16 mx-auto mb-4 opacity-30 text-gray-300 dark:text-gray-600" />
+                <p className="text-lg">{t('agentChat.noSession')}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Toast 提示 */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+        />
+      )}
+    </div>
+  )
+}

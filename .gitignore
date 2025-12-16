@@ -1,0 +1,31 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Data
+data/
+*.db
+
+# Config with secrets
+backend/config.local.toml
+frontend/.env.local
+
+logs
+
+build
+
+dist
+
+bin
+
+official

@@ -1,0 +1,34 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend
+browserwing
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Data
+data/
+*.db
+
+# Config with secrets
+config.local.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+config.toml
