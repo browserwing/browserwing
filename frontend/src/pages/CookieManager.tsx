@@ -452,33 +452,33 @@ export default function CookieManager() {
               </div>
 
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">📝 如何使用 EditThisCookie 导出？</h4>
+                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">{t('cookie.import.howto.title')}</h4>
                 <div className="text-xs text-blue-800 dark:text-blue-300 space-y-2">
                   <div>
-                    <strong>步骤1：安装扩展</strong>
+                    <strong>{t('cookie.import.howto.step1.title')}</strong>
                     <ol className="list-decimal list-inside ml-2 mt-1 space-y-1">
-                      <li>打开 Chrome 网上应用店</li>
-                      <li>搜索 "EditThisCookie"</li>
-                      <li>点击"添加至 Chrome"安装扩展</li>
+                      <li>{t('cookie.import.howto.step1.item1')}</li>
+                      <li>{t('cookie.import.howto.step1.item2')}</li>
+                      <li>{t('cookie.import.howto.step1.item3')}</li>
                     </ol>
                   </div>
 
                   <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
-                    <strong>步骤2：导出 Cookie</strong>
+                    <strong>{t('cookie.import.howto.step2.title')}</strong>
                     <ol className="list-decimal list-inside ml-2 mt-1 space-y-1">
-                      <li>在已登录的网站页面，点击浏览器右上角的 EditThisCookie 图标</li>
-                      <li>点击左下角的"导出"按钮（文件图标）</li>
-                      <li>选择 "JSON" 格式</li>
-                      <li>Cookie 已复制到剪贴板</li>
-                      <li>粘贴到上方输入框，点击"导入"</li>
+                      <li>{t('cookie.import.howto.step2.item1')}</li>
+                      <li>{t('cookie.import.howto.step2.item2')}</li>
+                      <li>{t('cookie.import.howto.step2.item3')}</li>
+                      <li>{t('cookie.import.howto.step2.item4')}</li>
+                      <li>{t('cookie.import.howto.step2.item5')}</li>
                     </ol>
                   </div>
 
                   <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
-                    <strong>💡 提示：</strong>
+                    <strong>{t('cookie.import.howto.tips.title')}</strong>
                     <ul className="list-disc list-inside ml-2 mt-1">
-                      <li>导入的 Cookie 会与现有 Cookie 合并（相同名称和域名的会被覆盖）</li>
-                      <li>可以多次导入不同网站的 Cookie</li>
+                      <li>{t('cookie.import.howto.tips.item1')}</li>
+                      <li>{t('cookie.import.howto.tips.item2')}</li>
                     </ul>
                   </div>
                 </div>
