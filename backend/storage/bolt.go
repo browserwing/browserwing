@@ -908,3 +908,32 @@ func (b *BoltDB) DeleteToolConfig(id string) error {
 		return bucket.Delete([]byte(id))
 	})
 }
+
+// DeleteToolConfigByScriptID 删除关联指定脚本ID的所有工具配置
+func (b *BoltDB) DeleteToolConfigByScriptID(scriptID string) error {
+	return b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(toolConfigsBucket)
+		// 先收集要删除的 key
+		var keysToDelete [][]byte
+		err := bucket.ForEach(func(k, v []byte) error {
+			var config models.ToolConfig
+			if err := json.Unmarshal(v, &config); err != nil {
+				return err
+			}
+			if config.ScriptID == scriptID {
+				keysToDelete = append(keysToDelete, append([]byte(nil), k...))
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		// 删除收集的 key
+		for _, key := range keysToDelete {
+			if err := bucket.Delete(key); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

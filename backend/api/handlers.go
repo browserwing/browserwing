@@ -489,6 +489,11 @@ func (h *Handler) DeleteScript(c *gin.Context) {
 		return
 	}
 
+	if err := h.db.DeleteToolConfigByScriptID(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.deleteScriptFailed"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "success.scriptDeleted"})
 }
 
@@ -1267,6 +1272,9 @@ func (h *Handler) BatchDeleteScripts(c *gin.Context) {
 	successCount := 0
 	for _, id := range req.ScriptIDs {
 		if err := h.db.DeleteScript(id); err != nil {
+			continue
+		}
+		if err := h.db.DeleteToolConfigByScriptID(id); err != nil {
 			continue
 		}
 		successCount++

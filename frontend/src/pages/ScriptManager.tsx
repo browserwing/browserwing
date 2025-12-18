@@ -87,6 +87,11 @@ export default function ScriptManager() {
   const [paramsDialogScript, setParamsDialogScript] = useState<Script | null>(null)
   const [scriptParameters, setScriptParameters] = useState<string[]>([])
 
+  // 导入确认相关
+  const [showImportConfirm, setShowImportConfirm] = useState(false)
+  const [importData, setImportData] = useState<any>(null)
+  const [duplicateScriptIds, setDuplicateScriptIds] = useState<string[]>([])
+
   const showMessage = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     setMessage(msg)
     setToastType(type)
@@ -585,22 +590,58 @@ export default function ScriptManager() {
 
       try {
         const text = await file.text()
-        const importData = JSON.parse(text)
+        const data = JSON.parse(text)
         
-        if (!importData.scripts || !Array.isArray(importData.scripts)) {
+        if (!data.scripts || !Array.isArray(data.scripts)) {
           showMessage(t('script.messages.invalidFormat'), 'error')
           return
         }
 
-        setLoading(true)
-        let successCount = 0
-        let failCount = 0
+        // 检查是否有重复的ID
+        const existingIds = new Set(scripts.map(s => s.id))
+        const duplicateIds = data.scripts
+          .filter((script: any) => script.id && existingIds.has(script.id))
+          .map((script: any) => script.id)
 
-        for (const script of importData.scripts) {
-          try {
-            // 创建新脚本，使用原有数据但生成新ID
+        if (duplicateIds.length > 0) {
+          // 有重复ID，显示确认对话框
+          setImportData(data)
+          setDuplicateScriptIds(duplicateIds)
+          setShowImportConfirm(true)
+        } else {
+          // 没有重复ID，直接导入
+          await performImport(data, false)
+        }
+      } catch (err) {
+        console.error('解析文件失败:', err)
+        showMessage(t('script.messages.invalidFormat'), 'error')
+      }
+    }
+    input.click()
+  }
+
+  const performImport = async (data: any, overwrite: boolean) => {
+    try {
+      setLoading(true)
+      let successCount = 0
+      let failCount = 0
+      const existingIds = new Set(scripts.map(s => s.id))
+
+      for (const script of data.scripts) {
+        try {
+          if (overwrite && script.id && existingIds.has(script.id)) {
+            // 覆盖现有脚本
+            await api.updateScript(script.id, {
+              name: script.name,
+              description: script.description || '',
+              url: script.url,
+              actions: script.actions,
+            })
+            successCount++
+          } else {
+            // 创建新脚本
             await api.createScript({
-              name: script.name + ' (imported)',
+              name: script.name + t('script.imported'),
               description: script.description || '',
               url: script.url,
               actions: script.actions,
@@ -609,27 +650,41 @@ export default function ScriptManager() {
               can_fetch: script.can_fetch || false,
             })
             successCount++
-          } catch (err) {
-            console.error('导入脚本失败:', script.name, err)
-            failCount++
           }
+        } catch (err) {
+          console.error('导入脚本失败:', script.name, err)
+          failCount++
         }
-
-        await loadScripts()
-        
-        if (failCount === 0) {
-          showMessage(t('script.importSuccess', { count: successCount }), 'success')
-        } else {
-          showMessage(t('script.importPartial', { success: successCount, failed: failCount }), 'info')
-        }
-      } catch (err) {
-        console.error('解析文件失败:', err)
-        showMessage(t('script.messages.invalidFormat'), 'error')
-      } finally {
-        setLoading(false)
       }
+
+      await loadScripts()
+      
+      if (failCount === 0) {
+        showMessage(t('script.importSuccess', { count: successCount }), 'success')
+      } else {
+        showMessage(t('script.importPartial', { success: successCount, failed: failCount }), 'info')
+      }
+    } catch (err) {
+      console.error('导入失败:', err)
+      showMessage(t('script.messages.invalidFormat'), 'error')
+    } finally {
+      setLoading(false)
+      setShowImportConfirm(false)
+      setImportData(null)
+      setDuplicateScriptIds([])
     }
-    input.click()
+  }
+
+  const handleImportOverwrite = () => {
+    if (importData) {
+      performImport(importData, true)
+    }
+  }
+
+  const handleImportCreateNew = () => {
+    if (importData) {
+      performImport(importData, false)
+    }
   }
 
   const handleBatchSetGroup = async () => {
@@ -1803,6 +1858,51 @@ export default function ScriptManager() {
           onConfirm={handleDeleteScript}
           onCancel={() => setDeleteConfirm({ show: false, scriptId: null })}
         />
+      )}
+
+      {/* Import Confirmation Dialog */}
+      {showImportConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                {t('script.import.duplicateTitle')}
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                {t('script.import.duplicateMessage', { count: duplicateScriptIds.length })}
+              </p>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 mb-4 max-h-32 overflow-y-auto">
+                <p className="text-sm text-gray-700 dark:text-gray-300 font-mono">
+                  {duplicateScriptIds.join(', ')}
+                </p>
+              </div>
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowImportConfirm(false)
+                    setImportData(null)
+                    setDuplicateScriptIds([])
+                  }}
+                  className="btn-secondary"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={handleImportCreateNew}
+                  className="btn-secondary"
+                >
+                  {t('script.import.createNew')}
+                </button>
+                <button
+                  onClick={handleImportOverwrite}
+                  className="btn-danger"
+                >
+                  {t('script.import.overwrite')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 批量设置分组对话框 */}

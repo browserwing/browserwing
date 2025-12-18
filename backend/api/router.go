@@ -90,8 +90,8 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			scripts.GET("/play/result", handler.GetPlayResult) // 获取回放抓取的数据
 
 			// MCP 命令相关
-			scripts.POST("/:id/mcp/generate", handler.GenerateMCPConfig)  // AI 生成 MCP 配置
-			scripts.POST("/:id/mcp", handler.ToggleScriptMCPCommand)      // 设置/取消 MCP 命令
+			scripts.POST("/:id/mcp/generate", handler.GenerateMCPConfig) // AI 生成 MCP 配置
+			scripts.POST("/:id/mcp", handler.ToggleScriptMCPCommand)     // 设置/取消 MCP 命令
 
 			// 批量操作
 			scripts.POST("/batch/group", handler.BatchSetGroup)       // 批量设置分组
