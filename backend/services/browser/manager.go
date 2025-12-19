@@ -407,8 +407,8 @@ func (m *Manager) OpenPage(url string, language string) error {
 
 	// 获取窗口实际尺寸并设置Viewport
 	windowInfo, evalErr := page.Eval(`() => ({
-		width: window.screen.availWidth,
-		height: window.screen.availHeight
+		width: window.innerWidth,
+		height: window.innerHeight
 	})`)
 	if evalErr == nil && windowInfo != nil {
 		if info, ok := windowInfo.Value.Val().(map[string]interface{}); ok {

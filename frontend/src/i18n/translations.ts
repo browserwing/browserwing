@@ -89,7 +89,7 @@ export const translations = {
     'success.recordingStarted': '录制已开始',
     'success.recordingStopped': '录制已停止',
     'success.mcpCommandDisabled': 'MCP命令已禁用',
-    'success.mcpCommandSet': '设置为MCP命令: {0}',
+    'success.mcpCommandSet': '设置为MCP命令',
     'success.scriptSaved': '脚本已保存',
     'success.executionRecordDeleted': '执行记录已删除',
     'success.recordingConfigUpdated': '录制配置已更新',
@@ -1565,8 +1565,8 @@ export const translations = {
     'cookie.messages.exportSuccess': '成功匯出 {count} 個 Cookie',
     'cookie.messages.exportError': '匯出失敗',
 
-    'success.mcpCommandDisabled': '已禁用為MCP命令: {0}',
-    'success.mcpCommandSet': '已設置MCP命令: {0}',
+    'success.mcpCommandDisabled': '已禁用為MCP命令',
+    'success.mcpCommandSet': '已設置MCP命令',
   },
 
   'en': {
@@ -1662,8 +1662,8 @@ export const translations = {
     'success.executionRecordDeleted': 'Execution record deleted',
     'success.recordingConfigUpdated': 'Recording config updated',
 
-    'success.mcpCommandDisabled': 'Disabled MCP command: {0}',
-    'success.mcpCommandSet': 'Set MCP command: {0}',
+    'success.mcpCommandDisabled': 'Disabled MCP command',
+    'success.mcpCommandSet': 'Set MCP command',
 
     // Navigation
     'nav.browser': 'Browser',
@@ -2446,8 +2446,8 @@ export const translations = {
     'success.executionRecordDeleted': 'Registro de ejecución eliminado',
     'success.recordingConfigUpdated': 'Configuración de grabación actualizada',
 
-    'success.mcpCommandDisabled': 'Comando MCP deshabilitado: {0}',
-    'success.mcpCommandSet': 'Comando MCP establecido: {0}',
+    'success.mcpCommandDisabled': 'Comando MCP deshabilitado',
+    'success.mcpCommandSet': 'Comando MCP establecido',
 
     // Navegación
     'nav.browser': 'Navegador',
