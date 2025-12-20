@@ -1395,7 +1395,7 @@ if (window.__browserwingRecorder__) {
 		hideHighlight();
 	});
 	
-	// 监听点击事件 - 使用capture模式并立即停止传播,防止重复记录
+	// 监听点击事件 - 使用capture模式记录操作
 	document.addEventListener('click', function(e) {
 		if (!window.__isRecordingActive__) return;
 		
@@ -1408,10 +1408,7 @@ if (window.__browserwingRecorder__) {
 			if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
 			if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
 			
-			// 立即停止事件传播,防止重复记录
-			e.stopImmediatePropagation();
-			
-			// 如果在 AI 填充表单模式下，调用 AI 生成
+			// 如果在 AI 填充表单模式下，阻止默认行为并调用 AI 生成
 			if (window.__aiFormFillMode__) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -1419,7 +1416,7 @@ if (window.__browserwingRecorder__) {
 				return false;
 			}
 			
-			// 如果在 AI 提取模式下，调用 AI 生成
+			// 如果在 AI 提取模式下，阻止默认行为并调用 AI 生成
 			if (window.__aiExtractMode__) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -1427,13 +1424,15 @@ if (window.__browserwingRecorder__) {
 				return false;
 			}
 			
-			// 如果在抓取模式下，记录抓取操作而不是点击
+			// 如果在抓取模式下，阻止默认行为并记录抓取操作
 			if (window.__extractMode__) {
 				e.preventDefault();
 				e.stopPropagation();
 				recordExtractAction(target, 'text', null);
 				return false;
 			}
+			
+			// 普通录制模式：不阻止事件传播，让原来的点击事件正常执行
 			
 			// 检查是否点击了文件上传按钮（input[type=file] 或者触发文件选择的按钮）
 			var isFileInput = target.tagName.toLowerCase() === 'input' && target.type === 'file';
