@@ -50,26 +50,22 @@ if (window.__browserwingRecorder__) {
 			
 		// 创建按钮区域
 		var buttonArea = document.createElement('div');
-		buttonArea.style.cssText = 'padding:16px 20px;display:flex;gap:10px;border-bottom:1px solid rgba(0,0,0,0.05);background:transparent;';
+		buttonArea.style.cssText = 'padding:12px 16px;display:flex;gap:8px;border-bottom:1px solid #e5e7eb;background:white;';
 		
 		var extractBtn = document.createElement('button');
 		extractBtn.id = '__browserwing_extract_btn__';
-		extractBtn.style.cssText = 'flex:1;padding:8px 14px;background:white;color:#334155;border:1.5px solid rgba(0,0,0,0.12);border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:-0.01em;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+		extractBtn.style.cssText = 'flex:1;padding:5px 12px;background:white;color:#374151;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
 		extractBtn.textContent = '{{DATA_EXTRACT}}';
 		extractBtn.onmouseover = function() {
 			if (!window.__extractMode__) {
-				this.style.background = '#f8fafc';
-				this.style.borderColor = 'rgba(0,0,0,0.18)';
-				this.style.transform = 'translateY(-1px)';
-				this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+				this.style.background = '#f9fafb';
+				this.style.borderColor = '#9ca3af';
 			}
 		};
 		extractBtn.onmouseout = function() {
 			if (!window.__extractMode__) {
 				this.style.background = 'white';
-				this.style.borderColor = 'rgba(0,0,0,0.12)';
-				this.style.transform = 'translateY(0)';
-				this.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+				this.style.borderColor = '#d1d5db';
 			}
 		};
 		extractBtn.onclick = function() {
@@ -80,17 +76,15 @@ if (window.__browserwingRecorder__) {
 		
 		var aiExtractBtn = document.createElement('button');
 		aiExtractBtn.id = '__browserwing_ai_extract_btn__';
-		aiExtractBtn.style.cssText = 'flex:1;padding:8px 14px;background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:white;border:1.5px solid rgba(0,0,0,0.1);border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:-0.01em;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 2px 8px rgba(15,23,42,0.2), 0 1px 3px rgba(0,0,0,0.1);';
+		aiExtractBtn.style.cssText = 'flex:1;padding:5px 12px;background:#1f2937;color:white;border:1px solid #1f2937;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
 		aiExtractBtn.textContent = '{{AI_EXTRACT}}';
 		aiExtractBtn.onmouseover = function() {
-			this.style.background = 'linear-gradient(135deg,#0f172a 0%,#020617 100%)';
-			this.style.transform = 'translateY(-1px)';
-			this.style.boxShadow = '0 4px 12px rgba(15,23,42,0.3), 0 2px 4px rgba(0,0,0,0.15)';
+			this.style.background = '#111827';
+			this.style.borderColor = '#111827';
 		};
 		aiExtractBtn.onmouseout = function() {
-			this.style.background = 'linear-gradient(135deg,#1e293b 0%,#0f172a 100%)';
-			this.style.transform = 'translateY(0)';
-			this.style.boxShadow = '0 2px 8px rgba(15,23,42,0.2), 0 1px 3px rgba(0,0,0,0.1)';
+			this.style.background = '#1f2937';
+			this.style.borderColor = '#1f2937';
 		};
 		aiExtractBtn.onclick = function() {
 			if (!panel.__isDragging) {
@@ -100,17 +94,15 @@ if (window.__browserwingRecorder__) {
 		
 		var aiFormFillBtn = document.createElement('button');
 		aiFormFillBtn.id = '__browserwing_ai_formfill_btn__';
-		aiFormFillBtn.style.cssText = 'flex:1;padding:8px 14px;background:linear-gradient(135deg,#64748b 0%,#475569 100%);color:white;border:1.5px solid rgba(0,0,0,0.1);border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:-0.01em;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 2px 8px rgba(71,85,105,0.2), 0 1px 3px rgba(0,0,0,0.1);';
+		aiFormFillBtn.style.cssText = 'flex:1;padding:5px 12px;background:#6b7280;color:white;border:1px solid #6b7280;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;';
 		aiFormFillBtn.textContent = '{{AI_FORMFILL}}';
 		aiFormFillBtn.onmouseover = function() {
-			this.style.background = 'linear-gradient(135deg,#475569 0%,#334155 100%)';
-			this.style.transform = 'translateY(-1px)';
-			this.style.boxShadow = '0 4px 12px rgba(71,85,105,0.3), 0 2px 4px rgba(0,0,0,0.15)';
+			this.style.background = '#4b5563';
+			this.style.borderColor = '#4b5563';
 		};
 		aiFormFillBtn.onmouseout = function() {
-			this.style.background = 'linear-gradient(135deg,#64748b 0%,#475569 100%)';
-			this.style.transform = 'translateY(0)';
-			this.style.boxShadow = '0 2px 8px rgba(71,85,105,0.2), 0 1px 3px rgba(0,0,0,0.1)';
+			this.style.background = '#6b7280';
+			this.style.borderColor = '#6b7280';
 		};
 		aiFormFillBtn.onclick = function() {
 			if (!panel.__isDragging) {
@@ -124,17 +116,17 @@ if (window.__browserwingRecorder__) {
 
 		var actionList = document.createElement('div');
 		actionList.id = '__browserwing_action_list__';
-		actionList.style.cssText = 'max-height:280px;overflow-y:auto;padding:12px;background:transparent;';
+		actionList.style.cssText = 'max-height:240px;overflow-y:auto;padding:8px;background:white;';
 		
 	var emptyState = document.createElement('div');
 	emptyState.id = '__browserwing_empty_state__';
-	emptyState.style.cssText = 'padding:32px 24px;text-align:center;color:#94a3b8;font-size:13px;font-weight:500;letter-spacing:-0.01em;';
+	emptyState.style.cssText = 'padding:24px;text-align:center;color:#6b7280;font-size:13px;';
 	emptyState.textContent = '{{EMPTY_STEPS}}';
 	
 	actionList.appendChild(emptyState);		// 创建当前操作提示区域
 		var currentAction = document.createElement('div');
 		currentAction.id = '__browserwing_current_action__';
-		currentAction.style.cssText = 'display:none;padding:14px 20px;background:rgba(248,250,252,0.8);border-top:1px solid rgba(0,0,0,0.05);color:#475569;font-size:12px;font-weight:500;line-height:1.5;letter-spacing:-0.01em;';
+		currentAction.style.cssText = 'display:none;padding:12px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;color:#374151;font-size:12px;line-height:1.5;';
 		
 		// 添加拖动功能
 		var isDragging = false;
@@ -186,17 +178,17 @@ if (window.__browserwingRecorder__) {
 		// 创建结束录制按钮区域
 		var stopRecordingArea = document.createElement('div');
 		stopRecordingArea.id = '__browserwing_stop_recording_area__';
-		stopRecordingArea.style.cssText = 'padding:16px 20px 20px;background:transparent;border-top:1px solid rgba(0,0,0,0.05);';
+		stopRecordingArea.style.cssText = 'padding:12px 16px;background:white;border-top:1px solid #e5e7eb;';
 		
 	var stopRecordingBtn = document.createElement('button');
 	stopRecordingBtn.id = '__browserwing_stop_recording_btn__';
-	stopRecordingBtn.style.cssText = 'width:100%;padding:14px 20px;background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:white;border:none;border-radius:12px;cursor:pointer;font-size:14px;font-weight:600;letter-spacing:-0.01em;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 4px 12px rgba(239,68,68,0.25), 0 2px 4px rgba(0,0,0,0.1);';
+	stopRecordingBtn.style.cssText = 'width:100%;padding:10px 16px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s;';
 	stopRecordingBtn.textContent = '{{STOP_RECORDING}}';
 	stopRecordingBtn.onmouseover = function() {
-		this.style.background = 'linear-gradient(135deg,#dc2626 0%,#b91c1c 100%)'; this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 6px 20px rgba(239,68,68,0.35), 0 4px 8px rgba(0,0,0,0.15)';
+		this.style.background = '#b91c1c';
 	};
 	stopRecordingBtn.onmouseout = function() {
-		this.style.background = 'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)'; this.style.transform = 'translateY(0)'; this.style.boxShadow = '0 4px 12px rgba(239,68,68,0.25), 0 2px 4px rgba(0,0,0,0.1)';
+		this.style.background = '#dc2626';
 	};
 	stopRecordingBtn.onclick = async function() {
 		// 使用轮询方式通知后端停止录制,而不是直接调用API
@@ -216,7 +208,7 @@ if (window.__browserwingRecorder__) {
 		// 创建抓取类型选择菜单
 		var menu = document.createElement('div');
 		menu.id = '__browserwing_extract_menu__';
-		menu.style.cssText = 'display:none;position:fixed;background:white;border:1px solid rgba(0,0,0,0.08);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.04);z-index:1000000;padding:6px;min-width:180px;backdrop-filter:blur(10px);';
+		menu.style.cssText = 'display:none;position:fixed;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.1);z-index:1000000;padding:4px;min-width:160px;';
 		
 		var menuItems = [
 			{type: 'text', label: '{{EXTRACT_TEXT}}'},
@@ -227,10 +219,10 @@ if (window.__browserwingRecorder__) {
 		for (var i = 0; i < menuItems.length; i++) {
 			var item = document.createElement('div');
 			item.setAttribute('data-type', menuItems[i].type);
-			item.style.cssText = 'padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;border-radius:8px;color:#334155;letter-spacing:-0.01em;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);';
+			item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:13px;border-radius:4px;color:#374151;transition:background 0.15s;';
 			item.textContent = menuItems[i].label;
-			item.onmouseover = function() { this.style.background = '#f1f5f9'; this.style.color = '#0f172a'; };
-			item.onmouseout = function() { this.style.background = 'transparent'; this.style.color = '#334155'; };
+			item.onmouseover = function() { this.style.background = '#f3f4f6'; };
+			item.onmouseout = function() { this.style.background = 'transparent'; };
 			menu.appendChild(item);
 		}
 		
@@ -378,7 +370,7 @@ if (window.__browserwingRecorder__) {
 		}
 		
 		var item = document.createElement('div');
-		item.style.cssText = 'padding:12px 14px;margin:6px 0;background:white;border:1px solid rgba(0,0,0,0.08);border-radius:10px;font-size:12px;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 1px 2px rgba(0,0,0,0.04);';
+		item.style.cssText = 'padding:10px 12px;margin:4px 0;background:white;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;transition:all 0.2s;';
 		item.onmouseover = function() {
 			this.style.background = '#f9fafb';
 			this.style.borderColor = '#d1d5db';
@@ -392,7 +384,7 @@ if (window.__browserwingRecorder__) {
 		header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;';
 		
 		var typeLabel = document.createElement('span');
-		typeLabel.style.cssText = 'font-weight:700;color:#0f172a;font-size:13px;letter-spacing:-0.01em;';
+		typeLabel.style.cssText = 'font-weight:600;color:#111827;';
 		
 		var typeText = action.type;
 		if (action.type.startsWith('extract_')) {
@@ -405,14 +397,14 @@ if (window.__browserwingRecorder__) {
 		typeLabel.textContent = '#' + (index + 1) + ' ' + typeText.charAt(0).toUpperCase() + typeText.slice(1);
 		
 		var indexLabel = document.createElement('span');
-		indexLabel.style.cssText = 'font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:-0.01em;';
+		indexLabel.style.cssText = 'font-size:11px;color:#9ca3af;font-weight:500;';
 		indexLabel.textContent = new Date(action.timestamp).toLocaleTimeString();
 		
 		header.appendChild(typeLabel);
 		header.appendChild(indexLabel);
 		
 		var details = document.createElement('div');
-		details.style.cssText = 'color:#64748b;font-size:11px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;';
+		details.style.cssText = 'color:#6b7280;font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 		
 		var detailText = '';
 		
@@ -502,16 +494,12 @@ if (window.__browserwingRecorder__) {
 			ui.extractBtn.style.color = '#374151';
 			ui.extractBtn.style.borderColor = '#d1d5db';
 			ui.extractBtn.onmouseover = function() {
-				this.style.background = '#f8fafc';
-				this.style.borderColor = 'rgba(0,0,0,0.18)';
-				this.style.transform = 'translateY(-1px)';
-				this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+				this.style.background = '#f9fafb';
+				this.style.borderColor = '#9ca3af';
 			};
 			ui.extractBtn.onmouseout = function() {
 				this.style.background = 'white';
-				this.style.borderColor = 'rgba(0,0,0,0.12)';
-				this.style.transform = 'translateY(0)';
-				this.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+				this.style.borderColor = '#d1d5db';
 			};
 			ui.menu.style.display = 'none';
 			document.body.style.cursor = 'default';

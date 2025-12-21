@@ -229,23 +229,23 @@ var RecorderI18n = map[string]map[string]string{
 // FloatButtonI18n 浮动按钮的多语言文本映射
 var FloatButtonI18n = map[string]map[string]string{
 	"zh-CN": {
-		"TITLE":        "Browserwing Pilot",
+		"TITLE":        "Browserwing",
 		"START_RECORD": "开始录制页面",
 	},
 	"zh-TW": {
-		"TITLE":        "Browserwing Pilot",
+		"TITLE":        "Browserwing",
 		"START_RECORD": "開始錄製頁面",
 	},
 	"en": {
-		"TITLE":        "Browserwing Pilot",
+		"TITLE":        "Browserwing",
 		"START_RECORD": "Start Recording",
 	},
 	"es": {
-		"TITLE":        "Browserwing Pilot",
+		"TITLE":        "Browserwing",
 		"START_RECORD": "Iniciar Grabación",
 	},
 	"ja": {
-		"TITLE":        "Browserwing Pilot",
+		"TITLE":        "Browserwing",
 		"START_RECORD": "記録を開始",
 	},
 }

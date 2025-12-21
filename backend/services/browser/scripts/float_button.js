@@ -6,33 +6,33 @@ if (!window.__browserwingFloatButton__) {
 function createFloatingRecordButton() {
     window.__browserwingFloatButton__ = true;
 	
-	// 创建主面板 - 类似录制面板风格
+	// 创建主面板 - 现代化设计风格
 	var panel = document.createElement('div');
 	panel.id = '__browserwing_float_panel__';
-	panel.style.cssText = 'position: fixed !important;top: 20px !important;right: 20px !important;z-index: 2147483647 !important;font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important;width: 280px !important;background: white !important;border-radius: 8px !important;box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;border: 1px solid #e5e7eb !important;overflow: hidden !important;opacity: 1 !important;visibility: visible !important;';
+	panel.style.cssText = 'position: fixed !important;top: 20px !important;right: 20px !important;z-index: 2147483647 !important;font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Helvetica, Arial, sans-serif !important;width: 320px !important;background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;border-radius: 16px !important;box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04) !important;border: 1px solid rgba(0, 0, 0, 0.06) !important;overflow: hidden !important;opacity: 1 !important;visibility: visible !important;backdrop-filter: blur(10px) !important;';
 	
 	// 创建头部区域（可拖动）
 	var header = document.createElement('div');
-	header.style.cssText = 'padding: 14px 16px !important;background: #fafafa !important;cursor: move !important;user-select: none !important;display: flex !important;align-items: center !important;justify-content: center !important;border-bottom: 1px solid #e5e7eb !important;';
+	header.style.cssText = 'padding: 20px 24px 16px !important;background: transparent !important;cursor: move !important;user-select: none !important;display: flex !important;align-items: center !important;justify-content: center !important;border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;';
 	
 	var title = document.createElement('div');
-	title.style.cssText = 'color: #1f2937 !important;font-size: 14px !important;font-weight: 600 !important;opacity: 1 !important;visibility: visible !important;';
+	title.style.cssText = 'color: #0f172a !important;font-size: 15px !important;font-weight: 600 !important;letter-spacing: -0.01em !important;opacity: 1 !important;visibility: visible !important;';
 	title.textContent = '{{TITLE}}';
 	
 	header.appendChild(title);
 	
 	// 创建按钮区域
 	var buttonArea = document.createElement('div');
-	buttonArea.style.cssText = 'padding: 16px !important;background: white !important;opacity: 1 !important;visibility: visible !important;';
+	buttonArea.style.cssText = 'padding: 20px 24px 24px !important;background: transparent !important;opacity: 1 !important;visibility: visible !important;';
 	
 	// 开始录制按钮
 	var startBtn = document.createElement('button');
 	startBtn.id = '__browserwing_start_record_btn__';
-	startBtn.style.cssText = 'width: 100% !important;padding: 12px 16px !important;background: #dc2626 !important;color: white !important;border: none !important;border-radius: 6px !important;cursor: pointer !important;font-size: 14px !important;font-weight: 600 !important;transition: all 0.2s !important;display: flex !important;align-items: center !important;justify-content: center !important;gap: 8px !important;opacity: 1 !important;visibility: visible !important;';
+	startBtn.style.cssText = 'width: 100% !important;padding: 14px 20px !important;background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;color: white !important;border: none !important;border-radius: 12px !important;cursor: pointer !important;font-size: 14px !important;font-weight: 600 !important;letter-spacing: -0.01em !important;transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;display: flex !important;align-items: center !important;justify-content: center !important;gap: 10px !important;opacity: 1 !important;visibility: visible !important;box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1) !important;';
 	
 	// 录制图标
 	var icon = document.createElement('div');
-	icon.style.cssText = 'width: 8px !important;height: 8px !important;border-radius: 50% !important;background: white !important;opacity: 1 !important;visibility: visible !important;flex-shrink: 0 !important;';
+	icon.style.cssText = 'width: 10px !important;height: 10px !important;border-radius: 50% !important;background: white !important;opacity: 0.95 !important;visibility: visible !important;flex-shrink: 0 !important;box-shadow: 0 0 8px rgba(255, 255, 255, 0.4) !important;';
 	
 	var btnText = document.createElement('span');
 	btnText.style.cssText = 'opacity: 1 !important;visibility: visible !important;';
@@ -43,10 +43,14 @@ function createFloatingRecordButton() {
 	
 	// 悬停效果
 	startBtn.onmouseover = function() {
-		this.style.background = '#b91c1c';
+		this.style.background = 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
+		this.style.transform = 'translateY(-2px)';
+		this.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.35), 0 4px 8px rgba(0, 0, 0, 0.15)';
 	};
 	startBtn.onmouseout = function() {
-		this.style.background = '#dc2626';
+		this.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+		this.style.transform = 'translateY(0)';
+		this.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1)';
 	};
 	
 	// 点击事件
@@ -115,5 +119,5 @@ function createFloatingRecordButton() {
 	});
 	
 	document.body.appendChild(panel);
-	console.log('[BrowserWing] Browserwing Pilot panel initialized');
+	console.log('[BrowserWing] Browserwing panel initialized');
 }
