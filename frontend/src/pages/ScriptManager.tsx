@@ -531,6 +531,12 @@ export default function ScriptManager() {
       newAction.scroll_y = 0
     }
 
+    // 为键盘事件类型设置默认值
+    if (type === 'keyboard') {
+      newAction.key = 'enter'
+      newAction.description = t('script.action.keyboardDefault')
+    }
+
     setEditingActions([...editingActions, newAction])
   }
 
@@ -1576,6 +1582,13 @@ export default function ScriptManager() {
                                     >
                                       + Upload File
                                     </button>
+                                    <button
+                                      onClick={() => handleAddAction('keyboard')}
+                                      className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
+                                      title={t('script.editor.addKeyboard')}
+                                    >
+                                      + Keyboard
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -2560,7 +2573,7 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
             <span className="font-semibold text-base text-gray-900 dark:text-gray-100">{t(action.type)}</span>
           </div>
           <div className="space-y-3">
-            {action.type !== 'sleep' && action.type !== 'wait' && action.type !== 'execute_js' && action.type !== 'upload_file' && action.type !== 'scroll' && (
+            {action.type !== 'sleep' && action.type !== 'wait' && action.type !== 'execute_js' && action.type !== 'upload_file' && action.type !== 'scroll' && action.type !== 'keyboard' && (
               <>
                 <div>
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.selector')}</label>
@@ -2756,6 +2769,46 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
                 </div>
               </>
             )}
+            {action.type === 'keyboard' && (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.key')}</label>
+                  <select
+                    value={action.key || 'enter'}
+                    onChange={(e) => onUpdate(index, 'key', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="enter">Enter (回车键)</option>
+                    <option value="tab">Tab (切换)</option>
+                    <option value="ctrl+a">Ctrl+A (全选)</option>
+                    <option value="ctrl+c">Ctrl+C (复制)</option>
+                    <option value="ctrl+v">Ctrl+V (粘贴)</option>
+                  </select>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('script.action.keyHint')}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.selector')} ({t('script.action.optional')})</label>
+                  <input
+                    type="text"
+                    value={action.selector || ''}
+                    onChange={(e) => onUpdate(index, 'selector', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg font-mono bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="CSS 选择器（可选）"
+                  />
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('script.action.keyboardSelectorHint')}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.description')} ({t('script.action.optional')})</label>
+                  <input
+                    type="text"
+                    value={action.description || ''}
+                    onChange={(e) => onUpdate(index, 'description', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={t('script.action.keyboardDescPlaceholder')}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-2">
@@ -2899,6 +2952,24 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="font-medium">{t('script.action.acceptTypes')}</span>{' '}
                 <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-sm">{action.accept}</code>
+              </div>
+            )}
+          </>
+        )}
+        {action.type === 'keyboard' && (
+          <>
+            {action.key && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="font-medium">{t('script.action.key')}</span>{' '}
+                <kbd className="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 rounded font-mono text-sm font-semibold text-gray-900 dark:text-gray-100 shadow-sm">
+                  {action.key}
+                </kbd>
+              </div>
+            )}
+            {action.description && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="font-medium">{t('script.action.description')}</span>{' '}
+                <span className="text-gray-800 dark:text-gray-200">{action.description}</span>
               </div>
             )}
           </>

@@ -194,6 +194,8 @@ export interface ScriptAction {
   text?: string
   tag_name?: string
   attrs?: Record<string, string>
+  // 键盘事件相关字段
+  key?: string
   // 数据抓取相关字段
   extract_type?: string
   attribute_name?: string

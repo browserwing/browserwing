@@ -485,6 +485,8 @@ func (p *Player) executeAction(ctx context.Context, page *rod.Page, action model
 		return p.executeUploadFile(ctx, page, action)
 	case "scroll":
 		return p.executeScroll(ctx, page, action)
+	case "keyboard":
+		return p.executeKeyboard(ctx, page, action)
 	default:
 		logger.Warn(ctx, "Unknown action type: %s", action.Type)
 		return nil
@@ -1370,4 +1372,141 @@ func (p *Player) executeUploadFile(ctx context.Context, page *rod.Page, action m
 	}
 
 	return fmt.Errorf("file upload failed after %d retries", maxRetries)
+}
+
+// executeKeyboard 执行键盘事件操作
+func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action models.ScriptAction) error {
+	key := action.Key
+	if key == "" {
+		return fmt.Errorf("keyboard action missing key")
+	}
+
+	logger.Info(ctx, "Executing keyboard action: %s", key)
+
+	var element *rod.Element
+	var err error
+
+	// 如果有选择器，先定位到目标元素并聚焦
+	if action.Selector != "" || action.XPath != "" {
+		elementInfo, findErr := p.findElementWithContext(ctx, page, action)
+		if findErr != nil {
+			logger.Warn(ctx, "Failed to find target element for keyboard action, executing on page: %v", findErr)
+		} else {
+			element = elementInfo.element
+			page = elementInfo.page // 使用正确的 page（可能是 iframe 的 frame）
+
+			// 等待元素可见
+			if err := element.WaitVisible(); err != nil {
+				logger.Warn(ctx, "Element not visible: %v", err)
+			}
+
+			// 滚动到元素可见
+			if err := element.ScrollIntoView(); err != nil {
+				logger.Warn(ctx, "Failed to scroll to element: %v", err)
+			}
+
+			// 高亮显示元素
+			p.highlightElement(ctx, element)
+			defer p.unhighlightElement(ctx, element)
+
+			// 聚焦元素
+			if err := element.Focus(); err != nil {
+				logger.Warn(ctx, "Failed to focus element: %v", err)
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+
+	// 执行键盘操作
+	switch key {
+	case "ctrl+a":
+		// 全选操作：Ctrl+A (Windows/Linux) 或 Cmd+A (Mac)
+		logger.Info(ctx, "Executing select all (Ctrl+A)")
+		keyboard := page.Keyboard
+		// 按下 Ctrl 键
+		err = keyboard.Press(input.ControlLeft)
+		if err != nil {
+			return fmt.Errorf("failed to press Ctrl: %w", err)
+		}
+		// 按下 A 键
+		err = keyboard.Type(input.KeyA)
+		if err != nil {
+			keyboard.Release(input.ControlLeft) // 释放 Ctrl
+			return fmt.Errorf("failed to press A: %w", err)
+		}
+		// 释放 Ctrl 键
+		err = keyboard.Release(input.ControlLeft)
+		if err != nil {
+			return fmt.Errorf("failed to release Ctrl: %w", err)
+		}
+
+	case "ctrl+c":
+		// 复制操作：Ctrl+C (Windows/Linux) 或 Cmd+C (Mac)
+		logger.Info(ctx, "Executing copy (Ctrl+C)")
+		keyboard := page.Keyboard
+		// 按下 Ctrl 键
+		err = keyboard.Press(input.ControlLeft)
+		if err != nil {
+			return fmt.Errorf("failed to press Ctrl: %w", err)
+		}
+		// 按下 C 键
+		err = keyboard.Type(input.KeyC)
+		if err != nil {
+			keyboard.Release(input.ControlLeft) // 释放 Ctrl
+			return fmt.Errorf("failed to press C: %w", err)
+		}
+		// 释放 Ctrl 键
+		err = keyboard.Release(input.ControlLeft)
+		if err != nil {
+			return fmt.Errorf("failed to release Ctrl: %w", err)
+		}
+
+	case "ctrl+v":
+		// 粘贴操作：Ctrl+V (Windows/Linux) 或 Cmd+V (Mac)
+		logger.Info(ctx, "Executing paste (Ctrl+V)")
+		keyboard := page.Keyboard
+		// 按下 Ctrl 键
+		err = keyboard.Press(input.ControlLeft)
+		if err != nil {
+			return fmt.Errorf("failed to press Ctrl: %w", err)
+		}
+		// 按下 V 键
+		err = keyboard.Type(input.KeyV)
+		if err != nil {
+			keyboard.Release(input.ControlLeft) // 释放 Ctrl
+			return fmt.Errorf("failed to press V: %w", err)
+		}
+		// 释放 Ctrl 键
+		err = keyboard.Release(input.ControlLeft)
+		if err != nil {
+			return fmt.Errorf("failed to release Ctrl: %w", err)
+		}
+
+	case "tab":
+		// Tab 键
+		logger.Info(ctx, "Executing Tab key")
+		keyboard := page.Keyboard
+		err = keyboard.Type(input.Tab)
+		if err != nil {
+			return fmt.Errorf("failed to press Tab: %w", err)
+		}
+
+	case "enter":
+		// 回车键
+		logger.Info(ctx, "Executing Enter key")
+		keyboard := page.Keyboard
+		err = keyboard.Type(input.Enter)
+		if err != nil {
+			return fmt.Errorf("failed to press Enter: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("unsupported keyboard key: %s", key)
+	}
+
+	// 等待一下让操作生效
+	time.Sleep(300 * time.Millisecond)
+
+	logger.Info(ctx, "✓ Keyboard action completed: %s", key)
+	return nil
 }

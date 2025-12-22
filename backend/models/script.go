@@ -6,7 +6,7 @@ import (
 
 // ScriptAction 脚本操作步骤
 type ScriptAction struct {
-	Type      string            `json:"type"`      // click, input, select, navigate, wait, sleep, extract_text, extract_attribute, extract_html, execute_js, upload_file
+	Type      string            `json:"type"`      // click, input, select, navigate, wait, sleep, extract_text, extract_attribute, extract_html, execute_js, upload_file, scroll, keyboard
 	Timestamp int64             `json:"timestamp"` // 时间戳（毫秒）
 	Selector  string            `json:"selector"`  // CSS选择器
 	XPath     string            `json:"xpath"`     // XPath选择器（更可靠）
@@ -18,6 +18,9 @@ type ScriptAction struct {
 	Text      string            `json:"text"`      // 元素文本内容
 	TagName   string            `json:"tag_name"`  // 元素标签名
 	Attrs     map[string]string `json:"attrs"`     // 元素属性
+
+	// 键盘事件相关字段
+	Key string `json:"key,omitempty"` // 键盘按键（用于 keyboard 类型，如 "ctrl+c", "ctrl+v", "enter"）
 
 	// 数据抓取相关字段
 	ExtractType   string `json:"extract_type,omitempty"`   // 抓取类型: text, attribute, html

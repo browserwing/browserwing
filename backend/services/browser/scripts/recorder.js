@@ -1648,6 +1648,19 @@ if (window.__browserwingRecorder__) {
 			var selectors = getSelector(target);
 			var selectorKey = selectors.css || selectors.xpath;  // 用作定时器 key
 			
+			// 检查上一个动作是否是 Ctrl+V 粘贴（针对同一个元素）
+			if (window.__recordedActions__.length > 0) {
+				var lastAction = window.__recordedActions__[window.__recordedActions__.length - 1];
+				// 如果上一个动作是 ctrl+v，且目标元素相同，则跳过 input 录制
+				if (lastAction.type === 'keyboard' && lastAction.key === 'ctrl+v') {
+					var lastSelector = lastAction.selector || lastAction.xpath;
+					if (lastSelector && (lastSelector === selectors.css || lastSelector === selectors.xpath)) {
+						console.log('[BrowserWing] Skipping input event after ctrl+v on same element');
+						return;
+					}
+				}
+			}
+			
 			// 清除之前的定时器
 			if (window.__inputTimers__[selectorKey]) {
 				clearTimeout(window.__inputTimers__[selectorKey]);
@@ -1693,6 +1706,24 @@ if (window.__browserwingRecorder__) {
 			
 			var selectors = getSelector(target);
 			var selectorKey = selectors.css || selectors.xpath;
+			
+			// 检查上一个动作是否是 Ctrl+V 粘贴（针对同一个元素）
+			if (window.__recordedActions__.length > 0) {
+				var lastAction = window.__recordedActions__[window.__recordedActions__.length - 1];
+				// 如果上一个动作是 ctrl+v，且目标元素相同，则跳过 blur 时的 input 录制
+				if (lastAction.type === 'keyboard' && lastAction.key === 'ctrl+v') {
+					var lastSelector = lastAction.selector || lastAction.xpath;
+					if (lastSelector && (lastSelector === selectors.css || lastSelector === selectors.xpath)) {
+						console.log('[BrowserWing] Skipping blur input event after ctrl+v on same element');
+						// 清除定时器
+						if (window.__inputTimers__[selectorKey]) {
+							clearTimeout(window.__inputTimers__[selectorKey]);
+							delete window.__inputTimers__[selectorKey];
+						}
+						return;
+					}
+				}
+			}
 			
 			// 清除防抖定时器
 			if (window.__inputTimers__[selectorKey]) {
@@ -1889,6 +1920,127 @@ if (window.__browserwingRecorder__) {
 		}
 		
 		return false;
+	}, true);
+	
+	// ============= 键盘事件监听 =============
+	// 监听键盘事件 - 支持 Ctrl+C、Ctrl+V、Enter
+	document.addEventListener('keydown', function(e) {
+		if (!window.__isRecordingActive__) return;
+		
+		try {
+			var target = e.target || e.srcElement;
+			if (!target) return;
+			
+			// 忽略录制器 UI 自身的键盘事件
+			if (target.id && target.id.indexOf('__browserwing_') === 0) return;
+			if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
+			
+			var keyAction = null;
+			
+			// 检测 Ctrl+A (Windows/Linux) 或 Cmd+A (Mac)
+			if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+				keyAction = {
+					type: 'keyboard',
+					timestamp: Date.now(),
+					key: 'ctrl+a',
+					description: '{{KEYBOARD_SELECT_ALL}}',
+					tagName: target.tagName ? target.tagName.toLowerCase() : ''
+				};
+				
+				// 如果在输入框或contenteditable中，记录选择器
+				if (target.tagName) {
+					var tagName = target.tagName.toLowerCase();
+					if (tagName === 'input' || tagName === 'textarea' || target.contentEditable === 'true') {
+						var selectors = getSelector(target);
+						keyAction.selector = selectors.css;
+						keyAction.xpath = selectors.xpath;
+					}
+				}
+			}
+			// 检测 Ctrl+C (Windows/Linux) 或 Cmd+C (Mac)
+			else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+				keyAction = {
+					type: 'keyboard',
+					timestamp: Date.now(),
+					key: 'ctrl+c',
+					description: '{{KEYBOARD_COPY}}',
+					tagName: target.tagName ? target.tagName.toLowerCase() : ''
+				};
+				
+				// 如果在输入框或contenteditable中，记录选择器
+				if (target.tagName) {
+					var tagName = target.tagName.toLowerCase();
+					if (tagName === 'input' || tagName === 'textarea' || target.contentEditable === 'true') {
+						var selectors = getSelector(target);
+						keyAction.selector = selectors.css;
+						keyAction.xpath = selectors.xpath;
+					}
+				}
+			}
+			// 检测 Ctrl+V (Windows/Linux) 或 Cmd+V (Mac)
+			else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+				keyAction = {
+					type: 'keyboard',
+					timestamp: Date.now(),
+					key: 'ctrl+v',
+					description: '{{KEYBOARD_PASTE}}',
+					tagName: target.tagName ? target.tagName.toLowerCase() : ''
+				};
+				
+				// 如果在输入框或contenteditable中，记录选择器
+				if (target.tagName) {
+					var tagName = target.tagName.toLowerCase();
+					if (tagName === 'input' || tagName === 'textarea' || target.contentEditable === 'true') {
+						var selectors = getSelector(target);
+						keyAction.selector = selectors.css;
+						keyAction.xpath = selectors.xpath;
+					}
+				}
+			}
+			// 检测 Tab 键
+			else if (e.key === 'Tab' || e.keyCode === 9) {
+				keyAction = {
+					type: 'keyboard',
+					timestamp: Date.now(),
+					key: 'tab',
+					description: '{{KEYBOARD_TAB}}',
+					tagName: target.tagName ? target.tagName.toLowerCase() : ''
+				};
+				
+				// 记录目标元素的选择器
+				if (target.tagName) {
+					var selectors = getSelector(target);
+					keyAction.selector = selectors.css;
+					keyAction.xpath = selectors.xpath;
+				}
+			}
+			// 检测 Enter 键
+			else if (e.key === 'Enter' || e.keyCode === 13) {
+				keyAction = {
+					type: 'keyboard',
+					timestamp: Date.now(),
+					key: 'enter',
+					description: '{{KEYBOARD_ENTER}}',
+					tagName: target.tagName ? target.tagName.toLowerCase() : ''
+				};
+				
+				// 记录目标元素的选择器
+				if (target.tagName) {
+					var selectors = getSelector(target);
+					keyAction.selector = selectors.css;
+					keyAction.xpath = selectors.xpath;
+				}
+			}
+			
+			// 如果识别到需要记录的按键，记录动作
+			if (keyAction) {
+				recordAction(keyAction);
+				showCurrentAction(keyAction.description);
+				console.log('[BrowserWing] Recorded keyboard action:', keyAction.key);
+			}
+		} catch (err) {
+			console.error('[BrowserWing] keydown event error:', err);
+		}
 	}, true);
 	
 	// 点击其他地方关闭菜单
