@@ -47,6 +47,7 @@ var RecorderI18n = map[string]map[string]string{
 		"STEPS_UNIT":               "步骤",
 		"SECONDS_UNIT":             "秒",
 		"WAIT_PREFIX":              "等待 ",
+		"SCROLL_TO":                "滚动到",
 	},
 	"zh-TW": {
 		"RECORDING_STATUS":         "腳本錄製中",
@@ -91,6 +92,7 @@ var RecorderI18n = map[string]map[string]string{
 		"STEPS_UNIT":               "步驟",
 		"SECONDS_UNIT":             "秒",
 		"WAIT_PREFIX":              "等待 ",
+		"SCROLL_TO":                "滾動到",
 	},
 	"en": {
 		"RECORDING_STATUS":         "Recording",
@@ -135,6 +137,7 @@ var RecorderI18n = map[string]map[string]string{
 		"STEPS_UNIT":               "Steps",
 		"SECONDS_UNIT":             "seconds",
 		"WAIT_PREFIX":              "Wait ",
+		"SCROLL_TO":                "Scroll to",
 	},
 	"es": {
 		"RECORDING_STATUS":         "Grabando",
@@ -179,6 +182,7 @@ var RecorderI18n = map[string]map[string]string{
 		"STEPS_UNIT":               "Pasos",
 		"SECONDS_UNIT":             "segundos",
 		"WAIT_PREFIX":              "Esperar ",
+		"SCROLL_TO":                "Desplazar a",
 	},
 	"ja": {
 		"RECORDING_STATUS":         "記録中",
@@ -223,6 +227,7 @@ var RecorderI18n = map[string]map[string]string{
 		"STEPS_UNIT":               "ステップ",
 		"SECONDS_UNIT":             "秒",
 		"WAIT_PREFIX":              "待機 ",
+		"SCROLL_TO":                "スクロール",
 	},
 }
 

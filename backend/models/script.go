@@ -32,6 +32,10 @@ type ScriptAction struct {
 	Description string   `json:"description,omitempty"` // 操作描述
 	Multiple    bool     `json:"multiple,omitempty"`    // 是否支持多文件上传
 	Accept      string   `json:"accept,omitempty"`      // 接受的文件类型
+
+	// 滚动相关字段
+	ScrollX int `json:"scroll_x,omitempty"` // 水平滚动位置（像素）
+	ScrollY int `json:"scroll_y,omitempty"` // 垂直滚动位置（像素）
 }
 
 // Script 自动化脚本

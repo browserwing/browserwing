@@ -1234,6 +1234,26 @@ if (window.__browserwingRecorder__) {
 		if (window.__recordedActions__.length > 0) {
 			var lastAction = window.__recordedActions__[window.__recordedActions__.length - 1];
 			
+			// 如果是 scroll 类型，始终更新最后一个 scroll 操作（而不是添加新的）
+			if (action.type === 'scroll' && lastAction.type === 'scroll') {
+				console.log('[BrowserWing] ↻ Updated last scroll position: X=' + action.scroll_x + ', Y=' + action.scroll_y);
+				lastAction.scroll_x = action.scroll_x;
+				lastAction.scroll_y = action.scroll_y;
+				lastAction.timestamp = action.timestamp;
+				lastAction.description = action.description;
+				
+				// 更新 sessionStorage
+				try {
+					sessionStorage.setItem('__browserwing_actions__', JSON.stringify(window.__recordedActions__));
+				} catch (e) {
+					console.error('[BrowserWing] sessionStorage save error:', e);
+				}
+				
+				// 更新 UI 显示
+				updateActionCount();
+				return; // 不添加新操作
+			}
+			
 			// 如果是 input 类型，检查是否与最后一个操作重复
 			if (action.type === 'input' && lastAction.type === 'input') {
 				// 相同选择器、相同标签、相同值，且时间间隔小于 2 秒，认为是重复
@@ -1884,7 +1904,48 @@ if (window.__browserwingRecorder__) {
 		}
 	}, true);
 
+	// ============= 滚动事件监听（防抖） =============
+	var scrollDebounceTimer = null;
+	var lastScrollX = window.scrollX || window.pageXOffset || 0;
+	var lastScrollY = window.scrollY || window.pageYOffset || 0;
+	
+	document.addEventListener('scroll', function(e) {
+		if (!window.__isRecordingActive__) return;
+		
+		// 清除之前的定时器
+		if (scrollDebounceTimer) {
+			clearTimeout(scrollDebounceTimer);
+		}
+		
+		// 设置新的定时器，500ms 后记录滚动位置
+		scrollDebounceTimer = setTimeout(function() {
+			try {
+				var currentScrollX = window.scrollX || window.pageXOffset || 0;
+				var currentScrollY = window.scrollY || window.pageYOffset || 0;
+				
+				// 只有当滚动位置真正变化时才记录
+				if (currentScrollX !== lastScrollX || currentScrollY !== lastScrollY) {
+					var action = {
+						type: 'scroll',
+						timestamp: Date.now(),
+						scroll_x: Math.round(currentScrollX),
+						scroll_y: Math.round(currentScrollY),
+						description: '{{SCROLL_TO}}' + ' X:' + Math.round(currentScrollX) + ', Y:' + Math.round(currentScrollY)
+					};
+					
+					recordAction(action);
+					showCurrentAction('{{SCROLL_TO}}' + ' X:' + Math.round(currentScrollX) + ', Y:' + Math.round(currentScrollY));
+					
+					lastScrollX = currentScrollX;
+					lastScrollY = currentScrollY;
+				}
+			} catch (err) {
+				console.error('[BrowserWing] scroll event error:', err);
+			}
+		}, 500); // 500ms 防抖延迟
+	}, true);
+
 	console.log('[BrowserWing] Recorder initialized successfully');
-	console.log('[BrowserWing] Monitoring: click, input, select, checkbox, radio, contenteditable');
+	console.log('[BrowserWing] Monitoring: click, input, select, checkbox, radio, contenteditable, scroll');
 	console.log('[BrowserWing] Extract mode available');
 }

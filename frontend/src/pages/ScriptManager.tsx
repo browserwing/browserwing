@@ -525,6 +525,12 @@ export default function ScriptManager() {
       newAction.description = t('script.action.uploadFileDefault')
     }
 
+    // 为滚动类型设置默认值
+    if (type === 'scroll') {
+      newAction.scroll_x = 0
+      newAction.scroll_y = 0
+    }
+
     setEditingActions([...editingActions, newAction])
   }
 
@@ -1527,6 +1533,13 @@ export default function ScriptManager() {
                                       title={t('script.editor.addSleep')}
                                     >
                                       + Sleep
+                                    </button>
+                                    <button
+                                      onClick={() => handleAddAction('scroll')}
+                                      className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
+                                      title={t('script.editor.addScroll')}
+                                    >
+                                      + Scroll
                                     </button>
                                     <button
                                       onClick={() => handleAddAction('extract_text')}
@@ -2547,7 +2560,7 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
             <span className="font-semibold text-base text-gray-900 dark:text-gray-100">{t(action.type)}</span>
           </div>
           <div className="space-y-3">
-            {action.type !== 'sleep' && action.type !== 'wait' && action.type !== 'execute_js' && action.type !== 'upload_file' && (
+            {action.type !== 'sleep' && action.type !== 'wait' && action.type !== 'execute_js' && action.type !== 'upload_file' && action.type !== 'scroll' && (
               <>
                 <div>
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.selector')}</label>
@@ -2655,6 +2668,34 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {((action.duration || 1000) / 1000).toFixed(1)} {t('script.action.delaySeconds')}
                 </p>
+              </div>
+            )}
+            {action.type === 'scroll' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.scrollX')}</label>
+                  <input
+                    type="number"
+                    value={action.scroll_x || 0}
+                    onChange={(e) => onUpdate(index, 'scroll_x', parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    min="0"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('script.action.scrollXHint')}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.scrollY')}</label>
+                  <input
+                    type="number"
+                    value={action.scroll_y || 0}
+                    onChange={(e) => onUpdate(index, 'scroll_y', parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                    min="0"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('script.action.scrollYHint')}</p>
+                </div>
               </div>
             )}
             {(action.type === 'extract_text' || action.type === 'extract_html' || action.type === 'extract_attribute') && (
@@ -2784,6 +2825,14 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
           <div className="text-sm text-gray-600 dark:text-gray-400">
             <span className="font-medium">{t('script.action.delay')}</span>{' '}
             <span className="text-gray-800 dark:text-gray-200">{action.duration}ms ({(action.duration / 1000).toFixed(1)}{t('script.action.delaySeconds')})</span>
+          </div>
+        )}
+        {action.type === 'scroll' && (
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="font-medium">{t('script.action.scrollPosition')}</span>{' '}
+            <span className="text-gray-800 dark:text-gray-200">
+              X: {action.scroll_x || 0}, Y: {action.scroll_y || 0}
+            </span>
           </div>
         )}
         {(action.type === 'extract_text' || action.type === 'extract_html' || action.type === 'extract_attribute') && (

@@ -483,6 +483,8 @@ func (p *Player) executeAction(ctx context.Context, page *rod.Page, action model
 		return p.executeJS(ctx, page, action)
 	case "upload_file":
 		return p.executeUploadFile(ctx, page, action)
+	case "scroll":
+		return p.executeScroll(ctx, page, action)
 	default:
 		logger.Warn(ctx, "Unknown action type: %s", action.Type)
 		return nil
@@ -1246,6 +1248,29 @@ func (p *Player) executeJS(ctx context.Context, page *rod.Page, action models.Sc
 	p.extractedData[varName] = result.Value
 
 	logger.Info(ctx, "✓ JavaScript execution successful: %s", varName)
+	return nil
+}
+
+// executeScroll 执行滚动操作
+func (p *Player) executeScroll(ctx context.Context, page *rod.Page, action models.ScriptAction) error {
+	scrollX := action.ScrollX
+	scrollY := action.ScrollY
+
+	logger.Info(ctx, "Scroll to position: X=%d, Y=%d", scrollX, scrollY)
+
+	// 使用 JavaScript 执行滚动
+	_, err := page.Eval(fmt.Sprintf(`() => {
+		window.scrollTo(%d, %d);
+		return true;
+	}`, scrollX, scrollY))
+	if err != nil {
+		return fmt.Errorf("failed to scroll: %w", err)
+	}
+
+	// 等待滚动完成
+	time.Sleep(500 * time.Millisecond)
+
+	logger.Info(ctx, "✓ Scroll successful")
 	return nil
 }
 
