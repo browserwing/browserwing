@@ -1577,11 +1577,17 @@ func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action mod
 				}
 			}
 
-			if !pasteSuccess {
-				logger.Warn(ctx, "KeyActions paste did not change content, trying navigator.clipboard API")
+			// 如果 KeyActions 成功，直接返回，避免重复粘贴
+			if pasteSuccess {
+				logger.Info(ctx, "✓ Keyboard action completed: %s", key)
+				return nil
+			}
 
-				// 方法2: 使用 navigator.clipboard API 读取剪贴板（支持富文本）
-				_, jsErr := page.Eval(`async () => {
+			// KeyActions 失败，尝试使用 navigator.clipboard API
+			logger.Warn(ctx, "KeyActions paste did not change content, trying navigator.clipboard API")
+
+			// 方法2: 使用 navigator.clipboard API 读取剪贴板（支持富文本）
+			_, jsErr := page.Eval(`async () => {
 					try {
 						console.log('[BrowserWing] Attempting to read clipboard...');
 						
@@ -1661,10 +1667,10 @@ func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action mod
 							// contenteditable 元素：支持富文本
 							console.log('[BrowserWing] Detected contenteditable element, attempting rich text paste');
 							
-							// 对于 React 编辑器，尽量使用浏览器原生粘贴事件
+							// 对于 React 编辑器，优先使用浏览器原生粘贴事件
 							// 而不是直接操作 DOM，避免破坏 React 状态
 							
-							// 方法1：尝试触发原生 paste 事件（最佳，不破坏框架状态）
+							// 尝试触发原生 paste 事件（最佳，不破坏框架状态）
 							try {
 								const pasteEvent = new ClipboardEvent('paste', {
 									bubbles: true,
@@ -1679,17 +1685,18 @@ func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action mod
 								pasteEvent.clipboardData.setData('text/plain', clipboardText);
 								
 								// 触发 paste 事件，让编辑器自己处理
-								const handled = activeElement.dispatchEvent(pasteEvent);
+								activeElement.dispatchEvent(pasteEvent);
 								
-								if (handled) {
-									console.log('[BrowserWing] Paste event dispatched successfully');
-									return true;
-								}
+								// ClipboardEvent 已触发，让编辑器处理，直接返回成功
+								// 不再执行手动插入逻辑，避免重复粘贴
+								console.log('[BrowserWing] Paste event dispatched to editor');
+								return true;
+								
 							} catch (eventErr) {
-								console.warn('[BrowserWing] Failed to dispatch paste event:', eventErr);
+								console.warn('[BrowserWing] Failed to dispatch paste event, trying manual insertion:', eventErr);
 							}
 							
-							// 方法2：手动插入 HTML（可能破坏 React 状态，但是备选方案）
+							// 如果 ClipboardEvent 触发失败，才使用手动插入（回退方案）
 							console.log('[BrowserWing] Fallback to manual HTML insertion');
 							
 							// 获取当前选区
@@ -1751,13 +1758,15 @@ func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action mod
 					}
 				}`)
 
-				if jsErr != nil {
-					return fmt.Errorf("all paste methods failed on Mac: %v", jsErr)
-				}
-				logger.Info(ctx, "✓ Paste successful using navigator.clipboard API")
+			if jsErr != nil {
+				return fmt.Errorf("all paste methods failed on Mac: %v", jsErr)
 			}
-		} else {
-			// Windows/Linux 使用原有方法
+			logger.Info(ctx, "✓ Paste successful using navigator.clipboard API")
+		}
+		// Mac 粘贴处理完成
+
+		// Windows/Linux 使用原有方法
+		if runtime.GOOS != "darwin" {
 			keyboard := page.Keyboard
 			err = keyboard.Press(input.ControlLeft)
 			if err != nil {
