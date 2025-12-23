@@ -41,12 +41,6 @@ func GetPresetToolsMetadata() []models.PresetToolMetadata {
 			},
 		},
 		{
-			ID:          "websearch",
-			Name:        "Web Search",
-			Description: "Search web pages and return content in markdown format",
-			Parameters:  []models.PresetToolParameterSchema{},
-		},
-		{
 			ID:          "git",
 			Name:        "Git",
 			Description: "Execute Git commands locally",
@@ -81,11 +75,35 @@ func InitPresetTools(ctx context.Context, toolReg *tools.Registry, db *storage.B
 		return fmt.Errorf("tool registry cannot be empty")
 	}
 
+	// 定义所有已实现的预设工具
+	implementedTools := map[string]func(params map[string]interface{}) interfaces.Tool{
+		"fileops": func(params map[string]interface{}) interfaces.Tool {
+			return &FileOpsTool{RootDir: getStringParam(params, "root_directory", "./")}
+		},
+		"bark": func(params map[string]interface{}) interfaces.Tool {
+			return &BarkTool{APIKey: getStringParam(params, "api_key", "")}
+		},
+		"git": func(params map[string]interface{}) interfaces.Tool {
+			return &GitTool{DefaultWorkDir: getStringParam(params, "default_workdir", "./")}
+		},
+		"pyexec": func(params map[string]interface{}) interfaces.Tool {
+			return &PyExecTool{}
+		},
+		"webfetch": func(params map[string]interface{}) interfaces.Tool {
+			return &WebFetchTool{}
+		},
+	}
+
 	// 获取所有工具配置
 	toolConfigs, err := db.ListToolConfigs()
 	if err != nil {
 		// 如果数据库为空，初始化默认配置
-		toolConfigs = initDefaultToolConfigs(db)
+		toolConfigs = initDefaultToolConfigs(db, implementedTools)
+	} else {
+		// 清理未实现的工具配置
+		cleanupUnimplementedTools(db, toolConfigs, implementedTools)
+		// 重新获取配置
+		toolConfigs, _ = db.ListToolConfigs()
 	}
 
 	// 构建配置映射
@@ -97,35 +115,24 @@ func InitPresetTools(ctx context.Context, toolReg *tools.Registry, db *storage.B
 	}
 
 	// 注册所有预设工具（根据配置）
-	registerToolIfEnabled(toolReg, "fileops", configMap, func(params map[string]interface{}) interfaces.Tool {
-		return &FileOpsTool{RootDir: getStringParam(params, "root_directory", "./")}
-	})
-
-	registerToolIfEnabled(toolReg, "bark", configMap, func(params map[string]interface{}) interfaces.Tool {
-		return &BarkTool{APIKey: getStringParam(params, "api_key", "")}
-	})
-
-	registerToolIfEnabled(toolReg, "git", configMap, func(params map[string]interface{}) interfaces.Tool {
-		return &GitTool{DefaultWorkDir: getStringParam(params, "default_workdir", "./")}
-	})
-
-	registerToolIfEnabled(toolReg, "pyexec", configMap, func(params map[string]interface{}) interfaces.Tool {
-		return &PyExecTool{}
-	})
-
-	registerToolIfEnabled(toolReg, "webfetch", configMap, func(params map[string]interface{}) interfaces.Tool {
-		return &WebFetchTool{}
-	})
+	for toolID, createFunc := range implementedTools {
+		registerToolIfEnabled(toolReg, toolID, configMap, createFunc)
+	}
 
 	return nil
 }
 
 // initDefaultToolConfigs 初始化默认工具配置
-func initDefaultToolConfigs(db *storage.BoltDB) []*models.ToolConfig {
+func initDefaultToolConfigs(db *storage.BoltDB, implementedTools map[string]func(params map[string]interface{}) interfaces.Tool) []*models.ToolConfig {
 	metadata := GetPresetToolsMetadata()
 	configs := make([]*models.ToolConfig, 0, len(metadata))
 
 	for _, meta := range metadata {
+		// 只为已实现的工具创建配置
+		if _, implemented := implementedTools[meta.ID]; !implemented {
+			continue
+		}
+
 		config := &models.ToolConfig{
 			ID:          meta.ID,
 			Name:        meta.Name,
@@ -142,6 +149,21 @@ func initDefaultToolConfigs(db *storage.BoltDB) []*models.ToolConfig {
 	}
 
 	return configs
+}
+
+// cleanupUnimplementedTools 清理未实现的工具配置
+func cleanupUnimplementedTools(db *storage.BoltDB, toolConfigs []*models.ToolConfig, implementedTools map[string]func(params map[string]interface{}) interfaces.Tool) {
+	for _, cfg := range toolConfigs {
+		// 只处理预设工具类型
+		if cfg.Type != models.ToolTypePreset {
+			continue
+		}
+
+		// 如果工具未实现，删除其配置
+		if _, implemented := implementedTools[cfg.ID]; !implemented {
+			_ = db.DeleteToolConfig(cfg.ID)
+		}
+	}
 }
 
 // registerToolIfEnabled 如果工具启用则注册
