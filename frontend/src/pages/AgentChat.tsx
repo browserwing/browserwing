@@ -81,14 +81,34 @@ export default function AgentChat() {
     }
   }
 
-  // 加载 MCP 状态
+  // 加载工具状态（包括所有类型的工具）
   const loadMCPStatus = async () => {
     try {
-      const response = await fetch('/api/v1/agent/mcp/status')
-      const data = await response.json()
-      setMcpStatus(data)
+      // 加载工具配置（预设工具和脚本工具）
+      const toolsResponse = await fetch('/api/v1/tool-configs')
+      const toolsData = await toolsResponse.json()
+      const enabledTools = (toolsData.data || []).filter((t: any) => t.enabled)
+      
+      // 加载MCP服务列表
+      const mcpResponse = await fetch('/api/v1/mcp-services')
+      const mcpData = await mcpResponse.json()
+      const mcpServices = mcpData.data || []
+      
+      // 计算所有MCP服务的工具总数
+      const mcpToolCount = mcpServices.reduce((sum: number, service: any) => {
+        return sum + (service.enabled ? (service.tool_count || 0) : 0)
+      }, 0)
+      
+      // 合并统计：启用的预设/脚本工具 + 启用的MCP服务的工具
+      const totalToolCount = enabledTools.length + mcpToolCount
+      const hasConnected = mcpServices.some((s: any) => s.status === 'connected' && s.enabled)
+      
+      setMcpStatus({
+        connected: hasConnected,
+        tool_count: totalToolCount
+      })
     } catch (error) {
-      console.error('加载 MCP 状态失败:', error)
+      console.error('加载工具状态失败:', error)
     }
   }
 

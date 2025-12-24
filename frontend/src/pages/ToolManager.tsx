@@ -30,9 +30,16 @@ export default function ToolManager() {
   const [expandedMCPId, setExpandedMCPId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (activeTab === 'mcp') {
+    // 初始加载时同时加载工具和MCP服务
+    loadTools()
+    loadMCPServices()
+  }, [])
+
+  // 当切换tab时，如果数据为空则重新加载
+  useEffect(() => {
+    if (activeTab === 'mcp' && mcpServices.length === 0) {
       loadMCPServices()
-    } else {
+    } else if (activeTab !== 'mcp' && tools.length === 0) {
       loadTools()
     }
   }, [activeTab])

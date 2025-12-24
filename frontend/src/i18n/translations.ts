@@ -576,6 +576,11 @@ export const translations = {
     'mcpService.autoDiscoverHint': '创建或更新服务后将自动发现工具',
     'mcpService.discoveringTools': '正在自动发现工具...',
     'mcpService.lastError': '错误',
+    'mcpService.deleteFailed': 'MCP服务删除失败',
+    'mcpService.toggleSuccess': 'MCP服务切换成功',
+    'mcpService.toggleFailed': 'MCP服务切换失败',
+    'mcpService.toolToggleSuccess': '工具切换成功',
+    'mcpService.toolToggleFailed': '工具切换失败',
 
     // 工具管理
     'toolManager.serviceUrlHint': '输入MCP服务器的基础URL (不含路径),例如: http://localhost:3000',
@@ -1499,6 +1504,22 @@ export const translations = {
     'browser.config.nameRequired': '請輸入配置名稱',
     'browser.messages.recordingStopped': '錄製已停止',
 
+    // MCP Service
+    'mcpService.createSuccess': 'MCP 服務建立成功',
+    'mcpService.updateSuccess': 'MCP 服務更新成功',
+    'mcpService.saveFailed': 'MCP 服務儲存失敗',
+    'mcpService.deleteConfirm': '確認刪除此 MCP 服務？',
+    'mcpService.deleteSuccess': 'MCP 服務刪除成功',
+    'mcpService.discoverSuccess': '工具探索成功',
+    'mcpService.autoDiscoverHint': '建立或更新服務後將自動探索工具',
+    'mcpService.discoveringTools': '正在自動探索工具…',
+    'mcpService.lastError': '錯誤',
+    'mcpService.deleteFailed': 'MCP 服務刪除失敗',
+    'mcpService.toggleSuccess': 'MCP 服務切換成功',
+    'mcpService.toggleFailed': 'MCP 服務切換失敗',
+    'mcpService.toolToggleSuccess': '工具切換成功',
+    'mcpService.toolToggleFailed': '工具切換失敗',
+
     // 提示詞管理
     'prompt.title': '提示詞管理',
     'prompt.subtitle': '管理和配置提示詞範本，提升 AI 生成品質',
@@ -2232,6 +2253,11 @@ export const translations = {
     'mcpService.autoDiscoverHint': 'Tools will be automatically discovered after creating or updating service',
     'mcpService.discoveringTools': 'Auto-discovering tools...',
     'mcpService.lastError': 'Error',
+    'mcpService.deleteFailed': 'Failed to delete MCP service',
+    'mcpService.toggleSuccess': 'MCP service toggled successfully',
+    'mcpService.toggleFailed': 'Failed to toggle MCP service',
+    'mcpService.toolToggleSuccess': 'Tool toggled successfully',
+    'mcpService.toolToggleFailed': 'Failed to toggle tool',
 
     // Tool Manager
     'toolManager.serviceUrlHint': 'Enter MCP server base URL (without path), e.g.: http://localhost:3000',
@@ -2663,6 +2689,22 @@ export const translations = {
     'version.downloadNow': 'Descargar ahora',
     'version.skipThisVersion': 'Saltar esta versión',
     'version.remindLater': 'Recordar más tarde',
+
+    // MCP Service
+    'mcpService.createSuccess': 'Servicio MCP creado con éxito',
+    'mcpService.updateSuccess': 'Servicio MCP actualizado con éxito',
+    'mcpService.saveFailed': 'Error al guardar el servicio MCP',
+    'mcpService.deleteConfirm': '¿Confirmar la eliminación de este servicio MCP?',
+    'mcpService.deleteSuccess': 'Servicio MCP eliminado con éxito',
+    'mcpService.discoverSuccess': 'Herramientas descubiertas con éxito',
+    'mcpService.autoDiscoverHint': 'Las herramientas se descubrirán automáticamente después de crear o actualizar el servicio',
+    'mcpService.discoveringTools': 'Descubriendo herramientas automáticamente...',
+    'mcpService.lastError': 'Error',
+    'mcpService.deleteFailed': 'Error al eliminar el servicio MCP',
+    'mcpService.toggleSuccess': 'Servicio MCP activado/desactivado con éxito',
+    'mcpService.toggleFailed': 'Error al activar/desactivar el servicio MCP',
+    'mcpService.toolToggleSuccess': 'Herramienta activada/desactivada con éxito',
+    'mcpService.toolToggleFailed': 'Error al activar/desactivar la herramienta',
 
     // Gestión de Scripts
     'script.title': 'Gestión de Scripts',
@@ -3455,6 +3497,21 @@ export const translations = {
 
     'success.mcpCommandDisabled': 'MCPコマンドが無効化されました',
     'success.mcpCommandSet': 'MCPコマンドが設定されました',
+
+    'mcpService.createSuccess': 'MCP サービスの作成に成功しました',
+    'mcpService.updateSuccess': 'MCP サービスの更新に成功しました',
+    'mcpService.saveFailed': 'MCP サービスの保存に失敗しました',
+    'mcpService.deleteConfirm': 'この MCP サービスを削除してもよろしいですか？',
+    'mcpService.deleteSuccess': 'MCP サービスの削除に成功しました',
+    'mcpService.discoverSuccess': 'ツールの検出に成功しました',
+    'mcpService.autoDiscoverHint': 'サービスを作成または更新すると、ツールが自動的に検出されます',
+    'mcpService.discoveringTools': 'ツールを自動検出しています…',
+    'mcpService.lastError': 'エラー',
+    'mcpService.deleteFailed': 'MCP サービスの削除に失敗しました',
+    'mcpService.toggleSuccess': 'MCP サービスの切り替えに成功しました',
+    'mcpService.toggleFailed': 'MCP サービスの切り替えに失敗しました',
+    'mcpService.toolToggleSuccess': 'ツールの切り替えに成功しました',
+    'mcpService.toolToggleFailed': 'ツールの切り替えに失敗しました',
 
     // ナビゲーション
     'nav.browser': 'ブラウザ',
