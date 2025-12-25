@@ -1285,7 +1285,13 @@ if (window.__browserwingRecorder__) {
 			// 自动插入 sleep：如果两个操作间隔超过 1 秒，插入 sleep action
 			var timeDiff = action.timestamp - lastAction.timestamp;
 			if (timeDiff > 1000 && lastAction.type !== 'sleep') {
-				var sleepDuration = Math.round(timeDiff);
+				var sleepDuration = Math.round(timeDiff) / 3;
+				// 最长为5秒
+				if (sleepDuration > 5000) {
+					sleepDuration = 5000;
+				}
+				
+				// 创建 sleep 操作
 				var sleepAction = {
 					type: 'sleep',
 					timestamp: lastAction.timestamp + 1, // 紧跟在上一个操作之后

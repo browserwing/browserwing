@@ -14,7 +14,7 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
         components={{
           // 自定义链接样式
           a: ({ node, ...props }) => (
-            <a {...props} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" />
+            <a {...props} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline break-words overflow-wrap-anywhere" target="_blank" rel="noopener noreferrer" />
           ),
           // 自定义代码块样式（改进版）
           code: ({ node, className, children, ...props }: any) => {
