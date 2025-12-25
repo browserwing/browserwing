@@ -114,13 +114,20 @@ build-embedded: $(BUILD_DIR) copy-frontend
 	@echo "$(COLOR_BLUE)💡 运行: ./$(BUILD_DIR)/$(APP_NAME) --port 8080$(COLOR_RESET)"
 
 build-mac: $(BUILD_DIR) copy-frontend
-	@echo "$(COLOR_YELLOW)🍎 构建 macOS 版本...$(COLOR_RESET)"
-	@cd $(BACKEND_DIR) && GOOS=darwin GOARCH=amd64 go build $(BUILD_TAGS) $(LDFLAGS) \
-		-o ../$(BUILD_DIR)/$(APP_NAME)-mac-amd64 .
-	@echo "$(COLOR_GREEN)✓ macOS amd64: $(BUILD_DIR)/$(APP_NAME)-mac-amd64$(COLOR_RESET)"
+	@$(MAKE) build-mac-arm64
+	@$(MAKE) build-mac-amd64
+
+build-mac-arm64: copy-frontend
+	@echo "$(COLOR_YELLOW)🍎 构建 macOS arm64 版本...$(COLOR_RESET)"
 	@cd $(BACKEND_DIR) && GOOS=darwin GOARCH=arm64 go build $(BUILD_TAGS) $(LDFLAGS) \
 		-o ../$(BUILD_DIR)/$(APP_NAME)-mac-arm64 .
 	@echo "$(COLOR_GREEN)✓ macOS arm64: $(BUILD_DIR)/$(APP_NAME)-mac-arm64$(COLOR_RESET)"
+
+build-mac-amd64: copy-frontend
+	@echo "$(COLOR_YELLOW)🍎 构建 macOS amd64 版本...$(COLOR_RESET)"
+	@cd $(BACKEND_DIR) && GOOS=darwin GOARCH=amd64 go build $(BUILD_TAGS) $(LDFLAGS) \
+		-o ../$(BUILD_DIR)/$(APP_NAME)-mac-amd64 .
+	@echo "$(COLOR_GREEN)✓ macOS amd64: $(BUILD_DIR)/$(APP_NAME)-mac-amd64$(COLOR_RESET)"
 
 # 构建 Linux 版本
 build-linux: $(BUILD_DIR) copy-frontend

@@ -68,6 +68,7 @@ export default function ScriptManager() {
 
   // Tutorial modal
   const [showTutorial, setShowTutorial] = useState(false)
+  const [copiedItem, setCopiedItem] = useState<string | null>(null)
 
   // 录制配置相关
   const [showRecordingConfig, setShowRecordingConfig] = useState(false)
@@ -202,7 +203,7 @@ export default function ScriptManager() {
         }
       }
     } catch (err: any) {
-      showMessage(err.response?.data?.error || t('script.messages.playError'), 'error')
+      showMessage(t(err.response?.data?.error) || t('script.messages.playError'), 'error')
     } finally {
       setLoading(false)
     }
@@ -230,7 +231,7 @@ export default function ScriptManager() {
       showMessage(t(response.data.message), 'success')
       await loadScripts()
     } catch (err: any) {
-      showMessage(err.response?.data?.error || t('script.messages.deleteError'), 'error')
+      showMessage(t(err.response?.data?.error) || t('script.messages.deleteError'), 'error')
     } finally {
       setLoading(false)
       setDeleteConfirm({ show: false, scriptId: null })
@@ -327,7 +328,7 @@ export default function ScriptManager() {
       await loadScripts()
       setShowMCPConfig(false)
     } catch (err: any) {
-      showMessage(err.response?.data?.error || t('script.messages.mcpSetError'), 'error')
+      showMessage(t(err.response?.data?.error) || t('script.messages.mcpSetError'), 'error')
     } finally {
       setLoading(false)
     }
@@ -393,6 +394,13 @@ export default function ScriptManager() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 处理复制并显示反馈
+  const handleCopyToClipboard = (text: string, itemId: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedItem(itemId)
+    setTimeout(() => setCopiedItem(null), 2000)
   }
 
   // 复制脚本的 curl 命令
@@ -2428,17 +2436,21 @@ export default function ScriptManager() {
                         <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
                           <div
                             className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => navigator.clipboard.writeText(JSON.stringify({
+                            onClick={() => handleCopyToClipboard(JSON.stringify({
                               mcpServers: {
                                 browserwing: {
                                   url: `http://${window.location.hostname}:18089/api/v1/mcp/message`
                                 }
                               }
-                            }, null, 2))}
+                            }, null, 2), 'mcp-config')}
                           >
                             <h6 className="font-medium text-gray-800 dark:text-gray-200 mb-1 flex items-center justify-between">
                               Cursor / Claude Desktop
-                              <Clipboard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                              {copiedItem === 'mcp-config' ? (
+                                <Check className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Clipboard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                              )}
                             </h6>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">{t('script.tutorial.mcp.copyDesc')}</p>
                             <pre className="bg-gray-50 dark:bg-gray-950 rounded p-2 text-xs font-mono overflow-x-auto dark:text-gray-300">
@@ -2481,12 +2493,16 @@ export default function ScriptManager() {
                           onClick={() => {
                             const curlExample = `curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
   -H "Content-Type: application/json"`;
-                            navigator.clipboard.writeText(curlExample);
+                            handleCopyToClipboard(curlExample, 'curl-basic');
                           }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-gray-600 dark:text-gray-400">{t('script.tutorial.mcp.copyDesc')}</span>
-                            <Clipboard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            {copiedItem === 'curl-basic' ? (
+                              <Check className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Clipboard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            )}
                           </div>
                           <pre className="bg-gray-50 dark:bg-gray-950 rounded p-2 text-xs font-mono overflow-x-auto dark:text-gray-300">
                             {`curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
@@ -2507,12 +2523,16 @@ export default function ScriptManager() {
       "password": "secret123"
     }
   }'`;
-                            navigator.clipboard.writeText(curlWithParams);
+                            handleCopyToClipboard(curlWithParams, 'curl-with-params');
                           }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-gray-600 dark:text-gray-400">{t('script.tutorial.mcp.copyDesc')}</span>
-                            <Clipboard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            {copiedItem === 'curl-with-params' ? (
+                              <Check className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Clipboard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            )}
                           </div>
                           <pre className="bg-gray-50 dark:bg-gray-950 rounded p-2 text-xs font-mono overflow-x-auto dark:text-gray-300">
                             {`curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
