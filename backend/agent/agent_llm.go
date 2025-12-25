@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/Ingenimax/agent-sdk-go/pkg/interfaces"
@@ -17,6 +19,207 @@ type LLMAdapter struct {
 	client   interfaces.LLM
 }
 
+// DeepSeekWrapper DeepSeek API 的包装器
+// 用于处理 DeepSeek 的特殊参数要求
+type DeepSeekWrapper struct {
+	client interfaces.LLM
+}
+
+// DeepSeekToolWrapper 包装工具以确保工具名称符合 DeepSeek 的要求
+type DeepSeekToolWrapper struct {
+	tool         interfaces.Tool
+	originalName string
+	cleanedName  string
+}
+
+// cleanToolName 清理工具名称，使其符合 DeepSeek 的要求 ^[a-zA-Z0-9_-]+$
+func cleanToolName(name string) string {
+	// 将不允许的字符替换为下划线
+	re := regexp.MustCompile(`[^a-zA-Z0-9_-]`)
+	cleaned := re.ReplaceAllString(name, "_")
+	
+	// 确保不以数字或特殊字符开头
+	if len(cleaned) > 0 && !regexp.MustCompile(`^[a-zA-Z]`).MatchString(cleaned) {
+		cleaned = "tool_" + cleaned
+	}
+	
+	return cleaned
+}
+
+// wrapToolsForDeepSeek 包装工具数组，清理工具名称
+func (d *DeepSeekWrapper) wrapToolsForDeepSeek(tools []interfaces.Tool) []interfaces.Tool {
+	wrappedTools := make([]interfaces.Tool, len(tools))
+	for i, tool := range tools {
+		originalName := tool.Name()
+		cleanedName := cleanToolName(originalName)
+		
+		// 如果名称需要清理，则使用包装器
+		if cleanedName != originalName {
+			wrappedTools[i] = &DeepSeekToolWrapper{
+				tool:         tool,
+				originalName: originalName,
+				cleanedName:  cleanedName,
+			}
+		} else {
+			wrappedTools[i] = tool
+		}
+	}
+	return wrappedTools
+}
+
+// Name 实现 interfaces.Tool 接口
+func (w *DeepSeekToolWrapper) Name() string {
+	return w.cleanedName
+}
+
+// Description 实现 interfaces.Tool 接口
+func (w *DeepSeekToolWrapper) Description() string {
+	return w.tool.Description()
+}
+
+// Parameters 实现 interfaces.Tool 接口
+func (w *DeepSeekToolWrapper) Parameters() map[string]interfaces.ParameterSpec {
+	return w.tool.Parameters()
+}
+
+// Run 实现 interfaces.Tool 接口
+func (w *DeepSeekToolWrapper) Run(ctx context.Context, input string) (string, error) {
+	return w.tool.Run(ctx, input)
+}
+
+// Execute 实现 interfaces.Tool 接口
+func (w *DeepSeekToolWrapper) Execute(ctx context.Context, args string) (string, error) {
+	return w.tool.Execute(ctx, args)
+}
+
+// Generate 实现 interfaces.LLM 接口
+func (d *DeepSeekWrapper) Generate(ctx context.Context, prompt string, options ...interfaces.GenerateOption) (string, error) {
+	// 修正选项中的 top_p 参数
+	fixedOptions := d.fixTopPOptions(options)
+	return d.client.Generate(ctx, prompt, fixedOptions...)
+}
+
+// GenerateWithTools 实现 interfaces.LLM 接口
+func (d *DeepSeekWrapper) GenerateWithTools(ctx context.Context, prompt string, tools []interfaces.Tool, options ...interfaces.GenerateOption) (string, error) {
+	// 清理工具名称
+	wrappedTools := d.wrapToolsForDeepSeek(tools)
+	// 修正选项中的 top_p 参数
+	fixedOptions := d.fixTopPOptions(options)
+	return d.client.GenerateWithTools(ctx, prompt, wrappedTools, fixedOptions...)
+}
+
+// GenerateDetailed 实现 interfaces.LLM 接口
+func (d *DeepSeekWrapper) GenerateDetailed(ctx context.Context, prompt string, options ...interfaces.GenerateOption) (*interfaces.LLMResponse, error) {
+	// 修正选项中的 top_p 参数
+	fixedOptions := d.fixTopPOptions(options)
+	return d.client.GenerateDetailed(ctx, prompt, fixedOptions...)
+}
+
+// GenerateWithToolsDetailed 实现 interfaces.LLM 接口
+func (d *DeepSeekWrapper) GenerateWithToolsDetailed(ctx context.Context, prompt string, tools []interfaces.Tool, options ...interfaces.GenerateOption) (*interfaces.LLMResponse, error) {
+	// 清理工具名称
+	wrappedTools := d.wrapToolsForDeepSeek(tools)
+	// 修正选项中的 top_p 参数
+	fixedOptions := d.fixTopPOptions(options)
+	return d.client.GenerateWithToolsDetailed(ctx, prompt, wrappedTools, fixedOptions...)
+}
+
+// Name 实现 interfaces.LLM 接口
+func (d *DeepSeekWrapper) Name() string {
+	return d.client.Name()
+}
+
+// SupportsStreaming 实现 interfaces.LLM 接口
+func (d *DeepSeekWrapper) SupportsStreaming() bool {
+	return d.client.SupportsStreaming()
+}
+
+// GenerateStream 实现 interfaces.StreamingLLM 接口
+func (d *DeepSeekWrapper) GenerateStream(ctx context.Context, prompt string, options ...interfaces.GenerateOption) (<-chan interfaces.StreamEvent, error) {
+	// 检查底层客户端是否支持流式
+	streamingLLM, ok := d.client.(interfaces.StreamingLLM)
+	if !ok {
+		return nil, fmt.Errorf("underlying client does not support streaming")
+	}
+
+	// 修正选项中的 top_p 参数
+	fixedOptions := d.fixTopPOptions(options)
+	return streamingLLM.GenerateStream(ctx, prompt, fixedOptions...)
+}
+
+// GenerateWithToolsStream 实现 interfaces.StreamingLLM 接口
+func (d *DeepSeekWrapper) GenerateWithToolsStream(ctx context.Context, prompt string, tools []interfaces.Tool, options ...interfaces.GenerateOption) (<-chan interfaces.StreamEvent, error) {
+	// 检查底层客户端是否支持流式
+	streamingLLM, ok := d.client.(interfaces.StreamingLLM)
+	if !ok {
+		return nil, fmt.Errorf("underlying client does not support streaming")
+	}
+
+	// 清理工具名称
+	wrappedTools := d.wrapToolsForDeepSeek(tools)
+	// 修正选项中的 top_p 参数
+	fixedOptions := d.fixTopPOptions(options)
+	return streamingLLM.GenerateWithToolsStream(ctx, prompt, wrappedTools, fixedOptions...)
+}
+
+// fixTopPOptions 修正 top_p 参数，确保在 (0, 1] 范围内
+func (d *DeepSeekWrapper) fixTopPOptions(options []interfaces.GenerateOption) []interfaces.GenerateOption {
+	// 应用选项到配置以读取当前值
+	opts := &interfaces.GenerateOptions{
+		LLMConfig: &interfaces.LLMConfig{},
+	}
+	for _, opt := range options {
+		opt(opts)
+	}
+
+	// DeepSeek 特殊处理：top_p 必须在 (0, 1] 范围内
+	// 如果 top_p 为 0 或 1，调整为 0.95
+	if opts.LLMConfig.TopP <= 0 || opts.LLMConfig.TopP >= 1 {
+		opts.LLMConfig.TopP = 0.95
+	}
+
+	// 重新构建选项
+	newOptions := []interfaces.GenerateOption{
+		interfaces.WithTemperature(opts.LLMConfig.Temperature),
+		interfaces.WithTopP(opts.LLMConfig.TopP),
+		interfaces.WithFrequencyPenalty(opts.LLMConfig.FrequencyPenalty),
+		interfaces.WithPresencePenalty(opts.LLMConfig.PresencePenalty),
+	}
+
+	if len(opts.LLMConfig.StopSequences) > 0 {
+		newOptions = append(newOptions, interfaces.WithStopSequences(opts.LLMConfig.StopSequences))
+	}
+
+	// 复制其他选项
+	if opts.SystemMessage != "" {
+		newOptions = append(newOptions, func(o *interfaces.GenerateOptions) {
+			o.SystemMessage = opts.SystemMessage
+		})
+	}
+	if opts.ResponseFormat != nil {
+		newOptions = append(newOptions, func(o *interfaces.GenerateOptions) {
+			o.ResponseFormat = opts.ResponseFormat
+		})
+	}
+	if opts.MaxIterations > 0 {
+		newOptions = append(newOptions, func(o *interfaces.GenerateOptions) {
+			o.MaxIterations = opts.MaxIterations
+		})
+	}
+	if opts.Memory != nil {
+		newOptions = append(newOptions, func(o *interfaces.GenerateOptions) {
+			o.Memory = opts.Memory
+		})
+	}
+	if opts.OrgID != "" {
+		newOptions = append(newOptions, func(o *interfaces.GenerateOptions) {
+			o.OrgID = opts.OrgID
+		})
+	}
+
+	return newOptions
+}
+
 // CreateLLMClient 根据配置创建 LLM 客户端
 // 支持多种 LLM 提供商,包括 OpenAI 兼容的 API
 func CreateLLMClient(config *models.LLMConfigModel) (interfaces.LLM, error) {
@@ -25,6 +228,11 @@ func CreateLLMClient(config *models.LLMConfigModel) (interfaces.LLM, error) {
 	// Anthropic Claude 系列 - 使用原生 SDK
 	if provider == "anthropic" || provider == "claude" {
 		return createAnthropicClient(config)
+	}
+
+	// DeepSeek 需要特殊处理（top_p 不能为 0 或 1）
+	if provider == "deepseek" {
+		return createDeepSeekClient(config)
 	}
 
 	// 其他所有提供商都使用 OpenAI 兼容模式
@@ -44,6 +252,29 @@ func createAnthropicClient(config *models.LLMConfigModel) (interfaces.LLM, error
 
 	client := anthropic.NewClient(config.APIKey, opts...)
 	return client, nil
+}
+
+// createDeepSeekClient 创建 DeepSeek 客户端
+// DeepSeek API 有特殊要求：
+// 1. top_p 必须在 (0, 1.0] 区间，不能为 0 或 1（通过包装器处理）
+// 2. 工具名称只支持 ^[a-zA-Z0-9_-]+$ 模式
+// 3. BaseURL 固定为 https://api.deepseek.com/v1
+func createDeepSeekClient(config *models.LLMConfigModel) (interfaces.LLM, error) {
+	opts := []openai.Option{
+		openai.WithModel(config.Model),
+	}
+
+	// DeepSeek 的 BaseURL
+	baseURL := "https://api.deepseek.com/v1"
+	if config.BaseURL != "" {
+		baseURL = config.BaseURL
+	}
+	opts = append(opts, openai.WithBaseURL(baseURL))
+
+	client := openai.NewClient(config.APIKey, opts...)
+	
+	// 使用包装器处理 DeepSeek 的特殊参数要求
+	return &DeepSeekWrapper{client: client}, nil
 }
 
 // createOpenAICompatibleClient 创建 OpenAI 兼容客户端

@@ -146,7 +146,7 @@ export default function LLMManager() {
         model: config.model,
         base_url: config.base_url,
       })
-      showToast(result.data.message, result.data.success ? 'success' : 'error')
+      showToast(t(result.data.message), result.data.success ? 'success' : 'error')
     } catch (error: any) {
       showToast(t('llm.messages.testError') + ': ' + (error.response?.data?.error || error.message), 'error')
     } finally {

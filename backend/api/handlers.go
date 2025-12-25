@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	sdkagent "github.com/Ingenimax/agent-sdk-go/pkg/agent"
 	"github.com/Ingenimax/agent-sdk-go/pkg/interfaces"
 	"github.com/Ingenimax/agent-sdk-go/pkg/mcp"
+	"github.com/browserwing/browserwing/agent"
 	localtools "github.com/browserwing/browserwing/agent/tools"
 	"github.com/browserwing/browserwing/config"
 	"github.com/browserwing/browserwing/llm"
@@ -755,10 +757,72 @@ func (h *Handler) DeleteLLMConfig(c *gin.Context) {
 
 // TestLLMConfig 测试 LLM 配置连接
 func (h *Handler) TestLLMConfig(c *gin.Context) {
-	// TODO: 需要实现真实的测试逻辑
+	var req models.LLMConfigModel
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "error.invalidParams",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// 验证必填字段
+	if req.Provider == "" || req.APIKey == "" || req.Model == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "error.llmConfigRequiredFields",
+		})
+		return
+	}
+
+	// 创建临时 LLM 客户端进行测试
+	client, err := agent.CreateLLMClient(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "llm.messages.testError",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// 创建 Agent 实例并发送简单的测试消息
+	ctx := c.Request.Context()
+	testPrompt := "Reply with 'OK' if you can read this message."
+	
+	// 使用 agent-sdk-go 的接口进行简单测试
+	// 创建一个临时 Agent 进行测试
+	ag, err := sdkagent.NewAgent(
+		sdkagent.WithLLM(client),
+		sdkagent.WithMaxIterations(1),
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "llm.messages.testError",
+			"error":   "Failed to create agent: " + err.Error(),
+		})
+		return
+	}
+	
+	// 使用非流式方法测试
+	response, err := ag.Run(ctx, testPrompt)
+	if err != nil {
+		logger.Error(ctx, "LLM test failed: %v", err)
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "llm.messages.testError",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	logger.Info(ctx, "LLM test successful: %s", response)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "llm.messages.testSuccess",
+		"response": response,
 	})
 }
 
