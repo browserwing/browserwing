@@ -708,7 +708,9 @@ func (m *Manager) ClearInPageRecordingState() {
 	m.lastRecordedStartURL = ""
 	m.lastDownloadedFiles = nil
 	m.mu.Unlock()
-} // PlayScript 回放脚本
+}
+
+// PlayScript 回放脚本
 func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*models.PlayResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
