@@ -93,6 +93,9 @@ export default function ScriptManager() {
   const [importData, setImportData] = useState<any>(null)
   const [duplicateScriptIds, setDuplicateScriptIds] = useState<string[]>([])
 
+  // 服务器配置
+  const [mcpPort, setMcpPort] = useState<string>('8081')
+
   const showMessage = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     setMessage(msg)
     setToastType(type)
@@ -107,6 +110,19 @@ export default function ScriptManager() {
   )
 
   useEffect(() => {
+    // 加载服务器配置
+    const loadServerConfig = async () => {
+      try {
+        const response = await api.getServerConfig()
+        if (response.data.mcp_http_port) {
+          setMcpPort(response.data.mcp_http_port)
+        }
+      } catch (err) {
+        console.error('加载服务器配置失败:', err)
+      }
+    }
+    loadServerConfig()
+
     if (activeTab === 'scripts') {
       loadScripts()
       loadRecordingConfig()
@@ -411,7 +427,7 @@ export default function ScriptManager() {
     // 检查脚本是否有参数
     const requiredParams = extractScriptParameters(script)
 
-    let curlCommand = `curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/${scriptId}/play \\
+    let curlCommand = `curl -X POST http://${window.location.hostname}:${mcpPort}/api/v1/scripts/${scriptId}/play \\
   -H "Content-Type: application/json"`
 
     // 如果有参数，添加 data 部分
@@ -2439,7 +2455,7 @@ export default function ScriptManager() {
                             onClick={() => handleCopyToClipboard(JSON.stringify({
                               mcpServers: {
                                 browserwing: {
-                                  url: `http://${window.location.hostname}:18089/api/v1/mcp/message`
+                                  url: `http://${window.location.hostname}:${mcpPort}/api/v1/mcp/message`
                                 }
                               }
                             }, null, 2), 'mcp-config')}
@@ -2457,7 +2473,7 @@ export default function ScriptManager() {
                               {`{
   "mcpServers": {
     "browserwing": {
-      "url": "http://${window.location.hostname}:18089/api/v1/mcp/message"
+      "url": "http://${window.location.hostname}:${mcpPort}/api/v1/mcp/message"
     }
   }
 }`}
@@ -2483,7 +2499,7 @@ export default function ScriptManager() {
                       <div>
                         <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-1">{t('script.tutorial.http.endpoint')}</h5>
                         <code className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-3 block font-mono text-sm dark:text-gray-200">
-                          POST http://{window.location.hostname}:18089/api/v1/scripts/{'{script_id}'}/play
+                          POST http://{window.location.hostname}:{mcpPort}/api/v1/scripts/{'{script_id}'}/play
                         </code>
                       </div>
                       <div>
@@ -2491,7 +2507,7 @@ export default function ScriptManager() {
                         <div
                           className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow relative group"
                           onClick={() => {
-                            const curlExample = `curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
+                            const curlExample = `curl -X POST http://${window.location.hostname}:${mcpPort}/api/v1/scripts/{script_id}/play \\
   -H "Content-Type: application/json"`;
                             handleCopyToClipboard(curlExample, 'curl-basic');
                           }}
@@ -2505,7 +2521,7 @@ export default function ScriptManager() {
                             )}
                           </div>
                           <pre className="bg-gray-50 dark:bg-gray-950 rounded p-2 text-xs font-mono overflow-x-auto dark:text-gray-300">
-                            {`curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
+                            {`curl -X POST http://${window.location.hostname}:${mcpPort}/api/v1/scripts/{script_id}/play \\
   -H "Content-Type: application/json"`}
                           </pre>
                         </div>
@@ -2515,7 +2531,7 @@ export default function ScriptManager() {
                         <div
                           className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow relative group"
                           onClick={() => {
-                            const curlWithParams = `curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
+                            const curlWithParams = `curl -X POST http://${window.location.hostname}:${mcpPort}/api/v1/scripts/{script_id}/play \\
   -H "Content-Type: application/json" \\
   -d '{
     "params": {
@@ -2535,7 +2551,7 @@ export default function ScriptManager() {
                             )}
                           </div>
                           <pre className="bg-gray-50 dark:bg-gray-950 rounded p-2 text-xs font-mono overflow-x-auto dark:text-gray-300">
-                            {`curl -X POST http://${window.location.hostname}:18089/api/v1/scripts/{script_id}/play \\
+                            {`curl -X POST http://${window.location.hostname}:${mcpPort}/api/v1/scripts/{script_id}/play \\
   -H "Content-Type: application/json" \\
   -d '{
     "params": {

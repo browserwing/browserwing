@@ -102,7 +102,7 @@ func main() {
 	browserManager := browser.NewManager(cfg, db, llmManager)
 	log.Println("✓ Browser manager initialized successfully")
 
-	// 初始化 MCP 服务器
+	// 初始化 MCP 服务器 (使用 mcp-go 库)
 	mcpServer := mcp.NewMCPServer(db, browserManager)
 	err = mcpServer.Start()
 	if err != nil {
@@ -163,7 +163,7 @@ func main() {
 }
 
 // setupGracefulShutdown 设置优雅退出，自动关闭浏览器
-func setupGracefulShutdown(browserManager *browser.Manager, db *storage.BoltDB, mcpServer *mcp.MCPServer, agentManager *agent.AgentManager) {
+func setupGracefulShutdown(browserManager *browser.Manager, db *storage.BoltDB, mcpServer mcp.IMCPServer, agentManager *agent.AgentManager) {
 	sigChan := make(chan os.Signal, 1)
 	// 监听 SIGINT (Ctrl+C) 和 SIGTERM
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

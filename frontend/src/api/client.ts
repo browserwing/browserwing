@@ -448,7 +448,17 @@ export interface TestLLMConfigRequest {
   base_url?: string
 }
 
+export interface ServerConfig {
+  mcp_http_port: string
+  port: string
+  host: string
+}
+
 export const api = {
+  // 配置相关
+  getServerConfig: () =>
+    client.get<ServerConfig>('/config'),
+
   // 文章相关
   getArticles: (params?: { group?: string; tags?: string[]; sortBy?: string; sortOrder?: string }) => 
     client.get<ArticleListItem[]>('/articles', { params }),

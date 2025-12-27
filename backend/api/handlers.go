@@ -25,13 +25,20 @@ import (
 	"github.com/google/uuid"
 )
 
+// 使用类型断言访问 MCP 服务器的 ServeHTTP 方法
+type MCPHTTPHandler interface {
+	GetStatus() map[string]interface{}
+	RegisterScript(*models.Script) error
+	UnregisterScript(string)
+}
+
 type Handler struct {
 	db             *storage.BoltDB
 	browserManager *browser.Manager
 	config         *config.Config
 	llmManager     *llm.Manager
-	mcpServer      interface{} // MCP 服务器（使用 interface{} 避免循环依赖）
-	agentManager   interface{} // Agent 管理器（用于 LLM 配置更新后的热加载）
+	mcpServer      MCPHTTPHandler // MCP 服务器（使用 interface{} 避免循环依赖）
+	agentManager   interface{}    // Agent 管理器（用于 LLM 配置更新后的热加载）
 }
 
 func NewHandler(
@@ -790,7 +797,7 @@ func (h *Handler) TestLLMConfig(c *gin.Context) {
 	// 创建 Agent 实例并发送简单的测试消息
 	ctx := c.Request.Context()
 	testPrompt := "Reply with 'OK' if you can read this message."
-	
+
 	// 使用 agent-sdk-go 的接口进行简单测试
 	// 创建一个临时 Agent 进行测试
 	ag, err := sdkagent.NewAgent(
@@ -805,7 +812,7 @@ func (h *Handler) TestLLMConfig(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// 使用非流式方法测试
 	response, err := ag.Run(ctx, testPrompt)
 	if err != nil {
@@ -820,8 +827,8 @@ func (h *Handler) TestLLMConfig(c *gin.Context) {
 
 	logger.Info(ctx, "LLM test successful: %s", response)
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "llm.messages.testSuccess",
+		"success":  true,
+		"message":  "llm.messages.testSuccess",
 		"response": response,
 	})
 }
@@ -912,10 +919,22 @@ func (h *Handler) DeleteBrowserConfig(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "browser.config.deleteSuccess"})
 }
 
+// ============= 配置相关 API =============
+
+// GetServerConfig 获取服务器配置信息
+func (h *Handler) GetServerConfig(c *gin.Context) {
+	// 只返回前端需要的配置信息
+	c.JSON(http.StatusOK, gin.H{
+		"mcp_http_port": h.config.Server.MCPHTTPPort,
+		"port":          h.config.Server.Port,
+		"host":          h.config.Server.Host,
+	})
+}
+
 // ============= MCP 相关 API =============
 
 // SetMCPServer 设置 MCP 服务器实例
-func (h *Handler) SetMCPServer(mcpServer interface{}) {
+func (h *Handler) SetMCPServer(mcpServer MCPHTTPHandler) {
 	h.mcpServer = mcpServer
 }
 
@@ -1041,18 +1060,8 @@ func (h *Handler) GetMCPStatus(c *gin.Context) {
 		return
 	}
 
-	// 使用类型断言访问 MCP 服务器方法
-	type MCPServerInterface interface {
-		GetStatus() map[string]interface{}
-	}
-
-	if mcpSrv, ok := h.mcpServer.(MCPServerInterface); ok {
-		status := mcpSrv.GetStatus()
-		c.JSON(200, status)
-		return
-	}
-
-	c.JSON(500, gin.H{"error": "error.mcpServerTypeError"})
+	status := h.mcpServer.GetStatus()
+	c.JSON(200, status)
 }
 
 // ListMCPCommandsAll 列出所有 MCP 命令
@@ -1108,46 +1117,6 @@ func (h *Handler) ListMCPCommands(c *gin.Context) {
 		"commands": commands,
 		"count":    len(commands),
 	})
-}
-
-// HandleMCPMessage 处理 HTTP 模式的 MCP 请求
-func (h *Handler) HandleMCPMessage(c *gin.Context) {
-	if h.mcpServer == nil {
-		c.JSON(503, gin.H{"error": "error.mcpServiceNotStarted"})
-		return
-	}
-
-	// 使用类型断言访问 MCP 服务器的 ServeHTTP 方法
-	type MCPHTTPHandler interface {
-		ServeHTTP(http.ResponseWriter, *http.Request)
-	}
-
-	if mcpSrv, ok := h.mcpServer.(MCPHTTPHandler); ok {
-		mcpSrv.ServeHTTP(c.Writer, c.Request)
-		return
-	}
-
-	c.JSON(500, gin.H{"error": "error.mcpServerNoHTTP"})
-}
-
-// HandleMCPSSE 处理 SSE 模式的 MCP 连接
-func (h *Handler) HandleMCPSSE(c *gin.Context) {
-	if h.mcpServer == nil {
-		c.JSON(503, gin.H{"error": "error.mcpServiceNotStarted"})
-		return
-	}
-
-	// 使用类型断言访问 MCP 服务器的 ServeHTTP 方法
-	type MCPHTTPHandler interface {
-		ServeHTTP(http.ResponseWriter, *http.Request)
-	}
-
-	if mcpSrv, ok := h.mcpServer.(MCPHTTPHandler); ok {
-		mcpSrv.ServeHTTP(c.Writer, c.Request)
-		return
-	}
-
-	c.JSON(500, gin.H{"error": "error.mcpServerNoSSE"})
 }
 
 // ListPrompts 列出所有提示词
@@ -1593,20 +1562,12 @@ func (h *Handler) syncMCPRegistration(ctx context.Context, script *models.Script
 		return
 	}
 
-	// 使用类型断言访问 MCP 服务器方法
-	type MCPServerInterface interface {
-		RegisterScript(*models.Script) error
-		UnregisterScript(string)
-	}
-
-	if mcpSrv, ok := h.mcpServer.(MCPServerInterface); ok {
-		if script.IsMCPCommand {
-			if err := mcpSrv.RegisterScript(script); err != nil {
-				logger.Error(ctx, "Failed to register MCP command: %v", err)
-			}
-		} else {
-			mcpSrv.UnregisterScript(script.ID)
+	if script.IsMCPCommand {
+		if err := h.mcpServer.RegisterScript(script); err != nil {
+			logger.Error(ctx, "Failed to register MCP command: %v", err)
 		}
+	} else {
+		h.mcpServer.UnregisterScript(script.ID)
 	}
 }
 

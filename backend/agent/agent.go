@@ -72,7 +72,7 @@ type MCPTool struct {
 	name        string
 	description string
 	inputSchema map[string]interface{}
-	mcpServer   *browsermcp.MCPServer
+	mcpServer   browsermcp.IMCPServer
 }
 
 func (t *MCPTool) Name() string {
@@ -149,7 +149,7 @@ func (t *MCPTool) Parameters() map[string]interfaces.ParameterSpec {
 // AgentManager Agent 管理器
 type AgentManager struct {
 	db               *storage.BoltDB
-	mcpServer        *browsermcp.MCPServer
+	mcpServer        browsermcp.IMCPServer
 	sessions         map[string]*ChatSession
 	agents           map[string]*agent.Agent // sessionID -> Agent 实例
 	llmClient        interfaces.LLM
@@ -162,7 +162,7 @@ type AgentManager struct {
 }
 
 // NewAgentManager 创建 Agent 管理器
-func NewAgentManager(db *storage.BoltDB, mcpServer *browsermcp.MCPServer) (*AgentManager, error) {
+func NewAgentManager(db *storage.BoltDB, mcpServer browsermcp.IMCPServer) (*AgentManager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	am := &AgentManager{

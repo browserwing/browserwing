@@ -43,6 +43,9 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 	// API路由组
 	api := r.Group("/api/v1")
 	{
+		// 配置相关
+		api.GET("/config", handler.GetServerConfig)
+
 		// 提示词相关
 		prompts := api.Group("/prompts")
 		{
@@ -117,8 +120,6 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			mcp.GET("/status", handler.GetMCPStatus)             // 获取 MCP 服务状态
 			mcp.GET("/commands", handler.ListMCPCommands)        // 列出所有 MCP 命令
 			mcp.GET("/commands_all", handler.ListMCPCommandsAll) // 列出所有 MCP 命令
-			mcp.POST("/message", handler.HandleMCPMessage)       // HTTP 模式：处理 MCP 请求
-			mcp.GET("/sse", handler.HandleMCPSSE)                // SSE 模式：长连接
 		}
 
 		// LLM 配置管理
