@@ -242,6 +242,14 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			// 使用 http.ServeContent 自动处理 MIME 类型和缓存
 			http.ServeContent(c.Writer, c.Request, stat.Name(), stat.ModTime(), file.(io.ReadSeeker))
 		})
+	} else {
+		r.NoRoute(func(c *gin.Context) {
+			if strings.HasPrefix(c.Request.URL.Path, "/api/v1/mcp/message") {
+				handler.mcpServer.ServeSteamableHTTP(c.Writer, c.Request)
+				return
+			}
+			c.String(http.StatusNotFound, "404 page not found")
+		})
 	}
 
 	return r
