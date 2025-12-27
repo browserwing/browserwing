@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import api, { Script, ScriptAction, RecordingConfig, ScriptExecution } from '../api/client'
-import { RefreshCw, Play, Trash2, Clock, FileCode, ChevronDown, ChevronUp, Edit2, X, Check, ExternalLink, GripVertical, Download, Upload, CheckSquare, Square, Copy, Tag, Folder, HelpCircle, Clipboard } from 'lucide-react'
+import { RefreshCw, Play, Trash2, Clock, FileCode, ChevronDown, ChevronUp, Edit2, X, Check, ExternalLink, GripVertical, Download, Upload, CheckSquare, Square, Copy, Tag, Folder, HelpCircle, Clipboard, Plus } from 'lucide-react'
 import Toast from '../components/Toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ScriptParamsDialog from '../components/ScriptParamsDialog'
@@ -92,6 +92,9 @@ export default function ScriptManager() {
   const [showImportConfirm, setShowImportConfirm] = useState(false)
   const [importData, setImportData] = useState<any>(null)
   const [duplicateScriptIds, setDuplicateScriptIds] = useState<string[]>([])
+
+  // 添加操作下拉菜单状态
+  const [showAddActionMenu, setShowAddActionMenu] = useState(false)
 
   const showMessage = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     setMessage(msg)
@@ -912,8 +915,8 @@ export default function ScriptManager() {
 
     try {
       setLoading(true)
-      const response = await api.batchDeleteScriptExecutions(Array.from(selectedExecutions))
-      showMessage(t('execution.messages.batchDeleteSuccess', { message: response.data.message }), 'success')
+      await api.batchDeleteScriptExecutions(Array.from(selectedExecutions))
+      showMessage(t('execution.messages.batchDeleteSuccess', { count: selectedExecutions.size.toString() }), 'success')
       setSelectedExecutions(new Set())
       await loadExecutions()
     } catch (err: any) {
@@ -1516,105 +1519,198 @@ export default function ScriptManager() {
                                   {t('script.editor.actionsTitle')}
                                 </h4>
                                 {isEditing && (
-                                  <div className="flex items-center space-x-1">
+                                  <div className="relative">
                                     <button
-                                      onClick={() => handleAddAction('click')}
-                                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                      title={t('script.editor.addClick')}
+                                      onClick={() => setShowAddActionMenu(!showAddActionMenu)}
+                                      className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg transition-colors shadow-sm"
                                     >
-                                      + Click
+                                      <Plus className="w-4 h-4" />
+                                      <span>{t('script.editor.addAction')}</span>
+                                      <ChevronDown className={`w-4 h-4 transition-transform ${showAddActionMenu ? 'rotate-180' : ''}`} />
                                     </button>
-                                    <button
-                                      onClick={() => handleAddAction('input')}
-                                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                      title={t('script.editor.addInput')}
-                                    >
-                                      + Input
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('select')}
-                                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                      title={t('script.editor.addSelect')}
-                                    >
-                                      + Select
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('navigate')}
-                                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                      title={t('script.editor.addNavigate')}
-                                    >
-                                      + Navigate
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('wait')}
-                                      className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                                      title={t('script.editor.addWait')}
-                                    >
-                                      + Wait
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('sleep')}
-                                      className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900 hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-700 dark:text-emerald-300 rounded transition-colors"
-                                      title={t('script.editor.addSleep')}
-                                    >
-                                      + Sleep
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('scroll')}
-                                      className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
-                                      title={t('script.editor.addScroll')}
-                                    >
-                                      + Scroll
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('extract_text')}
-                                      className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition-colors"
-                                      title={t('script.editor.addExtractText')}
-                                    >
-                                      + Extract Text
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('extract_html')}
-                                      className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition-colors"
-                                      title={t('script.editor.addExtractHtml')}
-                                    >
-                                      + Extract HTML
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('extract_attribute')}
-                                      className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded transition-colors"
-                                      title={t('script.editor.addExtractAttr')}
-                                    >
-                                      + Extract Attr
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('execute_js')}
-                                      className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-700 dark:text-purple-300 rounded transition-colors"
-                                      title={t('script.editor.addExecuteJs')}
-                                    >
-                                      + Execute JS
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('upload_file')}
-                                      className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900 hover:bg-orange-200 dark:hover:bg-orange-800 text-orange-700 dark:text-orange-300 rounded transition-colors"
-                                      title={t('script.editor.addUploadFile')}
-                                    >
-                                      + Upload File
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('keyboard')}
-                                      className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
-                                      title={t('script.editor.addKeyboard')}
-                                    >
-                                      + Keyboard
-                                    </button>
-                                    <button
-                                      onClick={() => handleAddAction('open_tab')}
-                                      className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-700 dark:text-purple-300 rounded transition-colors"
-                                      title="添加打开新标签页步骤"
-                                    >
-                                      + 新标签页
-                                    </button>
+                                    
+                                    {showAddActionMenu && (
+                                      <>
+                                        {/* 遮罩层用于点击外部关闭菜单 */}
+                                        <div 
+                                          className="fixed inset-0 z-10" 
+                                          onClick={() => setShowAddActionMenu(false)}
+                                        />
+                                        
+                                        {/* 下拉菜单 */}
+                                        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 max-h-96 overflow-y-auto">
+                                          {/* 基础操作 */}
+                                          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.basic')}</div>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('click')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                              >
+                                                Click
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('input')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                              >
+                                                Input
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('select')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                              >
+                                                Select
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('navigate')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                              >
+                                                Navigate
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          {/* 等待与滚动 */}
+                                          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.waitScroll')}</div>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('wait')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded transition-colors"
+                                              >
+                                                Wait
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('sleep')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded transition-colors"
+                                              >
+                                                Sleep
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('scroll')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
+                                              >
+                                                Scroll
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          {/* 数据提取 */}
+                                          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.extract')}</div>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('extract_text')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded transition-colors"
+                                              >
+                                                Extract Text
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('extract_html')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded transition-colors"
+                                              >
+                                                Extract HTML
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('extract_attribute')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded transition-colors col-span-2"
+                                              >
+                                                Extract Attribute
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          {/* 高级操作 */}
+                                          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.advanced')}</div>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('execute_js')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded transition-colors"
+                                              >
+                                                Execute JS
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('upload_file')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded transition-colors"
+                                              >
+                                                Upload File
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('keyboard')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
+                                              >
+                                                Keyboard
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          {/* 标签页操作 */}
+                                          <div className="px-3 py-2">
+                                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.tabs')}</div>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('open_tab')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                              >
+                                                {t('script.action.openTab')}
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  handleAddAction('switch_tab')
+                                                  setShowAddActionMenu(false)
+                                                }}
+                                                className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                              >
+                                                {t('script.action.switchTab')}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -2574,6 +2670,7 @@ interface SortableActionItemProps {
 
 function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate }: SortableActionItemProps) {
   const { t } = useLanguage()
+  const [isSemanticExpanded, setIsSemanticExpanded] = useState(false)
   const {
     attributes,
     listeners,
@@ -2880,12 +2977,22 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
           {/* 语义信息展示（编辑模式） */}
           {(action.intent || action.accessibility || action.context || action.evidence) && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex items-center space-x-2">
-                <span>{t('script.action.semanticInfo')}</span>
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">({t('script.action.readOnly')})</span>
-              </div>
+              <button
+                onClick={() => setIsSemanticExpanded(!isSemanticExpanded)}
+                className="w-full text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex items-center justify-between hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                <div className="flex items-center space-x-2">
+                  <span>{t('script.action.semanticInfo')}</span>
+                  <span className="text-xs font-normal text-gray-400 dark:text-gray-500">({t('script.action.readOnly')})</span>
+                </div>
+                {isSemanticExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
 
-              {action.intent && (action.intent.verb || action.intent.object) && (
+              {isSemanticExpanded && action.intent && (action.intent.verb || action.intent.object) && (
                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-sm">
                   <div className="font-medium text-purple-700 dark:text-purple-300 mb-1">Intent</div>
                   <div className="text-gray-700 dark:text-gray-300">
@@ -2896,7 +3003,7 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
                 </div>
               )}
 
-              {action.accessibility && (action.accessibility.role || action.accessibility.name) && (
+              {isSemanticExpanded && action.accessibility && (action.accessibility.role || action.accessibility.name) && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-sm">
                   <div className="font-medium text-blue-700 dark:text-blue-300 mb-1">Accessibility</div>
                   <div className="text-gray-700 dark:text-gray-300 space-y-1">
@@ -2916,7 +3023,7 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
                 </div>
               )}
 
-              {action.context && (
+              {isSemanticExpanded && action.context && (
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-sm space-y-2">
                   <div className="font-medium text-green-700 dark:text-green-300">Context</div>
                   {action.context.nearby_text && action.context.nearby_text.length > 0 && (
@@ -2954,7 +3061,7 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
                 </div>
               )}
 
-              {action.evidence && action.evidence.confidence !== undefined && (
+              {isSemanticExpanded && action.evidence && action.evidence.confidence !== undefined && (
                 <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 text-sm">
                   <div className="font-medium text-orange-700 dark:text-orange-300 mb-2">Evidence</div>
                   <div className="flex items-center space-x-3">
@@ -3006,6 +3113,7 @@ interface ActionItemViewProps {
 
 function ActionItemView({ action, index }: ActionItemViewProps) {
   const { t } = useLanguage()
+  const [isSemanticExpanded, setIsSemanticExpanded] = useState(false)
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-base shadow-sm">
@@ -3156,11 +3264,19 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
         {/* 语义信息展示 */}
         {(action.intent || action.accessibility || action.context || action.evidence) && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-              {t('script.action.semanticInfo')}
-            </div>
+            <button
+              onClick={() => setIsSemanticExpanded(!isSemanticExpanded)}
+              className="w-full text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex items-center justify-between hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              <span>{t('script.action.semanticInfo')}</span>
+              {isSemanticExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
 
-            {action.intent && (action.intent.verb || action.intent.object) && (
+            {isSemanticExpanded && action.intent && (action.intent.verb || action.intent.object) && (
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="font-medium text-purple-600 dark:text-purple-400">Intent:</span>{' '}
                 <span className="text-gray-800 dark:text-gray-200">
@@ -3171,7 +3287,7 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
               </div>
             )}
 
-            {action.accessibility && (action.accessibility.role || action.accessibility.name) && (
+            {isSemanticExpanded && action.accessibility && (action.accessibility.role || action.accessibility.name) && (
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="font-medium text-blue-600 dark:text-blue-400">Accessibility:</span>{' '}
                 <span className="text-gray-800 dark:text-gray-200">
@@ -3187,7 +3303,7 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
               </div>
             )}
 
-            {action.context && (
+            {isSemanticExpanded && action.context && (
               <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                 {action.context.nearby_text && action.context.nearby_text.length > 0 && (
                   <div>
@@ -3224,7 +3340,7 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
               </div>
             )}
 
-            {action.evidence && action.evidence.confidence !== undefined && (
+            {isSemanticExpanded && action.evidence && action.evidence.confidence !== undefined && (
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="font-medium text-orange-600 dark:text-orange-400">Confidence:</span>{' '}
                 <div className="inline-flex items-center space-x-2">
