@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { Chrome, FileCode, Brain, BookText, Languages, MessageSquare, Sun, Moon } from 'lucide-react'
+import { Chrome, FileCode, Brain, Languages, MessageSquare, Sun, Moon } from 'lucide-react'
 import { useLanguage, LANGUAGES } from '../i18n'
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
@@ -24,7 +24,6 @@ export default function Layout() {
     { path: '/browser', labelKey: 'nav.browser', icon: Chrome },
     { path: '/scripts', labelKey: 'nav.scripts', icon: FileCode },
     { path: '/llm', labelKey: 'nav.llm', icon: Brain },
-    { path: '/prompts', labelKey: 'nav.prompts', icon: BookText },
   ]
 
   // 点击外部关闭语言菜单

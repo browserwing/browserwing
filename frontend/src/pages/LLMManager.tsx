@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit, X, Star, TestTube, Loader } from 'lucide-react'
+import { Plus, Trash2, Edit, X, Star, TestTube, Loader, BookText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { api, LLMConfig, CreateLLMConfigRequest } from '../api/client'
 import Toast from '../components/Toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -7,6 +8,7 @@ import { useLanguage } from '../i18n'
 
 export default function LLMManager() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
 
   // LLM 提供商列表
   const PROVIDERS = [
@@ -180,13 +182,22 @@ export default function LLMManager() {
             {t('llm.subtitle')}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {t('llm.addConfig')}
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {t('llm.addConfig')}
+          </button>
+          <button
+            onClick={() => navigate('/prompts')}
+            className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <BookText className="w-4 h-4 mr-2" />
+            {t('nav.prompts')}
+          </button>
+        </div>
       </div>
 
       {/* Add Form */}
