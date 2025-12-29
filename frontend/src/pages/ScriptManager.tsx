@@ -656,6 +656,48 @@ export default function ScriptManager() {
     setSelectedScripts(new Set())
   }
 
+  // 导出单个脚本为JSON文件
+  const handleExportSingleScript = (script: Script) => {
+    // 导出时不包含分组和标签
+    const { group, tags, ...scriptData } = script
+    const exportData = {
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      scripts: [scriptData]
+    }
+
+    const jsonStr = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([jsonStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${script.name}-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    showMessage(t('script.exportSingleSuccess'), 'success')
+  }
+
+  // 复制单个脚本为JSON代码
+  const handleCopyScriptAsJson = (script: Script) => {
+    // 导出时不包含分组和标签
+    const { group, tags, ...scriptData } = script
+    const exportData = {
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      scripts: [scriptData]
+    }
+
+    const jsonStr = JSON.stringify(exportData, null, 2)
+    navigator.clipboard.writeText(jsonStr)
+      .then(() => {
+        showMessage(t('script.copyAsJsonSuccess'), 'success')
+      })
+      .catch(err => {
+        console.error('复制失败:', err)
+        showMessage(t('common.error'), 'error')
+      })
+  }
+
   const handleImportScripts = () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -1596,6 +1638,22 @@ export default function ScriptManager() {
                                     title={t('script.card.copyCurl')}
                                   >
                                     <Clipboard className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleExportSingleScript(script)}
+                                    disabled={loading}
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                    title={t('script.card.exportScript')}
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleCopyScriptAsJson(script)}
+                                    disabled={loading}
+                                    className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                                    title={t('script.card.copyAsJson')}
+                                  >
+                                    <FileCode className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => handleToggleMCP(script.id)}
