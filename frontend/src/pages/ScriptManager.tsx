@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api, { Script, ScriptAction, RecordingConfig, ScriptExecution } from '../api/client'
-import { RefreshCw, Play, Trash2, Clock, FileCode, ChevronDown, ChevronUp, Edit2, X, Check, ExternalLink, GripVertical, Download, Upload, CheckSquare, Square, Copy, Tag, Folder, HelpCircle, Clipboard, Plus } from 'lucide-react'
+import { Lightbulb, RefreshCw, Play, Trash2, Clock, FileCode, ChevronDown, ChevronUp, Edit2, X, Check, ExternalLink, GripVertical, Download, Upload, CheckSquare, Square, Copy, Tag, Folder, HelpCircle, Clipboard, Plus } from 'lucide-react'
 import Toast from '../components/Toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ScriptParamsDialog from '../components/ScriptParamsDialog'
@@ -1664,7 +1664,7 @@ export default function ScriptManager() {
                                       }`}
                                     title={script.is_mcp_command ? t('script.card.mcpCancel', { name: script.mcp_command_name || '' }) : t('script.card.mcpSet')}
                                   >
-                                    <ExternalLink className="w-4 h-4" />
+                                    <Lightbulb className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => setDeleteConfirm({ show: true, scriptId: script.id })}
