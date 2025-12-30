@@ -364,7 +364,7 @@ func (m *Manager) IsRunning() bool {
 }
 
 // CloseActivePage 关闭当前活动页面
-func (m *Manager) CloseActivePage(ctx context.Context) error {
+func (m *Manager) CloseActivePage(ctx context.Context, page *rod.Page) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -372,17 +372,16 @@ func (m *Manager) CloseActivePage(ctx context.Context) error {
 		return fmt.Errorf("browser is not running")
 	}
 
-	if m.activePage == nil {
+	if page == nil {
 		logger.Warn(ctx, "No active page to close")
 		return nil
 	}
 
 	logger.Info(ctx, "Closing active page...")
-	if err := m.activePage.Close(); err != nil {
+	if err := page.Close(); err != nil {
 		return fmt.Errorf("failed to close active page: %w", err)
 	}
 
-	m.activePage = nil
 	logger.Info(ctx, "Active page closed")
 	return nil
 }
@@ -711,12 +710,12 @@ func (m *Manager) ClearInPageRecordingState() {
 }
 
 // PlayScript 回放脚本
-func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*models.PlayResult, error) {
+func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*models.PlayResult, *rod.Page, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if !m.isRunning || m.browser == nil {
-		return nil, fmt.Errorf("browser is not running")
+		return nil, nil, fmt.Errorf("browser is not running")
 	}
 
 	// 创建执行记录
@@ -861,16 +860,13 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 		}
 	}
 
-	// 更新活动页面
-	m.activePage = page
-
 	// 如果执行失败，返回错误
 	if playErr != nil {
 		return &models.PlayResult{
 			Success: false,
 			Message: playErr.Error(),
 			Errors:  []string{playErr.Error()},
-		}, playErr
+		}, page, playErr
 	}
 
 	// 返回回放结果，包含抓取的数据
@@ -878,7 +874,7 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 		Success:       true,
 		Message:       "Script replay completed",
 		ExtractedData: m.player.GetExtractedData(),
-	}, nil
+	}, page, nil
 }
 
 // GetPlayerExtractedData 获取上次回放抓取的数据

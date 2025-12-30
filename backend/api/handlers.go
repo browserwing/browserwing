@@ -637,7 +637,7 @@ func (h *Handler) PlayScript(c *gin.Context) {
 	}
 
 	// 执行回放
-	result, err := h.browserManager.PlayScript(c.Request.Context(), scriptToRun)
+	result, page, err := h.browserManager.PlayScript(c.Request.Context(), scriptToRun)
 	if err != nil {
 		logger.Error(c.Request.Context(), "Failed to play script: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -648,9 +648,9 @@ func (h *Handler) PlayScript(c *gin.Context) {
 	}
 
 	// 关闭页面
-	if err := h.browserManager.CloseActivePage(c.Request.Context()); err != nil {
-		logger.Warn(c.Request.Context(), "Failed to close page: %v", err)		
-	}	
+	if err := h.browserManager.CloseActivePage(c.Request.Context(), page); err != nil {
+		logger.Warn(c.Request.Context(), "Failed to close page: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success.scriptPlaybackCompleted",

@@ -245,13 +245,13 @@ func (s *MCPServer) createToolHandler(script *models.Script) func(ctx context.Co
 		}
 
 		// 执行脚本
-		playResult, err := s.browserMgr.PlayScript(ctx, &scriptToRun)
+		playResult, page, err := s.browserMgr.PlayScript(ctx, &scriptToRun)
 		if err != nil {
 			return mcpgo.NewToolResultError(fmt.Sprintf("Failed to execute script: %v", err)), nil
 		}
 
 		// 关闭页面
-		if err := s.browserMgr.CloseActivePage(ctx); err != nil {
+		if err := s.browserMgr.CloseActivePage(ctx, page); err != nil {
 			logger.Warn(ctx, "Failed to close page: %v", err)
 		}
 
@@ -392,13 +392,13 @@ func (s *MCPServer) CallTool(ctx context.Context, name string, arguments map[str
 	}
 
 	// 执行脚本
-	playResult, err := s.browserMgr.PlayScript(ctx, &scriptToRun)
+	playResult, page, err := s.browserMgr.PlayScript(ctx, &scriptToRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script: %w", err)
 	}
 
 	// 关闭页面
-	if err := s.browserMgr.CloseActivePage(ctx); err != nil {
+	if err := s.browserMgr.CloseActivePage(ctx, page); err != nil {
 		logger.Warn(ctx, "Failed to close page: %v", err)
 	}
 
