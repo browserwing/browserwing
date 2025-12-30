@@ -27,16 +27,16 @@ type Script struct {
 
 // ScriptExecution 脚本执行结果
 type ScriptExecution struct {
-	ID          string                    `json:"id"`
-	ScriptID    string                    `json:"script_id"`
-	ScriptName  string                    `json:"script_name"`
-	Status      string                    `json:"status"` // success, failed, running
-	StartTime   int64                     `json:"start_time"`
-	EndTime     int64                     `json:"end_time"`
-	Duration    int64                     `json:"duration"` // 毫秒
-	Error       string                    `json:"error,omitempty"`
-	Result      map[string]interface{}    `json:"result,omitempty"`
-	ExtractedData map[string]string       `json:"extracted_data,omitempty"`
+	ID            string                 `json:"id"`
+	ScriptID      string                 `json:"script_id"`
+	ScriptName    string                 `json:"script_name"`
+	Status        string                 `json:"status"` // success, failed, running
+	StartTime     int64                  `json:"start_time"`
+	EndTime       int64                  `json:"end_time"`
+	Duration      int64                  `json:"duration"` // 毫秒
+	Error         string                 `json:"error,omitempty"`
+	Result        map[string]interface{} `json:"result,omitempty"`
+	ExtractedData map[string]string      `json:"extracted_data,omitempty"`
 }
 
 // Create 创建脚本
@@ -190,7 +190,7 @@ func (sc *ScriptClient) Play(ctx context.Context, scriptID string) (*ScriptExecu
 	}
 
 	// 执行脚本
-	result, err := sc.client.browserManager.PlayScript(ctx, dbScript)
+	result, page, err := sc.client.browserManager.PlayScript(ctx, dbScript)
 	if err != nil {
 		return nil, fmt.Errorf("failed to play script: %w", err)
 	}
@@ -241,6 +241,10 @@ func (sc *ScriptClient) Play(ctx context.Context, scriptID string) (*ScriptExecu
 	if err := sc.client.db.SaveScriptExecution(dbExecution); err != nil {
 		// 执行成功但保存记录失败,仅记录警告
 		fmt.Printf("Warning: Failed to save execution record: %v\n", err)
+	}
+
+	if err := sc.client.browserManager.CloseActivePage(ctx, page); err != nil {
+		fmt.Printf("Warning: Failed to close page: %v\n", err)
 	}
 
 	return execution, nil
