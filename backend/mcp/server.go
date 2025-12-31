@@ -255,13 +255,15 @@ func (s *MCPServer) createToolHandler(script *models.Script) func(ctx context.Co
 			logger.Warn(ctx, "Failed to close page: %v", err)
 		}
 
-		// 构建结果
-		resultText := fmt.Sprintf("Success: %v\nMessage: %s", playResult.Success, playResult.Message)
+		resultData := map[string]interface{}{
+			"success": playResult.Success,
+			"message": playResult.Message,
+		}
 		if len(playResult.ExtractedData) > 0 {
-			resultText += fmt.Sprintf("\nExtracted Data: %v", playResult.ExtractedData)
+			resultData["extracted_data"] = playResult.ExtractedData
 		}
 
-		return mcpgo.NewToolResultText(resultText), nil
+		return mcpgo.NewToolResultJSON(resultData)
 	}
 }
 

@@ -125,7 +125,7 @@ export const translations = {
     'nav.browser': '浏览器',
     'nav.scripts': '脚本',
     'nav.scriptExecutions': '执行记录',
-    'nav.agent': 'AI 会话',
+    'nav.agent': 'AI Agent',
     'nav.llm': '大模型',
     'nav.prompts': '提示词',
 
@@ -989,7 +989,7 @@ export const translations = {
     'nav.browser': '瀏覽器',
     'nav.scripts': '腳本',
     'nav.scriptExecutions': '執行記錄',
-    'nav.agent': 'AI 會話',
+    'nav.agent': 'AI Agent',
     'nav.llm': '大模型',
     'nav.prompts': '提示詞',
 
