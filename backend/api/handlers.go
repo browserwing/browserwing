@@ -614,11 +614,8 @@ func (h *Handler) PlayScript(c *gin.Context) {
 	}
 
 	// 如果提供了参数,创建脚本副本并替换占位符
-	scriptToRun := script
+	scriptToRun := script.Copy()
 	if len(req.Params) > 0 {
-		// 创建副本以避免修改原始脚本
-		scriptCopy := *script
-		scriptToRun = &scriptCopy
 
 		// 如果用户提供了 url 参数,使用它;否则替换 URL 中的占位符
 		if urlParam, ok := req.Params["url"]; ok && urlParam != "" {

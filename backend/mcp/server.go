@@ -212,7 +212,7 @@ func (s *MCPServer) createToolHandler(script *models.Script) func(ctx context.Co
 		}
 
 		// 创建脚本副本并替换占位符
-		scriptToRun := *script
+		scriptToRun := script.Copy()
 
 		// 将 arguments 转换为 map[string]string
 		params := make(map[string]string)
@@ -245,7 +245,7 @@ func (s *MCPServer) createToolHandler(script *models.Script) func(ctx context.Co
 		}
 
 		// 执行脚本
-		playResult, page, err := s.browserMgr.PlayScript(ctx, &scriptToRun)
+		playResult, page, err := s.browserMgr.PlayScript(ctx, scriptToRun)
 		if err != nil {
 			return mcpgo.NewToolResultError(fmt.Sprintf("Failed to execute script: %v", err)), nil
 		}
@@ -368,7 +368,7 @@ func (s *MCPServer) CallTool(ctx context.Context, name string, arguments map[str
 	}
 
 	// 创建脚本副本并替换占位符
-	scriptToRun := *script
+	scriptToRun := script.Copy()
 	params := make(map[string]string)
 	for key, value := range arguments {
 		params[key] = fmt.Sprintf("%v", value)
@@ -394,7 +394,7 @@ func (s *MCPServer) CallTool(ctx context.Context, name string, arguments map[str
 	}
 
 	// 执行脚本
-	playResult, page, err := s.browserMgr.PlayScript(ctx, &scriptToRun)
+	playResult, page, err := s.browserMgr.PlayScript(ctx, scriptToRun)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script: %w", err)
 	}

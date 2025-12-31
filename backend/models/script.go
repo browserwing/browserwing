@@ -119,6 +119,28 @@ type Script struct {
 	MCPInputSchema        map[string]interface{} `json:"mcp_input_schema"`        // MCP 命令输入参数 schema（JSON Schema 格式）
 }
 
+func (s *Script) Copy() *Script {
+	return &Script{
+		ID:                    s.ID,
+		Name:                  s.Name,
+		Description:           s.Description,
+		URL:                   s.URL,
+		Actions:               s.Actions,
+		CreatedAt:             s.CreatedAt,
+		UpdatedAt:             s.UpdatedAt,
+		Tags:                  s.Tags,
+		Group:                 s.Group,
+		Duration:              s.Duration,
+		CanPublish:            s.CanPublish,
+		CanFetch:              s.CanFetch,
+		DownloadedFiles:       s.DownloadedFiles,
+		IsMCPCommand:          s.IsMCPCommand,
+		MCPCommandName:        s.MCPCommandName,
+		MCPCommandDescription: s.MCPCommandDescription,
+		MCPInputSchema:        s.MCPInputSchema,
+	}
+}
+
 // PlayResult 脚本回放结果
 type PlayResult struct {
 	Success       bool                   `json:"success"`        // 是否成功
