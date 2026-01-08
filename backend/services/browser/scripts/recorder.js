@@ -621,6 +621,21 @@ if (window.__browserwingRecorder__) {
 		
 		window.__selectedElement__ = element;
 		
+		// 先弹出确认对话框，让用户选择是否添加自定义要求
+		var userChoice = confirm('{{AI_FORMFILL_CONFIRM}}\n\n{{CLICK_OK_TO_ADD_PROMPT}}\n{{CLICK_CANCEL_FOR_DEFAULT}}');
+		
+		var userPrompt = '';
+		if (userChoice) {
+			// 用户选择添加自定义要求，弹出输入框
+			userPrompt = prompt('{{AI_FORMFILL_PROMPT_INPUT}}:', '');
+			
+			// 用户取消输入，直接返回
+			if (userPrompt === null) {
+				console.log('[BrowserWing] User cancelled AI form fill');
+				return;
+			}
+		}
+		
 		// 显示全屏 Loading
 		showFullPageLoading('{{AI_ANALYZING_FORM}}');
 		
@@ -650,7 +665,8 @@ if (window.__browserwingRecorder__) {
 			window.__aiExtractionRequest__ = {
 				type: 'formfill',
 				html: cleanedHtml,
-				description: '{{FORMFILL_PROMPT}}'
+				description: '{{FORMFILL_PROMPT}}',
+				user_prompt: userPrompt || ''
 			};
 			
 			// 轮询等待后端处理结果
@@ -737,6 +753,21 @@ if (window.__browserwingRecorder__) {
 		
 		window.__selectedElement__ = element;
 		
+		// 先弹出确认对话框，让用户选择是否添加自定义要求
+		var userChoice = confirm('{{AI_EXTRACT_CONFIRM}}\n\n{{CLICK_OK_TO_ADD_PROMPT}}\n{{CLICK_CANCEL_FOR_DEFAULT}}');
+		
+		var userPrompt = '';
+		if (userChoice) {
+			// 用户选择添加自定义要求，弹出输入框
+			userPrompt = prompt('{{AI_EXTRACT_PROMPT_INPUT}}:', '');
+			
+			// 用户取消输入，直接返回
+			if (userPrompt === null) {
+				console.log('[BrowserWing] User cancelled AI extraction');
+				return;
+			}
+		}
+		
 		// 显示全屏 Loading
 		showFullPageLoading('{{AI_ANALYZING_PAGE}}');
 		
@@ -753,7 +784,8 @@ if (window.__browserwingRecorder__) {
 		console.log('[BrowserWing] Submitting AI extraction request via polling...');			// 设置请求到全局变量，让后端轮询处理（避免 CSP 问题）
 			window.__aiExtractionRequest__ = {
 				html: cleanedHtml,
-				description: '{{EXTRACT_PROMPT}}'
+				description: '{{EXTRACT_PROMPT}}',
+				user_prompt: userPrompt || ''
 			};
 			
 			// 轮询等待后端处理结果

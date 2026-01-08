@@ -365,6 +365,7 @@ func (r *Recorder) checkAndProcessAIRequestOnPage(ctx context.Context, page *rod
 
 	html, _ := requestData["html"].(string)
 	description, _ := requestData["description"].(string)
+	userPrompt, _ := requestData["user_prompt"].(string)
 	requestType, _ := requestData["type"].(string) // "extract" 或 "formfill"
 
 	if html == "" {
@@ -372,10 +373,24 @@ func (r *Recorder) checkAndProcessAIRequestOnPage(ctx context.Context, page *rod
 		return
 	}
 
+	// 合并用户自定义prompt到描述中
+	finalDescription := description
+	if userPrompt != "" {
+		// 获取 USER_REQUIREMENTS 的本地化文本
+		userReqText := "User requirements: "
+		if langTexts, ok := RecorderI18n[r.language]; ok {
+			if text, exists := langTexts["USER_REQUIREMENTS"]; exists {
+				userReqText = text
+			}
+		}
+		finalDescription = description + "\n\n" + userReqText + userPrompt
+		logger.Info(ctx, "User added custom prompt: %s", userPrompt)
+	}
+
 	// 处理表单填充请求
 	if requestType == "formfill" {
 		logger.Info(ctx, "Received AI form fill request, HTML length: %d", len(html))
-		r.handleFormFillRequest(ctx, page, html, description)
+		r.handleFormFillRequest(ctx, page, html, finalDescription)
 		return
 	}
 
@@ -398,7 +413,7 @@ func (r *Recorder) checkAndProcessAIRequestOnPage(ctx context.Context, page *rod
 	// 调用 LLM 生成代码
 	extractResult, err := extractor.GenerateExtractionJS(ctx, llm.ExtractionRequest{
 		HTML:        html,
-		Description: description,
+		Description: finalDescription,
 	})
 	if err != nil {
 		logger.Error(ctx, "AI code generation failed: %v", err)
