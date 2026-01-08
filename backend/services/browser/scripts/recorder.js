@@ -434,7 +434,8 @@ if (window.__browserwingRecorder__) {
 		}
 		
 		var item = document.createElement('div');
-		item.style.cssText = 'padding:12px 14px;margin:6px 0;background:white;border:1px solid rgba(0,0,0,0.08);border-radius:10px;font-size:12px;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 1px 2px rgba(0,0,0,0.04);';
+		item.setAttribute('data-action-index', index);
+		item.style.cssText = 'padding:12px 14px;margin:6px 0;background:white;border:1px solid rgba(0,0,0,0.08);border-radius:10px;font-size:12px;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 1px 2px rgba(0,0,0,0.04);position:relative;';
 		item.onmouseover = function() {
 			this.style.background = '#f9fafb';
 			this.style.borderColor = '#d1d5db';
@@ -447,6 +448,9 @@ if (window.__browserwingRecorder__) {
 		var header = document.createElement('div');
 		header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;';
 		
+		var leftSection = document.createElement('div');
+		leftSection.style.cssText = 'display:flex;align-items:center;gap:8px;flex:1;';
+		
 		var typeLabel = document.createElement('span');
 		typeLabel.style.cssText = 'font-weight:700;color:#0f172a;font-size:13px;letter-spacing:-0.01em;';
 		
@@ -457,6 +461,8 @@ if (window.__browserwingRecorder__) {
 			typeText = 'Upload File';
 		} else if (action.type === 'sleep') {
 			typeText = 'Sleep';
+		} else if (action.type === 'execute_js') {
+			typeText = 'Execute JS';
 		}
 		typeLabel.textContent = '#' + (index + 1) + ' ' + typeText.charAt(0).toUpperCase() + typeText.slice(1);
 		
@@ -464,8 +470,58 @@ if (window.__browserwingRecorder__) {
 		indexLabel.style.cssText = 'font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:-0.01em;';
 		indexLabel.textContent = new Date(action.timestamp).toLocaleTimeString();
 		
-		header.appendChild(typeLabel);
-		header.appendChild(indexLabel);
+		leftSection.appendChild(typeLabel);
+		leftSection.appendChild(indexLabel);
+		
+		// 操作按钮区域
+		var actionButtons = document.createElement('div');
+		actionButtons.style.cssText = 'display:flex;align-items:center;gap:6px;';
+		
+		// 如果是 execute_js 类型，添加预览按钮
+		if (action.type === 'execute_js' && action.js_code) {
+			var previewBtn = document.createElement('button');
+			previewBtn.setAttribute('data-action-index', index);
+			previewBtn.style.cssText = 'padding:5px;background:rgb(51 51 52);color:white;border:none;border-radius:6px;cursor:pointer;transition:all 0.2s;width:23px;height:23px;display:flex;align-items:center;justify-content:center;';
+			previewBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+			previewBtn.onmouseover = function() {
+				this.style.background = 'rgb(51 51 52)';
+				this.style.transform = 'scale(1.08)';
+			};
+			previewBtn.onmouseout = function() {
+				this.style.background = 'rgb(51 51 52)';
+				this.style.transform = 'scale(1)';
+			};
+			previewBtn.onclick = function(e) {
+				e.stopPropagation();
+				var idx = parseInt(this.getAttribute('data-action-index'));
+				var act = window.__recordedActions__[idx];
+				previewExecuteJSResult(act);
+			};
+			actionButtons.appendChild(previewBtn);
+		}
+		
+		// 添加删除按钮
+		var deleteBtn = document.createElement('button');
+		deleteBtn.setAttribute('data-action-index', index);
+		deleteBtn.style.cssText = 'padding:5px;background:#6b7280;color:white;border:none;border-radius:6px;cursor:pointer;transition:all 0.2s;width:23px;height:23px;display:flex;align-items:center;justify-content:center;';
+		deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path></svg>';
+		deleteBtn.onmouseover = function() {
+			this.style.background = '#4b5563';
+			this.style.transform = 'scale(1.08)';
+		};
+		deleteBtn.onmouseout = function() {
+			this.style.background = '#6b7280';
+			this.style.transform = 'scale(1)';
+		};
+		deleteBtn.onclick = function(e) {
+			e.stopPropagation();
+			var idx = parseInt(this.getAttribute('data-action-index'));
+			deleteAction(idx);
+		};
+		actionButtons.appendChild(deleteBtn);
+		
+		header.appendChild(leftSection);
+		header.appendChild(actionButtons);
 		
 		var details = document.createElement('div');
 		details.style.cssText = 'color:#64748b;font-size:11px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;';
@@ -529,6 +585,302 @@ if (window.__browserwingRecorder__) {
 		setTimeout(function() {
 			currentAction.style.display = 'none';
 		}, 3000);
+	};
+	
+	// 删除指定的操作步骤
+	var deleteAction = function(index) {
+		if (!window.__recordedActions__ || index < 0 || index >= window.__recordedActions__.length) {
+			console.error('[BrowserWing] Invalid action index:', index);
+			return;
+		}
+		
+		// 确认删除
+		var action = window.__recordedActions__[index];
+		var actionDesc = '#' + (index + 1) + ' ' + action.type;
+		if (!confirm('{{CONFIRM_DELETE}}\n\n' + actionDesc)) {
+			return;
+		}
+		
+		// 从数组中删除
+		window.__recordedActions__.splice(index, 1);
+		console.log('[BrowserWing] Deleted action at index:', index);
+		
+		// 更新 sessionStorage
+		try {
+			sessionStorage.setItem('__browserwing_actions__', JSON.stringify(window.__recordedActions__));
+		} catch (e) {
+			console.error('[BrowserWing] sessionStorage save error:', e);
+		}
+		
+		// 重新渲染整个列表
+		refreshActionList();
+		
+		// 更新计数
+		updateActionCount();
+		
+		showCurrentAction('{{STEP_DELETED}}');
+	};
+	
+	// 刷新整个操作列表
+	var refreshActionList = function() {
+		if (!window.__recorderUI__) return;
+		
+		var list = window.__recorderUI__.actionList;
+		var emptyState = window.__recorderUI__.emptyState;
+		
+		// 收集所有需要删除的节点（除了 emptyState）
+		var nodesToRemove = [];
+		for (var i = 0; i < list.childNodes.length; i++) {
+			var node = list.childNodes[i];
+			if (node !== emptyState) {
+				nodesToRemove.push(node);
+			}
+		}
+		
+		// 删除所有收集到的节点
+		for (var j = 0; j < nodesToRemove.length; j++) {
+			list.removeChild(nodesToRemove[j]);
+		}
+		
+		// 如果没有操作，显示空状态
+		if (window.__recordedActions__.length === 0) {
+			if (emptyState) {
+				emptyState.style.display = 'block';
+			}
+			return;
+		}
+		
+		// 隐藏空状态
+		if (emptyState) {
+			emptyState.style.display = 'none';
+		}
+		
+		// 重新添加所有操作
+		for (var k = 0; k < window.__recordedActions__.length; k++) {
+			addActionToList(window.__recordedActions__[k], k);
+		}
+	};
+	
+	// 预览 execute_js 操作的结果
+	var previewExecuteJSResult = function(action) {
+		if (!action || !action.js_code) {
+			console.error('[BrowserWing] Invalid action for preview');
+			return;
+		}
+		
+		showFullPageLoading('{{EXECUTING_CODE}}');
+		
+		try {
+			// 执行 JS 代码
+			// 注意：AI 生成的代码通常已经是 IIFE (立即执行函数表达式)，如 (() => {...})()
+			// 直接 eval 执行即可，不需要再包装一层 function
+			var result = eval(action.js_code);
+			
+			console.log('[BrowserWing] Execute result:', result);
+			
+			// 移除 Loading
+			removeFullPageLoading();
+			
+			// 显示结果弹框
+			showPreviewDialog(action, result);
+		} catch (error) {
+			// 移除 Loading
+			removeFullPageLoading();
+			
+			// 显示错误
+			alert('{{EXECUTE_ERROR}}\n\n' + error.message);
+			console.error('[BrowserWing] Execute JS error:', error);
+		}
+	};
+	
+	// 显示预览对话框
+	var showPreviewDialog = function(action, result) {
+		// 创建遮罩层
+		var overlay = document.createElement('div');
+		overlay.id = '__browserwing_preview_dialog__';
+		overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+		
+		// 创建对话框
+		var dialog = document.createElement('div');
+		dialog.style.cssText = 'background:white;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,0.3);max-width:800px;width:90%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;';
+		
+		// 对话框头部
+		var dialogHeader = document.createElement('div');
+		dialogHeader.style.cssText = 'padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;';
+		
+		var dialogTitle = document.createElement('div');
+		dialogTitle.style.cssText = 'font-size:18px;font-weight:700;color:#0f172a;';
+		dialogTitle.textContent = '{{PREVIEW_TITLE}}';
+		
+		var closeBtn = document.createElement('button');
+		closeBtn.style.cssText = 'background:none;border:none;font-size:24px;color:#6b7280;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:all 0.2s;';
+		closeBtn.textContent = '×';
+		closeBtn.onmouseover = function() {
+			this.style.background = '#f3f4f6';
+			this.style.color = '#111827';
+		};
+		closeBtn.onmouseout = function() {
+			this.style.background = 'none';
+			this.style.color = '#6b7280';
+		};
+		closeBtn.onclick = function() {
+			overlay.remove();
+		};
+		
+		dialogHeader.appendChild(dialogTitle);
+		dialogHeader.appendChild(closeBtn);
+		
+		// 对话框内容
+		var dialogContent = document.createElement('div');
+		dialogContent.style.cssText = 'padding:24px;overflow-y:auto;flex:1;';
+		
+		// 变量名显示
+		if (action.variable_name) {
+			var varName = document.createElement('div');
+			varName.style.cssText = 'margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+			varName.innerHTML = '<strong style="color:#475569;">{{VARIABLE_NAME}}:</strong> <code style="color:#1e293b;font-weight:600;">' + escapeHtml(action.variable_name) + '</code>';
+			dialogContent.appendChild(varName);
+		}
+		
+		// 结果标题
+		var resultTitle = document.createElement('div');
+		resultTitle.style.cssText = 'font-size:14px;font-weight:600;color:#475569;margin-bottom:12px;';
+		resultTitle.textContent = '{{EXECUTION_RESULT}}:';
+		dialogContent.appendChild(resultTitle);
+		
+		// 格式化 JSON（提前，以便复制按钮使用）
+		var jsonStr = '';
+		var hasValidResult = !(result === undefined || result === null);
+		
+		if (hasValidResult) {
+			try {
+				jsonStr = JSON.stringify(result, null, 2);
+			} catch (e) {
+				jsonStr = String(result);
+			}
+		}
+		
+		// 检查结果是否为空
+		if (!hasValidResult) {
+			var emptyNotice = document.createElement('div');
+			emptyNotice.style.cssText = 'padding:24px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;text-align:center;color:#991b1b;font-size:14px;';
+			emptyNotice.innerHTML = '<strong>⚠️ {{NO_DATA_RETURNED}}</strong><br><span style="font-size:12px;color:#dc2626;margin-top:8px;display:block;">{{CHECK_CODE_HINT}}</span>';
+			dialogContent.appendChild(emptyNotice);
+		} else {
+			// JSON 显示区域容器（相对定位，用于浮动复制按钮）
+			var jsonContainer = document.createElement('div');
+			jsonContainer.style.cssText = 'position:relative;';
+			
+			// 复制按钮（浮动在右上角）
+			var copyBtn = document.createElement('button');
+			copyBtn.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;z-index:10;backdrop-filter:blur(8px);';
+			copyBtn.textContent = '{{COPY}}';
+			copyBtn.onmouseover = function() {
+				this.style.background = 'rgba(255,255,255,0.25)';
+				this.style.transform = 'scale(1.05)';
+			};
+			copyBtn.onmouseout = function() {
+				this.style.background = 'rgba(255,255,255,0.15)';
+				this.style.transform = 'scale(1)';
+			};
+			
+			// 复制按钮点击事件
+			copyBtn.onclick = function() {
+				if (!jsonStr) {
+					alert('{{NO_DATA_TO_COPY}}');
+					return;
+				}
+				
+				// 复制到剪贴板
+				try {
+					// 使用现代 Clipboard API
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(jsonStr).then(function() {
+							// 成功反馈
+							var originalText = copyBtn.textContent;
+							copyBtn.textContent = '{{COPIED}}';
+							copyBtn.style.background = 'rgba(255,255,255,0.3)';
+							
+							setTimeout(function() {
+								copyBtn.textContent = originalText;
+								copyBtn.style.background = 'rgba(255,255,255,0.15)';
+							}, 2000);
+						}).catch(function(err) {
+							console.error('[BrowserWing] Copy failed:', err);
+							alert('{{COPY_FAILED}}');
+						});
+					} else {
+						// 降级方案：使用 textarea
+						var textarea = document.createElement('textarea');
+						textarea.value = jsonStr;
+						textarea.style.position = 'fixed';
+						textarea.style.opacity = '0';
+						document.body.appendChild(textarea);
+						textarea.select();
+						
+						try {
+							document.execCommand('copy');
+							// 成功反馈
+							var originalText = copyBtn.textContent;
+							copyBtn.textContent = '{{COPIED}}';
+							copyBtn.style.background = 'rgba(255,255,255,0.3)';
+							
+							setTimeout(function() {
+								copyBtn.textContent = originalText;
+								copyBtn.style.background = 'rgba(255,255,255,0.15)';
+							}, 2000);
+						} catch (err) {
+							console.error('[BrowserWing] Copy failed:', err);
+							alert('{{COPY_FAILED}}');
+						} finally {
+							document.body.removeChild(textarea);
+						}
+					}
+				} catch (err) {
+					console.error('[BrowserWing] Copy error:', err);
+					alert('{{COPY_FAILED}}');
+				}
+			};
+			
+			// JSON 显示区域
+			var jsonDisplay = document.createElement('pre');
+			jsonDisplay.style.cssText = 'background:#1e293b;color:#e2e8f0;padding:16px;padding-top:40px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;margin:0;box-shadow:inset 0 2px 4px rgba(0,0,0,0.2);';
+			jsonDisplay.textContent = jsonStr;
+			
+			jsonContainer.appendChild(copyBtn);
+			jsonContainer.appendChild(jsonDisplay);
+			dialogContent.appendChild(jsonContainer);
+			
+			// 数据统计信息
+			var stats = document.createElement('div');
+			stats.style.cssText = 'margin-top:16px;padding:12px;background:#ecfdf5;border-radius:8px;border:1px solid #a7f3d0;color:#065f46;font-size:13px;';
+			
+			var dataType = Array.isArray(result) ? 'Array' : typeof result;
+			var dataSize = '';
+			if (Array.isArray(result)) {
+				dataSize = result.length + ' {{ITEMS}}';
+			} else if (typeof result === 'object' && result !== null) {
+				dataSize = Object.keys(result).length + ' {{PROPERTIES}}';
+			}
+			
+			stats.innerHTML = '<strong>{{DATA_TYPE}}:</strong> ' + dataType + (dataSize ? ' (' + dataSize + ')' : '');
+			dialogContent.appendChild(stats);
+		}
+		
+		// 组装对话框
+		dialog.appendChild(dialogHeader);
+		dialog.appendChild(dialogContent);
+		overlay.appendChild(dialog);
+		
+		// 添加到页面
+		document.body.appendChild(overlay);
+		
+		// 点击遮罩层关闭
+		overlay.onclick = function(e) {
+			if (e.target === overlay) {
+				overlay.remove();
+			}
+		};
 	};
 	
 	// 切换抓取模式
@@ -1902,12 +2254,13 @@ if (window.__browserwingRecorder__) {
 			var target = e.target || e.srcElement;
 			if (!target || !target.tagName) return;
 			
-			// 忽略录制器 UI 自身
-			if (target.id && target.id.indexOf('__browserwing_') === 0) return;
-			if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
-			if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
-			
-			highlightElement(target);
+		// 忽略录制器 UI 自身
+		if (target.id && target.id.indexOf('__browserwing_') === 0) return;
+		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
+		if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
+		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
+		
+		highlightElement(target);
 		} catch (err) {
 			console.error('[BrowserWing] mouseover event error:', err);
 		}
@@ -1926,10 +2279,11 @@ if (window.__browserwingRecorder__) {
 			var target = e.target || e.srcElement;
 			if (!target || !target.tagName) return;
 			
-			// 忽略录制器 UI 自身的点击
-			if (target.id && target.id.indexOf('__browserwing_') === 0) return;
-			if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
-			if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
+		// 忽略录制器 UI 自身的点击
+		if (target.id && target.id.indexOf('__browserwing_') === 0) return;
+		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
+		if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
+		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
 			
 			// 如果在 AI 填充表单模式下，阻止默认行为并调用 AI 生成
 			if (window.__aiFormFillMode__) {
@@ -2392,6 +2746,7 @@ if (window.__browserwingRecorder__) {
 		if (target.id && target.id.indexOf('__browserwing_') === 0) return;
 		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
 		if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
+		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
 		
 		e.preventDefault();
 		e.stopPropagation();
@@ -2419,9 +2774,10 @@ if (window.__browserwingRecorder__) {
 			var target = e.target || e.srcElement;
 			if (!target) return;
 			
-			// 忽略录制器 UI 自身的键盘事件
-			if (target.id && target.id.indexOf('__browserwing_') === 0) return;
-			if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
+		// 忽略录制器 UI 自身的键盘事件
+		if (target.id && target.id.indexOf('__browserwing_') === 0) return;
+		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
+		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
 			
 			var keyAction = null;
 			
