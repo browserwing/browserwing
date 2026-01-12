@@ -885,6 +885,17 @@ func (h *Handler) ListBrowserConfigs(c *gin.Context) {
 		return
 	}
 
+	// 如果数据库中没有配置，创建并保存默认配置
+	if len(configs) == 0 {
+		defaultConfig := h.browserManager.GetDefaultBrowserConfig()
+		if err := h.db.SaveBrowserConfig(defaultConfig); err != nil {
+			logger.Error(c.Request.Context(), "Failed to save default browser config: %v", err)
+			c.JSON(500, gin.H{"error": "Failed to create default configuration"})
+			return
+		}
+		configs = []models.BrowserConfig{*defaultConfig}
+	}
+
 	c.JSON(200, gin.H{
 		"configs": configs,
 		"count":   len(configs),

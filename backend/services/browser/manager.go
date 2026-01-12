@@ -709,7 +709,6 @@ func (m *Manager) ClearInPageRecordingState() {
 
 // PlayScript 回放脚本
 func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*models.PlayResult, *rod.Page, error) {
-
 	if !m.isRunning || m.browser == nil {
 		return nil, nil, fmt.Errorf("browser is not running")
 	}
@@ -979,10 +978,52 @@ func (m *Manager) checkInPageRecordingRequests(ctx context.Context, page *rod.Pa
 	}
 }
 
+// isHeadlessEnvironment 检测当前环境是否为无GUI环境
+func isHeadlessEnvironment() bool {
+	// 检查是否在 Docker 容器中
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+
+	// 检查 cgroup 文件是否包含 docker 或 containerd 标识
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		content := string(data)
+		if strings.Contains(content, "docker") || strings.Contains(content, "containerd") {
+			return true
+		}
+	}
+
+	// Linux 环境下检查 DISPLAY 和 WAYLAND_DISPLAY 环境变量
+	display := os.Getenv("DISPLAY")
+	waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
+
+	// 如果两个环境变量都为空，则认为是无GUI环境
+	if display == "" && waylandDisplay == "" {
+		return true
+	}
+
+	return false
+}
+
+// GetDefaultBrowserConfig 获取默认浏览器配置（公开方法）
+func (m *Manager) GetDefaultBrowserConfig() *models.BrowserConfig {
+	return m.getDefaultBrowserConfig()
+}
+
 // getDefaultBrowserConfig 获取默认浏览器配置
 func (m *Manager) getDefaultBrowserConfig() *models.BrowserConfig {
 	useStealth := true
-	headless := false
+	// 根据环境自动设置 headless 默认值
+	// 如果是无GUI环境（Docker、Linux服务器等），默认使用 headless 模式
+	headless := isHeadlessEnvironment()
+
+	// 记录环境检测结果
+	reason := "检测到GUI环境，默认启用有界面模式"
+	if headless {
+		reason = "检测到无GUI环境，默认启用headless模式"
+	}
+	logger.Info(context.Background(), "检测浏览器运行环境: headless=%v, %s", headless, reason)
+
 	return &models.BrowserConfig{
 		ID:          "default",
 		Name:        "默认配置",
