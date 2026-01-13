@@ -45,7 +45,16 @@ export function extractScriptParameters(script: Script): string[] {
     }
   })
   
-  return Array.from(allPlaceholders).sort()
+  const variables = Array.from(allPlaceholders).sort()
+  if (script.variables) {
+    Object.keys(script.variables).forEach(variable => {
+      if (!variables.includes(variable)) {
+        variables.push(variable)
+      }
+    })
+  }
+  console.log('variables', variables)
+  return variables
 }
 
 /**

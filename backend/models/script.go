@@ -117,6 +117,9 @@ type Script struct {
 	MCPCommandName        string                 `json:"mcp_command_name"`        // MCP 命令名称（如 "execute_script"）
 	MCPCommandDescription string                 `json:"mcp_command_description"` // MCP 命令描述
 	MCPInputSchema        map[string]interface{} `json:"mcp_input_schema"`        // MCP 命令输入参数 schema（JSON Schema 格式）
+
+	// 预设变量（可以在脚本中使用 ${变量名} 引用，也可以在外部调用时传入覆盖）
+	Variables map[string]string `json:"variables,omitempty"` // 预设变量，key 为变量名，value 为默认值
 }
 
 func (s *Script) Copy() *Script {
@@ -128,6 +131,11 @@ func (s *Script) Copy() *Script {
 
 	tags := make([]string, len(s.Tags))
 	copy(tags, s.Tags)
+
+	variables := make(map[string]string)
+	for k, v := range s.Variables {
+		variables[k] = v
+	}
 
 	return &Script{
 		ID:                    s.ID,
@@ -147,6 +155,7 @@ func (s *Script) Copy() *Script {
 		MCPCommandName:        s.MCPCommandName,
 		MCPCommandDescription: s.MCPCommandDescription,
 		MCPInputSchema:        s.MCPInputSchema,
+		Variables:             variables,
 	}
 }
 

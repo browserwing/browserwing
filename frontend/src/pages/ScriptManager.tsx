@@ -105,6 +105,11 @@ export default function ScriptManager() {
   // 添加操作下拉菜单状态
   const [showAddActionMenu, setShowAddActionMenu] = useState(false)
 
+  // 变量管理相关
+  const [editingVariables, setEditingVariables] = useState<Record<string, string>>({})
+  const [newVariableName, setNewVariableName] = useState('')
+  const [newVariableValue, setNewVariableValue] = useState('')
+
   const showMessage = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     setMessage(msg)
     setToastType(type)
@@ -474,6 +479,7 @@ export default function ScriptManager() {
   const handleEditScript = (script: Script) => {
     setEditingScript(script)
     setEditingActions([...script.actions])
+    setEditingVariables(script.variables ? { ...script.variables } : {})
     setExpandedScriptId(script.id) // 自动展开操作列表
   }
 
@@ -487,10 +493,12 @@ export default function ScriptManager() {
         description: editingScript.description,
         url: editingScript.url,
         actions: editingActions,
+        variables: editingVariables,
       })
       showMessage(t('script.messages.updateSuccess'), 'success')
       setEditingScript(null)
       setEditingActions([])
+      setEditingVariables({})
       await loadScripts()
     } catch (err: any) {
       showMessage(err.response?.data?.error || t('script.messages.updateError'), 'error')
@@ -545,6 +553,38 @@ export default function ScriptManager() {
         return arrayMove(items, oldIndex, newIndex)
       })
     }
+  }
+
+  const handleAddVariable = () => {
+    if (!newVariableName.trim()) {
+      showMessage(t('script.messages.variableNameRequired') || '变量名不能为空', 'error')
+      return
+    }
+    if (editingVariables[newVariableName]) {
+      showMessage(t('script.messages.variableExists') || '变量已存在', 'error')
+      return
+    }
+    setEditingVariables({
+      ...editingVariables,
+      [newVariableName]: newVariableValue
+    })
+    setNewVariableName('')
+    setNewVariableValue('')
+    showMessage(t('script.messages.variableAdded') || '变量已添加', 'success')
+  }
+
+  const handleUpdateVariable = (name: string, value: string) => {
+    setEditingVariables({
+      ...editingVariables,
+      [name]: value
+    })
+  }
+
+  const handleDeleteVariable = (name: string) => {
+    const newVariables = { ...editingVariables }
+    delete newVariables[name]
+    setEditingVariables(newVariables)
+    showMessage(t('script.messages.variableDeleted') || '变量已删除', 'success')
   }
 
   const handleAddAction = (type: string) => {
@@ -797,6 +837,11 @@ export default function ScriptManager() {
               actions: script.actions,
             }
             
+            // 如果导入数据包含变量，则更新变量
+            if (script.variables !== undefined) {
+              updateData.variables = script.variables
+            }
+            
             // 如果导入数据包含MCP信息，则更新MCP信息
             if (script.is_mcp_command !== undefined) {
               updateData.is_mcp_command = script.is_mcp_command
@@ -833,6 +878,11 @@ export default function ScriptManager() {
               tags: script.tags || [],
               can_publish: script.can_publish || false,
               can_fetch: script.can_fetch || false,
+            }
+            
+            // 如果导入数据包含变量，则设置变量
+            if (script.variables !== undefined) {
+              createData.variables = script.variables
             }
             
             // 如果导入数据包含MCP信息，则设置MCP信息
@@ -1680,9 +1730,104 @@ export default function ScriptManager() {
                           </div>
                         </div>
 
-                        {/* Expanded Actions List */}
+                        {/* Expanded Content */}
                         {isExpanded && (
                           <div className="border-t border-gray-200 dark:border-gray-700 px-4 pb-4">
+                            {/* 变量管理区域 */}
+                            {(isEditing || (script.variables && Object.keys(script.variables).length > 0)) && (
+                              <div className="mt-3 pb-3 border-b border-gray-200 dark:border-gray-700">
+                                <h4 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                  {t('script.editor.variables.title') || '脚本变量'}
+                                </h4>
+                                
+                                {isEditing ? (
+                                  <div className="space-y-3">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      {t('script.editor.variables.description') || '定义可在脚本中使用的变量，使用 ${变量名} 引用。外部调用时可传入参数覆盖这些默认值。'}
+                                    </p>
+                                    
+                                    {/* 现有变量列表 */}
+                                    {Object.keys(editingVariables).length > 0 && (
+                                      <div className="space-y-2">
+                                        {Object.entries(editingVariables).map(([name, value]) => (
+                                          <div key={name} className="flex items-center gap-2">
+                                            <code className="text-sm font-mono text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded min-w-[120px] flex items-center">
+                                              ${'{' + name + '}'}
+                                            </code>
+                                            <input
+                                              type="text"
+                                              value={value}
+                                              onChange={(e) => handleUpdateVariable(name, e.target.value)}
+                                              className="input flex-1 text-sm"
+                                              placeholder={t('script.editor.variables.valuePlaceholder') || '变量默认值'}
+                                            />
+                                            <button
+                                              onClick={() => handleDeleteVariable(name)}
+                                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                              title={t('script.editor.variables.deleteVariable') || '删除变量'}
+                                            >
+                                              <X className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    
+                                    {/* 添加新变量 */}
+                                    <div className="flex items-center gap-2 pt-2">
+                                      <input
+                                        type="text"
+                                        value={newVariableName}
+                                        onChange={(e) => setNewVariableName(e.target.value)}
+                                        className="input flex-1 text-sm"
+                                        placeholder={t('script.editor.variables.namePlaceholder') || '变量名（如：username）'}
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            handleAddVariable()
+                                          }
+                                        }}
+                                      />
+                                      <input
+                                        type="text"
+                                        value={newVariableValue}
+                                        onChange={(e) => setNewVariableValue(e.target.value)}
+                                        className="input flex-1 text-sm"
+                                        placeholder={t('script.editor.variables.valuePlaceholder') || '默认值'}
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            handleAddVariable()
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={handleAddVariable}
+                                        className="btn-primary px-4 py-2 text-sm flex items-center gap-1"
+                                        title={t('script.editor.variables.addVariable') || '添加变量'}
+                                      >
+                                        <Plus className="w-4 h-4" />
+                                        {t('common.add') || '添加'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {Object.entries(script.variables || {}).map(([name, value]) => (
+                                      <div key={name} className="flex items-center gap-2 text-sm">
+                                        <code className="font-mono text-gray-700 dark:text-gray-300 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded min-w-[120px]">
+                                          ${'{' + name + '}'}
+                                        </code>
+                                        <span className="text-gray-600 dark:text-gray-400">=</span>
+                                        <span className="text-gray-900 dark:text-gray-100">{value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* 操作步骤列表 */}
                             <div className="mt-3">
                               <div className="flex items-center justify-between mb-3">
                                 <h4 className="text-base font-semibold text-gray-800 dark:text-gray-200 flex items-center">

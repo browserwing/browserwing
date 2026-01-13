@@ -510,6 +510,7 @@ func (h *Handler) UpdateScript(c *gin.Context) {
 		MCPCommandName        *string                `json:"mcp_command_name"`
 		MCPCommandDescription *string                `json:"mcp_command_description"`
 		MCPInputSchema        map[string]interface{} `json:"mcp_input_schema"`
+		Variables             map[string]string      `json:"variables"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -533,6 +534,9 @@ func (h *Handler) UpdateScript(c *gin.Context) {
 		if len(req.Actions) > 0 {
 			script.Duration = req.Actions[len(req.Actions)-1].Timestamp - req.Actions[0].Timestamp
 		}
+	}
+	if req.Variables != nil {
+		script.Variables = req.Variables
 	}
 	if req.Tags != nil {
 		script.Tags = req.Tags
@@ -613,15 +617,32 @@ func (h *Handler) PlayScript(c *gin.Context) {
 		req.Params = make(map[string]string)
 	}
 
-	// 如果提供了参数,创建脚本副本并替换占位符
+	// 创建脚本副本并合并参数
 	scriptToRun := script.Copy()
-	if len(req.Params) > 0 {
+
+	// 合并参数：先使用脚本预设变量，再用外部传入的参数覆盖
+	mergedParams := make(map[string]string)
+
+	// 1. 首先添加脚本的预设变量
+	if scriptToRun.Variables != nil {
+		for key, value := range scriptToRun.Variables {
+			mergedParams[key] = value
+		}
+	}
+
+	// 2. 外部传入的参数会覆盖预设变量
+	for key, value := range req.Params {
+		mergedParams[key] = value
+	}
+
+	// 如果有参数（包括预设变量和外部参数），替换占位符
+	if len(mergedParams) > 0 {
 
 		// 如果用户提供了 url 参数,使用它;否则替换 URL 中的占位符
-		if urlParam, ok := req.Params["url"]; ok && urlParam != "" {
+		if urlParam, ok := mergedParams["url"]; ok && urlParam != "" {
 			scriptToRun.URL = urlParam
 		} else {
-			scriptToRun.URL = replacePlaceholders(scriptToRun.URL, req.Params)
+			scriptToRun.URL = replacePlaceholders(scriptToRun.URL, mergedParams)
 		}
 
 		// 复制 actions 数组以避免修改原始数据
@@ -630,17 +651,17 @@ func (h *Handler) PlayScript(c *gin.Context) {
 
 		// 替换所有 action 中的占位符
 		for i := range scriptToRun.Actions {
-			scriptToRun.Actions[i].Selector = replacePlaceholders(scriptToRun.Actions[i].Selector, req.Params)
-			scriptToRun.Actions[i].XPath = replacePlaceholders(scriptToRun.Actions[i].XPath, req.Params)
-			scriptToRun.Actions[i].Value = replacePlaceholders(scriptToRun.Actions[i].Value, req.Params)
-			scriptToRun.Actions[i].URL = replacePlaceholders(scriptToRun.Actions[i].URL, req.Params)
-			scriptToRun.Actions[i].JSCode = replacePlaceholders(scriptToRun.Actions[i].JSCode, req.Params)
+			scriptToRun.Actions[i].Selector = replacePlaceholders(scriptToRun.Actions[i].Selector, mergedParams)
+			scriptToRun.Actions[i].XPath = replacePlaceholders(scriptToRun.Actions[i].XPath, mergedParams)
+			scriptToRun.Actions[i].Value = replacePlaceholders(scriptToRun.Actions[i].Value, mergedParams)
+			scriptToRun.Actions[i].URL = replacePlaceholders(scriptToRun.Actions[i].URL, mergedParams)
+			scriptToRun.Actions[i].JSCode = replacePlaceholders(scriptToRun.Actions[i].JSCode, mergedParams)
 
 			// 替换文件路径中的占位符
 			if len(scriptToRun.Actions[i].FilePaths) > 0 {
 				newFilePaths := make([]string, len(scriptToRun.Actions[i].FilePaths))
 				for j, path := range scriptToRun.Actions[i].FilePaths {
-					newFilePaths[j] = replacePlaceholders(path, req.Params)
+					newFilePaths[j] = replacePlaceholders(path, mergedParams)
 				}
 				scriptToRun.Actions[i].FilePaths = newFilePaths
 			}

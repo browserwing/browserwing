@@ -252,6 +252,7 @@ export interface Script {
   mcp_command_name?: string
   mcp_command_description?: string
   mcp_input_schema?: Record<string, any>
+  variables?: Record<string, string>  // 预设变量
 }
 
 export interface SaveScriptRequest {
@@ -263,6 +264,7 @@ export interface SaveScriptRequest {
   tags?: string[]
   can_publish?: boolean
   can_fetch?: boolean
+  variables?: Record<string, string>  // 预设变量
 }
 
 export interface PlayResult {

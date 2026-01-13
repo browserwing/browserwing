@@ -214,8 +214,17 @@ func (s *MCPServer) createToolHandler(script *models.Script) func(ctx context.Co
 		// 创建脚本副本并替换占位符
 		scriptToRun := script.Copy()
 
-		// 将 arguments 转换为 map[string]string
+		// 合并参数：先使用脚本预设变量，再用外部传入的参数覆盖
 		params := make(map[string]string)
+
+		// 1. 首先添加脚本的预设变量
+		if scriptToRun.Variables != nil {
+			for key, value := range scriptToRun.Variables {
+				params[key] = value
+			}
+		}
+
+		// 2. 外部传入的参数会覆盖预设变量
 		if request.Params.Arguments != nil {
 			if argsMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
 				for key, value := range argsMap {
@@ -370,6 +379,10 @@ func (s *MCPServer) CallTool(ctx context.Context, name string, arguments map[str
 	// 创建脚本副本并替换占位符
 	scriptToRun := script.Copy()
 	params := make(map[string]string)
+	for key, value := range scriptToRun.Variables {
+		params[key] = value
+	}
+
 	for key, value := range arguments {
 		params[key] = fmt.Sprintf("%v", value)
 	}

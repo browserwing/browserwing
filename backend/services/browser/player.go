@@ -1315,7 +1315,7 @@ func (p *Player) executeUploadFile(ctx context.Context, page *rod.Page, action m
 	}
 
 	// 检查是否有文件路径
-	if action.FilePaths == nil || len(action.FilePaths) == 0 {
+	if len(action.FilePaths) == 0 {
 		return fmt.Errorf("no file paths specified for upload")
 	}
 
