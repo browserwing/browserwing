@@ -13,6 +13,7 @@ if (window.__browserwingRecorder__) {
 	window.__aiFormFillMode__ = false; // AI填充表单模式标志
 	window.__recorderUI__ = null; // 录制器 UI 元素
 	window.__highlightElement__ = null; // 高亮元素
+	window.__highlightLabel__ = null; // 高亮标签元素
 	window.__selectedElement__ = null; // AI模式选中的元素
 	window.__recordingFloatButton__ = null; // 浮动录制按钮
 	window.__isRecordingActive__ = false; // 录制是否激活
@@ -324,6 +325,13 @@ if (window.__browserwingRecorder__) {
 		highlight.style.cssText = 'position:absolute;pointer-events:none;z-index:999998;border:2px solid #374151;border-radius:4px;box-shadow:0 0 0 2px rgba(55,65,81,0.1);transition:all 0.15s cubic-bezier(0.4,0,0.2,1);display:none;';
 		document.body.appendChild(highlight);
 		window.__highlightElement__ = highlight;
+		
+		// 创建信息标签
+		var infoLabel = document.createElement('div');
+		infoLabel.id = '__browserwing_highlight_label__';
+		infoLabel.style.cssText = 'position:absolute;pointer-events:none;z-index:999999;background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:white;padding:6px 12px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;max-width:500px;line-height:1.4;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);';
+		document.body.appendChild(infoLabel);
+		window.__highlightLabel__ = infoLabel;
 	};
 	
 	// 高亮元素
@@ -332,6 +340,7 @@ if (window.__browserwingRecorder__) {
 		
 		var rect = element.getBoundingClientRect();
 		var highlight = window.__highlightElement__;
+		var label = window.__highlightLabel__;
 		
 		highlight.style.display = 'block';
 		highlight.style.left = (rect.left + window.scrollX - 3) + 'px';
@@ -347,12 +356,62 @@ if (window.__browserwingRecorder__) {
 			highlight.style.borderColor = '#82dee4ff';
 			highlight.style.boxShadow = '0 0 0 2px rgba(119, 192, 252, 0.39)';
 		}
+		
+		// 更新信息标签
+		if (label) {
+			// 获取元素信息
+			var tagName = element.tagName ? element.tagName.toLowerCase() : 'unknown';
+			var selectors = getSelector(element);
+			var xpath = selectors.xpath || '//unknown';
+			
+			// 截断过长的 XPath
+			var displayXPath = xpath;
+			if (xpath.length > 80) {
+				displayXPath = xpath.substring(0, 77) + '...';
+			}
+			
+			// 构建标签内容
+			var labelHTML = '<div style="margin-bottom:2px;"><span style="color:#60a5fa;font-weight:700;">&lt;' + escapeHtml(tagName) + '&gt;</span></div>';
+			labelHTML += '<div style="color:#94a3b8;font-size:11px;word-break:break-all;">' + escapeHtml(displayXPath) + '</div>';
+			
+			label.innerHTML = labelHTML;
+			label.style.display = 'block';
+			
+			// 计算标签位置（左上角，向上偏移）
+			var labelLeft = rect.left + window.scrollX - 3;
+			var labelTop = rect.top + window.scrollY - 3;
+			
+			// 确保标签不会超出视口顶部
+			if (labelTop < window.scrollY + 10) {
+				labelTop = rect.bottom + window.scrollY + 5; // 如果上方空间不够，放到元素下方
+			} else {
+				// 获取标签高度后再调整位置
+				label.style.left = labelLeft + 'px';
+				label.style.top = labelTop + 'px';
+				var labelHeight = label.offsetHeight;
+				labelTop = labelTop - labelHeight - 8; // 向上偏移
+			}
+			
+			label.style.left = labelLeft + 'px';
+			label.style.top = labelTop + 'px';
+			
+			// 确保标签不会超出视口右侧
+			var labelRight = labelLeft + label.offsetWidth;
+			var viewportRight = window.scrollX + window.innerWidth;
+			if (labelRight > viewportRight) {
+				labelLeft = viewportRight - label.offsetWidth - 10;
+				label.style.left = labelLeft + 'px';
+			}
+		}
 	};
 	
 	// 隐藏高亮
 	var hideHighlight = function() {
 		if (window.__highlightElement__) {
 			window.__highlightElement__.style.display = 'none';
+		}
+		if (window.__highlightLabel__) {
+			window.__highlightLabel__.style.display = 'none';
 		}
 	};
 	
