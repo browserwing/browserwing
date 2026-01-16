@@ -109,7 +109,7 @@ func (m *Manager) LoadAll() error {
 			extractor, err := NewExtractor(llmCfg, m.db)
 			if err != nil {
 				// 记录错误但继续加载其他配置
-				fmt.Printf("Failed to load LLM config %s: %v\n", cfg.Name, err)
+				logger.Error(context.Background(), "Failed to load LLM config %s: %v", cfg.Name, err)
 				continue
 			}
 

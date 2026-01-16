@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/browserwing/browserwing/pkg/logger"
 	mcpgo "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -89,19 +90,19 @@ func (r *MCPToolRegistry) registerNavigateTool() error {
 	)
 
 	handler := func(ctx context.Context, request mcpgo.CallToolRequest) (*mcpgo.CallToolResult, error) {
-		fmt.Printf("[MCP Handler] browser_navigate called\n")
+		logger.Info(ctx, "[MCP Handler] browser_navigate called")
 
 		args := request.Params.Arguments.(map[string]interface{})
 		url, _ := args["url"].(string)
-		fmt.Printf("[MCP Handler] URL: %s\n", url)
+		logger.Info(ctx, "[MCP Handler] URL: %s", url)
 
 		// 检查 context
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[MCP Handler] Context already done: %v\n", ctx.Err())
+			logger.Info(ctx, "[MCP Handler] Context already done: %v", ctx.Err())
 			return mcpgo.NewToolResultError(fmt.Sprintf("context error: %v", ctx.Err())), nil
 		default:
-			fmt.Printf("[MCP Handler] Context is active\n")
+			logger.Info(ctx, "[MCP Handler] Context is active")
 		}
 
 		opts := &NavigateOptions{
@@ -111,15 +112,15 @@ func (r *MCPToolRegistry) registerNavigateTool() error {
 		if waitUntil, ok := args["wait_until"].(string); ok && waitUntil != "" {
 			opts.WaitUntil = waitUntil
 		}
-		fmt.Printf("[MCP Handler] Options: WaitUntil=%s, Timeout=%v\n", opts.WaitUntil, opts.Timeout)
+		logger.Info(ctx, "[MCP Handler] Options: WaitUntil=%s, Timeout=%v", opts.WaitUntil, opts.Timeout)
 
-		fmt.Printf("[MCP Handler] Calling executor.Navigate...\n")
+		logger.Info(ctx, "[MCP Handler] Calling executor.Navigate...")
 		result, err := r.executor.Navigate(ctx, url, opts)
 		if err != nil {
-			fmt.Printf("[MCP Handler] Navigate failed: %v\n", err)
+			logger.Info(ctx, "[MCP Handler] Navigate failed: %v", err)
 			return mcpgo.NewToolResultError(err.Error()), nil
 		}
-		fmt.Printf("[MCP Handler] Navigate succeeded\n")
+		logger.Info(ctx, "[MCP Handler] Navigate succeeded")
 
 		// 构建返回文本，包含消息和语义树
 		var responseText string

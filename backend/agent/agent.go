@@ -24,7 +24,28 @@ import (
 	localtools "github.com/browserwing/browserwing/agent/tools"
 )
 
-const maxIterations = 3
+// 导入全局工具结果存储
+var toolResultStore = localtools.GlobalToolResultStore
+
+const maxIterations = 4
+
+// getStringFromMap 从 map 中安全地获取字符串值
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+// min 返回两个整数中的较小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 const (
 	defSystemPrompt = `You are a helpful AI assistant with access to various tools. When users ask questions or make requests, you should:
@@ -47,9 +68,13 @@ type ChatMessage struct {
 
 // ToolCall 工具调用信息
 type ToolCall struct {
-	ToolName string `json:"tool_name"`
-	Status   string `json:"status"` // calling, success, error
-	Message  string `json:"message,omitempty"`
+	ToolName     string                 `json:"tool_name"`
+	Status       string                 `json:"status"` // calling, success, error
+	Message      string                 `json:"message,omitempty"`
+	Instructions string                 `json:"instructions,omitempty"` // 工具调用说明（为什么调用、如何使用）
+	Arguments    map[string]interface{} `json:"arguments,omitempty"`    // 工具调用参数
+	Result       string                 `json:"result,omitempty"`       // 工具执行结果
+	Timestamp    time.Time              `json:"timestamp"`              // 调用时间戳
 }
 
 // ChatSession 聊天会话
@@ -86,6 +111,9 @@ func (t *MCPTool) Description() string {
 }
 
 func (t *MCPTool) InputSchema() map[string]interface{} {
+	// 注意：现在 MCPTool 会被 ToolWrapper 包装
+	// ToolWrapper 会自动添加 instructions 参数
+	// 这里直接返回原始 schema 即可
 	return t.inputSchema
 }
 
@@ -269,9 +297,14 @@ func (am *AgentManager) initMCPTools() error {
 			mcpServer:   am.mcpServer,
 		}
 
+		// 包装工具以添加 instructions 参数和捕获执行结果
+		wrappedTool := localtools.WrapTool(tool)
+		
 		// 注册到工具注册表
-		am.toolReg.Register(tool)
+		am.toolReg.Register(wrappedTool)
 		count++
+		
+		logger.Info(am.ctx, "Registered script MCP tool (wrapped): %s", script.MCPCommandName)
 	}
 
 	if count == 0 {
@@ -366,12 +399,16 @@ func (am *AgentManager) initExecutorTools() error {
 			mcpServer:   am.mcpServer,
 		}
 
+		// 包装工具以添加 instructions 参数和捕获执行结果
+		wrappedTool := localtools.WrapTool(tool)
+
 		// 注册到工具注册表
-		am.toolReg.Register(tool)
+		am.toolReg.Register(wrappedTool)
 		count++
+		
+		logger.Debug(am.ctx, "Registered executor tool (wrapped): %s", meta.Name)
 	}
 
-	logger.Info(am.ctx, "[initExecutorTools] ✓ Registered %d Executor tools", count)
 	return nil
 }
 
@@ -544,11 +581,27 @@ func (am *AgentManager) loadSessionsFromDB() error {
 		for _, dbMsg := range dbMessages {
 			toolCalls := make([]*ToolCall, 0, len(dbMsg.ToolCalls))
 			for _, tc := range dbMsg.ToolCalls {
-				toolCalls = append(toolCalls, &ToolCall{
-					ToolName: tc["tool_name"].(string),
-					Status:   tc["status"].(string),
-					Message:  tc["message"].(string),
-				})
+				toolCall := &ToolCall{
+					ToolName: getStringFromMap(tc, "tool_name"),
+					Status:   getStringFromMap(tc, "status"),
+					Message:  getStringFromMap(tc, "message"),
+					Instructions: getStringFromMap(tc, "instructions"),
+					Result:  getStringFromMap(tc, "result"),
+				}
+				
+				// 加载 arguments
+				if args, ok := tc["arguments"].(map[string]interface{}); ok {
+					toolCall.Arguments = args
+				}
+				
+				// 加载 timestamp
+				if tsStr, ok := tc["timestamp"].(string); ok {
+					if ts, err := time.Parse(time.RFC3339, tsStr); err == nil {
+						toolCall.Timestamp = ts
+					}
+				}
+				
+				toolCalls = append(toolCalls, toolCall)
 			}
 
 			messages = append(messages, ChatMessage{
@@ -796,7 +849,7 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 				}
 
 			case interfaces.AgentEventToolResult:
-				logger.Warn(ctx, "Received unhandled tool result event: %+v", event)
+				// 工具执行结果
 				if event.ToolCall == nil {
 					logger.Error(ctx, "Tool result event missing ToolCall information")
 					continue
@@ -804,10 +857,42 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 				tc := event.ToolCall
 				toolCall, exists := toolCallMap[tc.Name]
 				if !exists {
+					logger.Warn(ctx, "[ToolResult Event] Tool call not found in map: %s", tc.Name)
 					continue
 				}
 
-				// 更新工具调用状态
+				// 详细日志：查看事件的完整结构
+				logger.Info(ctx, "[ToolResult Event] Tool: %s, Status: %s, Result length: %d", 
+					tc.Name, tc.Status, len(tc.Result))
+				logger.Info(ctx, "[ToolResult Event] ToolCall details - ID: %s, Arguments: %s, Result: %s", 
+					tc.ID, tc.Arguments, tc.Result)
+				logger.Info(ctx, "[ToolResult Event] Event.Content: %s", event.Content)
+				if event.Metadata != nil {
+					logger.Info(ctx, "[ToolResult Event] Event.Metadata: %+v", event.Metadata)
+				}
+
+				// 尝试从多个地方获取执行结果
+				resultData := tc.Result
+				if resultData == "" && event.Content != "" {
+					resultData = event.Content
+					logger.Info(ctx, "[ToolResult Event] Using event.Content as result")
+				}
+				if resultData == "" && event.Metadata != nil {
+					if result, ok := event.Metadata["result"].(string); ok && result != "" {
+						resultData = result
+						logger.Info(ctx, "[ToolResult Event] Using metadata.result as result")
+					}
+				}
+				// 最后尝试从全局存储中获取（工具包装器会保存结果）
+				if resultData == "" {
+					storedResult := toolResultStore.GetResult(tc.Name)
+					if storedResult != "" {
+						resultData = storedResult
+						logger.Info(ctx, "[ToolResult Event] Using GlobalToolResultStore result (length: %d)", len(resultData))
+					}
+				}
+
+				// 更新工具调用状态和结果
 				switch tc.Status {
 				case "executing":
 					toolCall.Status = "calling"
@@ -815,9 +900,22 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 				case "completed":
 					toolCall.Status = "success"
 					toolCall.Message = "调用成功"
+					// 保存执行结果
+					if resultData != "" {
+						toolCall.Result = resultData
+						logger.Info(ctx, "[ToolResult Event] Saved result (first 200 chars): %s", 
+							resultData[:min(200, len(resultData))])
+					} else {
+						logger.Warn(ctx, "[ToolResult Event] Result is empty!")
+					}
 				case "error":
 					toolCall.Status = "error"
 					toolCall.Message = "调用失败"
+					// 保存错误信息
+					if resultData != "" {
+						toolCall.Result = resultData
+						logger.Info(ctx, "[ToolResult Event] Saved error result: %s", resultData)
+					}
 				}
 
 				// 发送工具调用状态
@@ -827,7 +925,6 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 				}
 
 			case interfaces.AgentEventToolCall:
-				logger.Warn(ctx, "Received unhandled tool call event: %+v", event)
 				// 工具调用
 				if event.ToolCall == nil {
 					logger.Error(ctx, "Tool call event missing ToolCall information")
@@ -839,9 +936,40 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 				toolCall, exists := toolCallMap[tc.Name]
 				if !exists {
 					toolCall = &ToolCall{
-						ToolName: tc.Name,
-						Status:   "calling",
+						ToolName:  tc.Name,
+						Status:    "calling",
+						Timestamp: time.Now(),
+						Arguments: make(map[string]interface{}),
 					}
+					
+					logger.Info(ctx, "[ToolCall Event] Tool: %s, Arguments JSON: %s", tc.Name, tc.Arguments)
+					
+					// 提取 instructions 和其他参数
+					if tc.Arguments != "" {
+						// 解析参数 JSON
+						var args map[string]interface{}
+						if err := json.Unmarshal([]byte(tc.Arguments), &args); err == nil {
+							logger.Info(ctx, "[ToolCall Event] Parsed args: %+v", args)
+							
+							// 提取 instructions
+							if instructions, ok := args["instructions"].(string); ok {
+								toolCall.Instructions = instructions
+								logger.Info(ctx, "[ToolCall Event] Found instructions: %s", instructions)
+								// 从参数中移除 instructions，保留实际的工具参数
+								delete(args, "instructions")
+							} else {
+								logger.Warn(ctx, "[ToolCall Event] No instructions found in args")
+							}
+							toolCall.Arguments = args
+							logger.Info(ctx, "[ToolCall Event] Final toolCall - Instructions: %s, Args: %+v", 
+								toolCall.Instructions, toolCall.Arguments)
+						} else {
+							logger.Error(ctx, "[ToolCall Event] Failed to parse arguments JSON: %v", err)
+						}
+					} else {
+						logger.Warn(ctx, "[ToolCall Event] Arguments is empty")
+					}
+					
 					toolCallMap[tc.Name] = toolCall
 					assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, toolCall)
 				}
@@ -875,10 +1003,17 @@ processingComplete:
 	// 保存助手消息到数据库
 	var toolCallsData []map[string]interface{}
 	for _, tc := range assistantMsg.ToolCalls {
+		logger.Info(ctx, "Saving tool call to DB: name=%s, status=%s, instructions=%s, args=%+v, result_len=%d", 
+			tc.ToolName, tc.Status, tc.Instructions, tc.Arguments, len(tc.Result))
+		
 		toolCallsData = append(toolCallsData, map[string]interface{}{
-			"tool_name": tc.ToolName,
-			"status":    tc.Status,
-			"message":   tc.Message,
+			"tool_name":    tc.ToolName,
+			"status":       tc.Status,
+			"message":      tc.Message,
+			"instructions": tc.Instructions,
+			"arguments":    tc.Arguments,
+			"result":       tc.Result,
+			"timestamp":    tc.Timestamp.Format(time.RFC3339),
 		})
 	}
 	dbAssistantMsg := &models.AgentMessage{

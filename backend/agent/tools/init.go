@@ -3,12 +3,196 @@ package tools
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Ingenimax/agent-sdk-go/pkg/interfaces"
 	"github.com/Ingenimax/agent-sdk-go/pkg/tools"
 	"github.com/browserwing/browserwing/models"
+	"github.com/browserwing/browserwing/pkg/logger"
 	"github.com/browserwing/browserwing/storage"
 )
+
+// toolResultContextKey 用于在 context 中存储工具执行结果
+type toolResultContextKey struct{}
+
+// ToolResultStore 存储工具执行结果
+type ToolResultStore struct {
+	mu      sync.RWMutex
+	results map[string]string // toolName -> result
+}
+
+// GlobalToolResultStore 全局工具结果存储
+var GlobalToolResultStore = &ToolResultStore{
+	results: make(map[string]string),
+}
+
+// SetResult 设置工具执行结果
+func (s *ToolResultStore) SetResult(toolName, result string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.results[toolName] = result
+}
+
+// GetResult 获取并清除工具执行结果
+func (s *ToolResultStore) GetResult(toolName string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := s.results[toolName]
+	delete(s.results, toolName) // 获取后清除
+	return result
+}
+
+// ToolWithSchema 定义带有 InputSchema 方法的工具接口
+type ToolWithSchema interface {
+	interfaces.Tool
+	InputSchema() map[string]interface{}
+}
+
+// ToolWrapper 工具包装器，为所有工具添加 instructions 参数
+type ToolWrapper struct {
+	originalTool interfaces.Tool
+}
+
+// InputSchema 重写 InputSchema 方法，添加 instructions 参数
+func (w *ToolWrapper) InputSchema() map[string]interface{} {
+	logger.Info(context.Background(), "[ToolWrapper.InputSchema] Called for tool: %s", w.Name())
+
+	var originalSchema map[string]interface{}
+
+	// 尝试获取原始 schema
+	if toolWithSchema, ok := w.originalTool.(ToolWithSchema); ok {
+		originalSchema = toolWithSchema.InputSchema()
+		logger.Info(context.Background(), "[ToolWrapper.InputSchema] Got original schema from tool")
+	} else {
+		// 如果工具没有 InputSchema，创建一个基本的
+		originalSchema = map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+		}
+		logger.Info(context.Background(), "[ToolWrapper.InputSchema] Created basic schema")
+	}
+
+	// 复制 schema
+	schema := make(map[string]interface{})
+	for k, v := range originalSchema {
+		schema[k] = v
+	}
+
+	// 添加 instructions 参数到 properties
+	properties, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		properties = make(map[string]interface{})
+		schema["properties"] = properties
+	}
+
+	// 添加 instructions 字段
+	properties["instructions"] = map[string]interface{}{
+		"type":        "string",
+		"description": instructionsDescription,
+	}
+
+	// 将 instructions 添加到 required 列表
+	required, ok := schema["required"].([]interface{})
+	if !ok {
+		required = []interface{}{}
+	}
+	required = append(required, "instructions")
+	schema["required"] = required
+
+	logger.Info(context.Background(), "[ToolWrapper.InputSchema] Final schema has %d properties, required: %v",
+		len(properties), required)
+
+	return schema
+}
+
+const instructionsDescription = "Please briefly explain: 1) Why you are calling this tool 2) What information or task you expect to accomplish with this tool. This explanation will be shown to users to help them understand the AI's thinking process. 3) In the explanation, use the specific tool name instead of saying 'this tool'."
+
+// Parameters 重写 Parameters 方法，添加 instructions 参数
+func (w *ToolWrapper) Parameters() map[string]interfaces.ParameterSpec {
+
+	// 获取原始参数
+	originalParams := w.originalTool.Parameters()
+
+	// 复制参数
+	params := make(map[string]interfaces.ParameterSpec)
+	for k, v := range originalParams {
+		params[k] = v
+	}
+
+	// 添加 instructions 参数
+	params["instructions"] = interfaces.ParameterSpec{
+		Type:        "string",
+		Description: instructionsDescription,
+		Required:    true,
+	}
+
+	return params
+}
+
+// Name 返回工具名称
+func (w *ToolWrapper) Name() string {
+	return w.originalTool.Name()
+}
+
+// Description 返回工具描述
+func (w *ToolWrapper) Description() string {
+	return w.originalTool.Description()
+}
+
+// Run 执行工具（从参数中移除 instructions 后调用原始工具）
+func (w *ToolWrapper) Run(ctx context.Context, input string) (string, error) {
+	toolName := w.Name()
+
+	// 记录执行开始
+
+	result, err := w.originalTool.Run(ctx, input)
+
+	// 记录执行结果
+	if err != nil {
+		// 保存错误信息
+		GlobalToolResultStore.SetResult(toolName, fmt.Sprintf("Error: %v", err))
+	} else {
+		resultPreview := result
+		if len(resultPreview) > 200 {
+			resultPreview = result[:200] + "..."
+		}
+		// 保存结果到全局存储
+		GlobalToolResultStore.SetResult(toolName, result)
+	}
+
+	return result, err
+}
+
+// Execute 执行工具（从参数中移除 instructions 后调用原始工具）
+func (w *ToolWrapper) Execute(ctx context.Context, input string) (string, error) {
+	toolName := w.Name()
+
+	// 记录执行开始
+
+	result, err := w.originalTool.Execute(ctx, input)
+
+	// 记录执行结果
+	if err != nil {
+		// 保存错误信息
+		GlobalToolResultStore.SetResult(toolName, fmt.Sprintf("Error: %v", err))
+	} else {
+		resultPreview := result
+		if len(resultPreview) > 200 {
+			resultPreview = result[:200] + "..."
+		}
+		// 保存结果到全局存储
+		GlobalToolResultStore.SetResult(toolName, result)
+	}
+
+	return result, err
+}
+
+// WrapTool 包装工具以添加 instructions 参数
+func WrapTool(tool interfaces.Tool) interfaces.Tool {
+	return &ToolWrapper{
+		originalTool: tool,
+	}
+}
 
 // GetPresetToolsMetadata 获取所有预设工具的元数据
 func GetPresetToolsMetadata() []models.PresetToolMetadata {
@@ -179,7 +363,9 @@ func registerToolIfEnabled(
 	}
 
 	tool := createFunc(config.Parameters)
-	toolReg.Register(tool)
+	// 包装工具以添加 instructions 参数
+	wrappedTool := WrapTool(tool)
+	toolReg.Register(wrappedTool)
 }
 
 // getStringParam 从参数映射中获取字符串参数

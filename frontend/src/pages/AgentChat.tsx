@@ -10,6 +10,10 @@ interface ToolCall {
   tool_name: string
   status: 'calling' | 'success' | 'error'
   message?: string
+  instructions?: string  // 工具调用说明
+  arguments?: Record<string, any>  // 工具调用参数
+  result?: string  // 工具执行结果
+  timestamp?: string  // 调用时间戳
 }
 
 interface ChatMessage {
@@ -50,6 +54,7 @@ export default function AgentChat() {
   const [selectedLlm, setSelectedLlm] = useState<string>('')
   const [showLlmDropdown, setShowLlmDropdown] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(new Set())
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -328,11 +333,18 @@ export default function AgentChat() {
               case 'tool_call':
                 // 工具调用
                 if (chunk.tool_call) {
+                  console.log('收到工具调用事件:', {
+                    tool_name: chunk.tool_call.tool_name,
+                    status: chunk.tool_call.status,
+                    instructions: chunk.tool_call.instructions,
+                    arguments: chunk.tool_call.arguments,
+                    result: chunk.tool_call.result ? `${chunk.tool_call.result.substring(0, 50)}...` : 'empty',
+                  })
+
                   const existingIndex = assistantMsg.tool_calls?.findIndex(
                     tc => tc.tool_name === chunk.tool_call?.tool_name
                   ) ?? -1
 
-                  console.log('更新工具调用:', chunk.tool_call)
                   if (existingIndex >= 0 && assistantMsg.tool_calls) {
                     assistantMsg.tool_calls[existingIndex] = chunk.tool_call
                   } else {
@@ -442,24 +454,93 @@ export default function AgentChat() {
     }
   }
 
-  // 渲染工具调用状态
-  const renderToolCall = (toolCall: ToolCall) => {
+  // 切换工具调用详情展开状态
+  const toggleToolCallExpand = (messageId: string, toolName: string) => {
+    const key = `${messageId}-${toolName}`
+    setExpandedToolCalls(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(key)) {
+        newSet.delete(key)
+      } else {
+        newSet.add(key)
+      }
+      return newSet
+    })
+  }
+
+  // 渲染工具调用状态（新版本，支持展开详情）
+  const renderToolCall = (toolCall: ToolCall, messageId: string, isInline: boolean = false) => {
+    console.log('渲染工具调用:', {
+      tool_name: toolCall.tool_name,
+      instructions: toolCall.instructions,
+      has_arguments: !!toolCall.arguments,
+      has_result: !!toolCall.result,
+    })
+
     const statusIcons = {
       calling: <Loader2 className="w-4 h-4 animate-spin text-gray-600 dark:text-gray-400" />,
       success: <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />,
       error: <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />,
     }
 
+    const key = `${messageId}-${toolCall.tool_name}`
+    const isExpanded = expandedToolCalls.has(key)
+
     return (
       <div
         key={toolCall.tool_name}
-        className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm mt-2"
+        className={`${isInline ? 'my-3' : 'mt-2'} bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden`}
       >
-        <Wrench className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-        <span className="text-gray-700 dark:text-gray-300">{toolCall.tool_name}</span>
-        {statusIcons[toolCall.status]}
-        {toolCall.message && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">{toolCall.message}</span>
+        {/* 工具调用头部 */}
+        <button
+          onClick={() => toggleToolCallExpand(messageId, toolCall.tool_name)}
+          className="w-full px-3 py-2 flex items-center gap-2 transition-colors text-left"
+        >
+          <Wrench className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
+            {toolCall.tool_name}
+          </span>
+          {statusIcons[toolCall.status]}
+          <ChevronDown
+            className={`w-4 h-4 text-gray-500 dark:text-gray-400 ml-auto flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''
+              }`}
+          />
+        </button>
+
+        {/* 工具调用详情（展开时显示）*/}
+        {isExpanded && (
+          <div className="px-3 pb-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+            {/* 参数 */}
+            {toolCall.arguments && Object.keys(toolCall.arguments).length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                  {t('agentChat.toolParameters')}:
+                </div>
+                <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                  {JSON.stringify(toolCall.arguments, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* 结果 */}
+            {toolCall.result && (
+              <div>
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                  {t('agentChat.toolResult')}:
+                </div>
+                <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto max-h-40 overflow-y-auto">
+                  {toolCall.result}
+                </pre>
+              </div>
+            )}
+
+            {/* 状态消息 */}
+            {toolCall.message && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {t('agentChat.status')}: {toolCall.message}
+              </div>
+            )}
+          </div>
         )}
       </div>
     )
@@ -589,37 +670,50 @@ export default function AgentChat() {
                         message.role === 'user' ? 'justify-end' : 'justify-start'
                       }`}
                     >
-                      <div className="relative group">
+                      <div className="relative group max-w-2xl">
                         <div
-                          className={`px-4 py-3 rounded-2xl max-w-2xl ${message.role === 'user'
+                          className={`px-4 py-3 rounded-2xl ${message.role === 'user'
                             ? 'bg-gray-900 dark:bg-gray-900 text-white'
                             : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
                           }`}
                         >
-                          {/* 消息内容 - 支持 Markdown 渲染 */}
                           {message.role === 'assistant' ? (
-                            message.content ? (
-                              <MarkdownRenderer 
-                                content={message.content} 
-                                className="text-base"
-                              />
-                            ) : isStreaming ? (
+                            <>
+                              {/* 工具调用说明和卡片（显示在内容上方）*/}
+                              {message.tool_calls && message.tool_calls.length > 0 && (
+                                <div className="space-y-3 mb-3">
+                                  {message.tool_calls.map(tc => (
+                                    <div key={tc.tool_name}>
+                                      {/* Instructions 显示在卡片上方 - 普通文字样式 */}
+                                      {tc.instructions && (
+                                        <div className="mb-2 text-gray-900 dark:text-gray-100">
+                                          {tc.instructions}
+                                        </div>
+                                      )}
+                                      {/* 工具调用卡片 */}
+                                      {renderToolCall(tc, message.id, true)}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* 消息内容 - 支持 Markdown 渲染 */}
+                              {message.content ? (
+                                <MarkdownRenderer
+                                  content={message.content}
+                                  className="text-base"
+                                />
+                              ) : isStreaming ? (
                                 <div className="flex items-center gap-1.5 py-3">
                                   <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1.4s' }}></span>
                                   <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1.4s' }}></span>
                                   <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1.4s' }}></span>
-                              </div>
-                            ) : null
+                                  </div>
+                              ) : null}
+                            </>
                           ) : (
                             <div className="whitespace-pre-wrap break-words text-base">
                               {message.content}
-                            </div>
-                          )}
-
-                          {/* 工具调用状态 */}
-                          {message.tool_calls && message.tool_calls.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {message.tool_calls.map(renderToolCall)}
                             </div>
                           )}
 

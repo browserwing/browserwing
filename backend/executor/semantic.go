@@ -5,67 +5,68 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/browserwing/browserwing/pkg/logger"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 )
 
 // ExtractSemanticTree 从页面提取语义树（基于 Accessibility Tree）
 func ExtractSemanticTree(ctx context.Context, page *rod.Page) (*SemanticTree, error) {
-	fmt.Printf("[ExtractSemanticTree] Starting extraction\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Starting extraction")
 
 	// 检查 context 是否已经取消
 	select {
 	case <-ctx.Done():
-		fmt.Printf("[ExtractSemanticTree] Context already done: %v\n", ctx.Err())
+		logger.Info(ctx, "[ExtractSemanticTree] Context already done: %v", ctx.Err())
 		return nil, ctx.Err()
 	default:
-		fmt.Printf("[ExtractSemanticTree] Context is active\n")
+		logger.Info(ctx, "[ExtractSemanticTree] Context is active")
 	}
 
 	// 先禁用再启用，确保状态干净
-	fmt.Printf("[ExtractSemanticTree] Disabling accessibility...\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Disabling accessibility...")
 	_ = proto.AccessibilityDisable{}.Call(page)
 
 	// 启用 Accessibility 域
-	fmt.Printf("[ExtractSemanticTree] Enabling accessibility...\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Enabling accessibility...")
 	err := proto.AccessibilityEnable{}.Call(page)
 	if err != nil {
-		fmt.Printf("[ExtractSemanticTree] Failed to enable accessibility: %v\n", err)
+		logger.Info(ctx, "[ExtractSemanticTree] Failed to enable accessibility: %v", err)
 		return nil, fmt.Errorf("failed to enable accessibility: %w", err)
 	}
-	fmt.Printf("[ExtractSemanticTree] Accessibility enabled\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Accessibility enabled")
 
 	// 确保函数结束时禁用
 	defer func() {
-		fmt.Printf("[ExtractSemanticTree] Cleaning up - disabling accessibility\n")
+		logger.Info(ctx, "[ExtractSemanticTree] Cleaning up - disabling accessibility")
 		_ = proto.AccessibilityDisable{}.Call(page)
 	}()
 
 	// 检查 context
 	select {
 	case <-ctx.Done():
-		fmt.Printf("[ExtractSemanticTree] Context done before getting tree: %v\n", ctx.Err())
+		logger.Info(ctx, "[ExtractSemanticTree] Context done before getting tree: %v", ctx.Err())
 		return nil, ctx.Err()
 	default:
 	}
 
 	// 获取 Accessibility Tree，不限制深度（让它获取完整树）
 	// 但我们会在后续处理时过滤
-	fmt.Printf("[ExtractSemanticTree] Getting full AX tree...\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Getting full AX tree...")
 	axTree, err := proto.AccessibilityGetFullAXTree{}.Call(page)
 	if err != nil {
-		fmt.Printf("[ExtractSemanticTree] Failed to get AX tree: %v\n", err)
+		logger.Info(ctx, "[ExtractSemanticTree] Failed to get AX tree: %v", err)
 		return nil, fmt.Errorf("failed to get accessibility tree: %w", err)
 	}
-	fmt.Printf("[ExtractSemanticTree] Got AX tree with %d nodes\n", len(axTree.Nodes))
+	logger.Info(ctx, "[ExtractSemanticTree] Got AX tree with %d nodes", len(axTree.Nodes))
 
 	if len(axTree.Nodes) == 0 {
-		fmt.Printf("[ExtractSemanticTree] AX tree is empty\n")
+		logger.Info(ctx, "[ExtractSemanticTree] AX tree is empty")
 		return nil, fmt.Errorf("accessibility tree is empty")
 	}
 
 	// 构建语义树
-	fmt.Printf("[ExtractSemanticTree] Building semantic tree...\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Building semantic tree...")
 	tree := &SemanticTree{
 		Elements:     make(map[string]*SemanticNode),
 		AXNodeMap:    make(map[proto.AccessibilityAXNodeID]*proto.AccessibilityAXNode),
@@ -73,21 +74,21 @@ func ExtractSemanticTree(ctx context.Context, page *rod.Page) (*SemanticTree, er
 	}
 
 	// 构建 AX Node 映射
-	fmt.Printf("[ExtractSemanticTree] Building AX node map...\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Building AX node map...")
 	for _, axNode := range axTree.Nodes {
 		tree.AXNodeMap[axNode.NodeID] = axNode
 	}
-	fmt.Printf("[ExtractSemanticTree] AX node map built with %d nodes\n", len(tree.AXNodeMap))
+	logger.Info(ctx, "[ExtractSemanticTree] AX node map built with %d nodes", len(tree.AXNodeMap))
 
 	// 转换为语义节点
 	// 注意：不要过度过滤，保留所有节点，在后续查询时再过滤
-	fmt.Printf("[ExtractSemanticTree] Converting to semantic nodes...\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Converting to semantic nodes...")
 	nodeCount := 0
 	for i, axNode := range axTree.Nodes {
 		// 检查 context
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[ExtractSemanticTree] Context cancelled during node conversion at node %d/%d\n", i, len(axTree.Nodes))
+			logger.Info(ctx, "[ExtractSemanticTree] Context cancelled during node conversion at node %d/%d", i, len(axTree.Nodes))
 			return nil, ctx.Err()
 		default:
 		}
@@ -103,17 +104,17 @@ func ExtractSemanticTree(ctx context.Context, page *rod.Page) (*SemanticTree, er
 
 		// 每100个节点输出一次进度
 		if (i+1)%100 == 0 {
-			fmt.Printf("[ExtractSemanticTree] Processed %d/%d nodes, kept %d\n", i+1, len(axTree.Nodes), nodeCount)
+			logger.Info(ctx, "[ExtractSemanticTree] Processed %d/%d nodes, kept %d", i+1, len(axTree.Nodes), nodeCount)
 		}
 	}
-	fmt.Printf("[ExtractSemanticTree] Converted %d nodes to %d semantic nodes\n", len(axTree.Nodes), nodeCount)
+	logger.Info(ctx, "[ExtractSemanticTree] Converted %d nodes to %d semantic nodes", len(axTree.Nodes), nodeCount)
 
 	// 构建根节点
 	if len(axTree.Nodes) > 0 {
 		tree.Root = tree.Elements[string(axTree.Nodes[0].NodeID)]
 	}
 
-	fmt.Printf("[ExtractSemanticTree] Semantic tree extraction completed successfully\n")
+	logger.Info(ctx, "[ExtractSemanticTree] Semantic tree extraction completed successfully")
 	return tree, nil
 }
 

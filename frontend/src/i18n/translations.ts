@@ -573,6 +573,9 @@ export const translations = {
     'agentChat.stopGeneration': '停止生成',
     'agentChat.send': '发送',
     'agentChat.generationStopped': '已停止生成',
+    'agentChat.toolParameters': '参数',
+    'agentChat.toolResult': '结果',
+    'agentChat.status': '状态',
 
     // 工具管理
     'toolManager.title': '工具管理',
@@ -1063,6 +1066,9 @@ export const translations = {
     'agentChat.stopGeneration': '停止生成',
     'agentChat.send': '發送',
     'agentChat.generationStopped': '已停止生成',
+    'agentChat.toolParameters': '參數',
+    'agentChat.toolResult': '結果',
+    'agentChat.status': '狀態',
 
     // 工具管理
     'toolManager.title': '工具管理',
@@ -2341,6 +2347,9 @@ export const translations = {
     'agentChat.stopGeneration': 'Stop Generation',
     'agentChat.send': 'Send',
     'agentChat.generationStopped': 'Generation stopped',
+    'agentChat.toolParameters': 'Parameters',
+    'agentChat.toolResult': 'Result',
+    'agentChat.status': 'Status',
 
     // Tool Manager
     'toolManager.title': 'Tool Management',
@@ -3254,6 +3263,9 @@ export const translations = {
     'agentChat.stopGeneration': 'Detener Generación',
     'agentChat.send': 'Enviar',
     'agentChat.generationStopped': 'Generación detenida',
+    'agentChat.toolParameters': 'Parámetros',
+    'agentChat.toolResult': 'Resultado',
+    'agentChat.status': 'Estado',
 
     // Gestión del Navegador
     'browser.title': 'Gestión del Navegador',
@@ -4134,6 +4146,9 @@ export const translations = {
     'agentChat.stopGeneration': '生成を停止',
     'agentChat.send': '送信',
     'agentChat.generationStopped': '生成が停止されました',
+    'agentChat.toolParameters': 'パラメータ',
+    'agentChat.toolResult': '結果',
+    'agentChat.status': 'ステータス',
 
     // ブラウザ管理
     'browser.title': 'ブラウザ管理',
