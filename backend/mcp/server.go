@@ -491,7 +491,9 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		url, _ := arguments["url"].(string)
 		waitUntil, _ := arguments["wait_until"].(string)
 		
-		opts := &executor.NavigateOptions{}
+		opts := &executor.NavigateOptions{
+			Timeout: 60 * time.Second, // 设置默认超时为 60 秒
+		}
 		if waitUntil != "" {
 			opts.WaitUntil = waitUntil
 		}
@@ -516,6 +518,7 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		
 		opts := &executor.ClickOptions{
 			WaitVisible: waitVisible,
+			Timeout:     30 * time.Second, // 设置默认超时为 30 秒
 		}
 		
 		result, err := s.executor.Click(ctx, identifier, opts)
@@ -536,7 +539,8 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		}
 		
 		opts := &executor.TypeOptions{
-			Clear: clear,
+			Clear:   clear,
+			Timeout: 30 * time.Second, // 设置默认超时为 30 秒
 		}
 		
 		result, err := s.executor.Type(ctx, identifier, text, opts)
@@ -552,7 +556,11 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		identifier, _ := arguments["identifier"].(string)
 		value, _ := arguments["value"].(string)
 		
-		result, err := s.executor.Select(ctx, identifier, value, nil)
+		opts := &executor.SelectOptions{
+			Timeout: 30 * time.Second, // 设置默认超时为 30 秒
+		}
+		
+		result, err := s.executor.Select(ctx, identifier, value, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -663,10 +671,11 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		}
 		
 		opts := &executor.WaitForOptions{
-			State: state,
+			State:   state,
+			Timeout: 30 * time.Second, // 设置默认超时为 30 秒
 		}
 		
-		if timeout, ok := arguments["timeout"].(float64); ok {
+		if timeout, ok := arguments["timeout"].(float64); ok && timeout > 0 {
 			opts.Timeout = time.Duration(timeout) * time.Second
 		}
 		

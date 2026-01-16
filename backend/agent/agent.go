@@ -135,7 +135,16 @@ func (t *MCPTool) Execute(ctx context.Context, input string) (string, error) {
 	execCtx := ctx
 	var cancel context.CancelFunc
 	if strings.HasPrefix(t.name, "browser_") {
-		execCtx, cancel = context.WithTimeout(context.Background(), 120*time.Second)
+		// 检查原始 context 是否已经 done
+		select {
+		case <-ctx.Done():
+			logger.Warn(ctx, "Original context already done for tool %s: %v", t.name, ctx.Err())
+			// 如果原始 context 已经取消，使用 Background 创建新的独立 context
+			execCtx, cancel = context.WithTimeout(context.Background(), 120*time.Second)
+		default:
+			// 原始 context 正常，从它派生
+			execCtx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		}
 		defer cancel()
 		logger.Info(ctx, "Using extended timeout (120s) for browser tool: %s", t.name)
 	}
