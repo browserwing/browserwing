@@ -105,11 +105,10 @@ func (w *ToolWrapper) InputSchema() map[string]interface{} {
 	return schema
 }
 
-const instructionsDescription = "Please briefly explain: 1) Why you are calling this tool 2) What information or task you expect to accomplish with this tool. This explanation will be shown to users to help them understand the AI's thinking process. 3) In the explanation, use the specific tool name instead of saying 'this tool'."
+const instructionsDescription = "Please briefly explain: 1) Why you are calling this tool 2) What information or task you expect to accomplish with this tool. This explanation will be shown to users to help them understand the AI's thinking process. 3) In the explanation, use the specific tool name instead of saying 'this tool'. 4) Respond in the same language as the user's message. 5) Write a brief, friendly explanation (1-2 sentences) in first person that tells the user what you're about to do and why. "
 
 // Parameters 重写 Parameters 方法，添加 instructions 参数
 func (w *ToolWrapper) Parameters() map[string]interfaces.ParameterSpec {
-
 	// 获取原始参数
 	originalParams := w.originalTool.Parameters()
 

@@ -55,9 +55,12 @@ func main() {
 
 	logger.InitLogger(cfg.Log)
 
-	// 禁用 agent-sdk-go 内部 zerolog 的 Debug 和 Info 日志
-	// 只允许 Warn 及以上级别的日志输出
-	zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	// 完全禁用 agent-sdk-go 内部 zerolog 的日志输出
+	// 避免在终端输出调试信息
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+
+	// 如果需要保留 zerolog 日志但输出到文件，可以重定向到日志文件
+	// 但这里我们选择完全禁用，因为已经有自己的日志系统
 
 	// 优先级: 命令行参数 > 环境变量 > 配置文件
 	if *port != "" {

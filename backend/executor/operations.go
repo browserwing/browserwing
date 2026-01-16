@@ -17,8 +17,15 @@ func (e *Executor) Navigate(ctx context.Context, url string, opts *NavigateOptio
 	logger.Info(ctx, "[Navigate] Starting navigation to %s", url)
 
 	if !e.Browser.IsRunning() {
-		logger.Error(ctx, "[Navigate] Browser is not running")
-		return nil, fmt.Errorf("browser is not running")
+		err := e.Browser.Start(ctx)
+		if err != nil {
+			return &OperationResult{
+				Success:   false,
+				Error:     err.Error(),
+				Timestamp: time.Now(),
+			}, err
+		}
+		logger.Info(ctx, "[Navigate] Browser started")
 	}
 	logger.Info(ctx, "[Navigate] Browser is running")
 
@@ -213,10 +220,23 @@ func (e *Executor) Click(ctx context.Context, identifier string, opts *ClickOpti
 		}
 	}
 
+	// 同时返回当前的页面语义树
+	tree, err := e.GetSemanticTree(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to get semantic tree: %s", err.Error())
+	}
+	var semanticTreeText string
+	if tree != nil {
+		semanticTreeText = tree.SerializeToSimpleText()
+	}
+
 	return &OperationResult{
 		Success:   true,
 		Message:   fmt.Sprintf("Successfully clicked element: %s", identifier),
 		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"semantic_tree": semanticTreeText,
+		},
 	}, nil
 }
 
@@ -431,63 +451,6 @@ func (e *Executor) GetValue(ctx context.Context, identifier string) (*OperationR
 		Timestamp: time.Now(),
 		Data: map[string]interface{}{
 			"value": value.String(),
-		},
-	}, nil
-}
-
-// Screenshot 截图
-func (e *Executor) Screenshot(ctx context.Context, opts *ScreenshotOptions) (*OperationResult, error) {
-	page := e.Browser.GetActivePage()
-	if page == nil {
-		return nil, fmt.Errorf("no active page")
-	}
-
-	if opts == nil {
-		opts = &ScreenshotOptions{
-			FullPage: false,
-			Quality:  80,
-			Format:   "png",
-		}
-	}
-
-	var format proto.PageCaptureScreenshotFormat
-	if opts.Format == "jpeg" {
-		format = proto.PageCaptureScreenshotFormatJpeg
-	} else {
-		format = proto.PageCaptureScreenshotFormatPng
-	}
-
-	var data []byte
-	var err error
-
-	if opts.FullPage {
-		data, err = page.Screenshot(opts.FullPage, &proto.PageCaptureScreenshot{
-			Format:  format,
-			Quality: &opts.Quality,
-		})
-	} else {
-		data, err = page.Screenshot(false, &proto.PageCaptureScreenshot{
-			Format:  format,
-			Quality: &opts.Quality,
-		})
-	}
-
-	if err != nil {
-		return &OperationResult{
-			Success:   false,
-			Error:     fmt.Sprintf("Failed to take screenshot: %s", err.Error()),
-			Timestamp: time.Now(),
-		}, err
-	}
-
-	return &OperationResult{
-		Success:   true,
-		Message:   "Successfully captured screenshot",
-		Timestamp: time.Now(),
-		Data: map[string]interface{}{
-			"data":   data,
-			"format": opts.Format,
-			"size":   len(data),
 		},
 	}, nil
 }
@@ -977,5 +940,481 @@ func (e *Executor) Reload(ctx context.Context) (*OperationResult, error) {
 		Success:   true,
 		Message:   "Successfully reloaded page",
 		Timestamp: time.Now(),
+	}, nil
+}
+
+// Screenshot 截图
+func (e *Executor) Screenshot(ctx context.Context, opts *ScreenshotOptions) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	if opts == nil {
+		opts = &ScreenshotOptions{
+			FullPage: false,
+			Quality:  80,
+			Format:   "png",
+		}
+	}
+
+	var format proto.PageCaptureScreenshotFormat
+	if opts.Format == "jpeg" || opts.Format == "jpg" {
+		format = proto.PageCaptureScreenshotFormatJpeg
+	} else {
+		format = proto.PageCaptureScreenshotFormatPng
+	}
+
+	var data []byte
+	var err error
+
+	if opts.FullPage {
+		data, err = page.Screenshot(opts.FullPage, &proto.PageCaptureScreenshot{
+			Format:  format,
+			Quality: &opts.Quality,
+		})
+	} else {
+		data, err = page.Screenshot(false, &proto.PageCaptureScreenshot{
+			Format:  format,
+			Quality: &opts.Quality,
+		})
+	}
+
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to take screenshot: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully captured screenshot (%d bytes)", len(data)),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"data":   data,
+			"format": opts.Format,
+			"size":   len(data),
+		},
+	}, nil
+}
+
+// Evaluate 执行 JavaScript 代码
+func (e *Executor) Evaluate(ctx context.Context, script string) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	result, err := page.Eval(script)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to execute script: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   "Successfully executed script",
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"result": result.Value,
+		},
+	}, nil
+}
+
+// PressKey 按键
+func (e *Executor) PressKey(ctx context.Context, key string, opts *PressKeyOptions) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	if opts == nil {
+		opts = &PressKeyOptions{}
+	}
+
+	// 创建 keyboard
+	keyboard := page.Keyboard
+
+	// 按下修饰键
+	if opts.Ctrl {
+		keyboard.Press(input.ControlLeft)
+		defer keyboard.Release(input.ControlLeft)
+	}
+	if opts.Shift {
+		keyboard.Press(input.ShiftLeft)
+		defer keyboard.Release(input.ShiftLeft)
+	}
+	if opts.Alt {
+		keyboard.Press(input.AltLeft)
+		defer keyboard.Release(input.AltLeft)
+	}
+	if opts.Meta {
+		keyboard.Press(input.MetaLeft)
+		defer keyboard.Release(input.MetaLeft)
+	}
+
+	// 按下并释放目标键
+	var keyCode input.Key
+	switch strings.ToLower(key) {
+	case "enter", "return":
+		keyCode = input.Enter
+	case "tab":
+		keyCode = input.Tab
+	case "escape", "esc":
+		keyCode = input.Escape
+	case "backspace":
+		keyCode = input.Backspace
+	case "delete":
+		keyCode = input.Delete
+	case "arrowup", "up":
+		keyCode = input.ArrowUp
+	case "arrowdown", "down":
+		keyCode = input.ArrowDown
+	case "arrowleft", "left":
+		keyCode = input.ArrowLeft
+	case "arrowright", "right":
+		keyCode = input.ArrowRight
+	case "home":
+		keyCode = input.Home
+	case "end":
+		keyCode = input.End
+	case "pageup":
+		keyCode = input.PageUp
+	case "pagedown":
+		keyCode = input.PageDown
+	case "space":
+		keyCode = input.Space
+	default:
+		// 单个字符
+		if len(key) == 1 {
+			err := keyboard.Type(input.Key(key[0]))
+			if err != nil {
+				return &OperationResult{
+					Success:   false,
+					Error:     fmt.Sprintf("Failed to press key: %s", err.Error()),
+					Timestamp: time.Now(),
+				}, err
+			}
+			return &OperationResult{
+				Success:   true,
+				Message:   fmt.Sprintf("Successfully pressed key: %s", key),
+				Timestamp: time.Now(),
+			}, nil
+		}
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Unknown key: %s", key),
+			Timestamp: time.Now(),
+		}, fmt.Errorf("unknown key: %s", key)
+	}
+
+	if err := keyboard.Press(keyCode); err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to press key: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+	keyboard.Release(keyCode)
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully pressed key: %s", key),
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// Resize 调整浏览器窗口大小
+func (e *Executor) Resize(ctx context.Context, width, height int) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+		Width:  width,
+		Height: height,
+	})
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to resize window: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully resized window to %dx%d", width, height),
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// GetConsoleMessages 获取控制台消息
+func (e *Executor) GetConsoleMessages(ctx context.Context) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	// 收集控制台消息
+	messages := []map[string]interface{}{}
+
+	// 监听控制台事件
+	go page.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
+		msg := map[string]interface{}{
+			"type":      e.Type,
+			"timestamp": time.Now().Format(time.RFC3339),
+			"args":      []string{},
+		}
+		for _, arg := range e.Args {
+			if arg.Value.Val() != nil {
+				msg["args"] = append(msg["args"].([]string), fmt.Sprintf("%v", arg.Value.Val()))
+			}
+		}
+		messages = append(messages, msg)
+	})()
+
+	// 等待一小段时间以收集消息
+	time.Sleep(100 * time.Millisecond)
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Retrieved %d console messages", len(messages)),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"messages": messages,
+		},
+	}, nil
+}
+
+// HandleDialog 处理对话框（alert, confirm, prompt）
+func (e *Executor) HandleDialog(ctx context.Context, accept bool, text string) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	// 设置对话框处理器
+	go page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
+		if accept {
+			proto.PageHandleJavaScriptDialog{
+				Accept:     true,
+				PromptText: text,
+			}.Call(page)
+		} else {
+			proto.PageHandleJavaScriptDialog{
+				Accept: false,
+			}.Call(page)
+		}
+	})()
+
+	return &OperationResult{
+		Success:   true,
+		Message:   "Dialog handler configured",
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// FileUpload 上传文件
+func (e *Executor) FileUpload(ctx context.Context, identifier string, filePaths []string) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	elem, err := e.findElementWithTimeout(ctx, page, identifier, 10*time.Second)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to find element: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	err = elem.SetFiles(filePaths)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to upload files: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully uploaded %d file(s)", len(filePaths)),
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// Drag 拖拽元素
+func (e *Executor) Drag(ctx context.Context, fromIdentifier, toIdentifier string) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	fromElem, err := e.findElementWithTimeout(ctx, page, fromIdentifier, 10*time.Second)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to find source element: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	toElem, err := e.findElementWithTimeout(ctx, page, toIdentifier, 10*time.Second)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to find target element: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	// 获取源元素和目标元素的位置
+	fromBox, err := fromElem.Shape()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to get source element shape: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	toBox, err := toElem.Shape()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to get target element shape: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	// 计算中心点
+	fromRect := fromBox.Box()
+	toRect := toBox.Box()
+	fromCenter := proto.Point{
+		X: fromRect.X + fromRect.Width/2,
+		Y: fromRect.Y + fromRect.Height/2,
+	}
+	toCenter := proto.Point{
+		X: toRect.X + toRect.Width/2,
+		Y: toRect.Y + toRect.Height/2,
+	}
+
+	// 执行拖拽
+	err = page.Mouse.MoveLinear(fromCenter, 10)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to move to source: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	err = page.Mouse.Down(proto.InputMouseButtonLeft, 1)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to mouse down: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	err = page.Mouse.MoveLinear(toCenter, 10)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to move to target: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	err = page.Mouse.Up(proto.InputMouseButtonLeft, 1)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to mouse up: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   "Successfully dragged element",
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// ClosePage 关闭当前页面
+func (e *Executor) ClosePage(ctx context.Context) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	err := page.Close()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to close page: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   "Successfully closed page",
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// GetNetworkRequests 获取网络请求（需要先启用网络监控）
+func (e *Executor) GetNetworkRequests(ctx context.Context) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	// 启用网络监控
+	err := proto.NetworkEnable{}.Call(page)
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to enable network monitoring: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	requests := []map[string]interface{}{}
+
+	// 监听网络请求
+	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
+		req := map[string]interface{}{
+			"url":       e.Request.URL,
+			"method":    e.Request.Method,
+			"timestamp": time.Now().Format(time.RFC3339),
+			"type":      e.Type,
+		}
+		requests = append(requests, req)
+	})()
+
+	// 等待一段时间收集请求
+	time.Sleep(100 * time.Millisecond)
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Retrieved %d network requests", len(requests)),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"requests": requests,
+		},
 	}, nil
 }

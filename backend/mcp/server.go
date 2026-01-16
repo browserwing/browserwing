@@ -114,7 +114,7 @@ func (s *MCPServer) Start() error {
 	if err := s.toolRegistry.RegisterAllTools(); err != nil {
 		return fmt.Errorf("failed to register executor tools: %w", err)
 	}
-	
+
 	logger.Info(s.ctx, "Registered %d executor tools", len(s.toolRegistry.GetToolMetadata()))
 
 	return nil
@@ -490,14 +490,14 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 	case "browser_navigate":
 		url, _ := arguments["url"].(string)
 		waitUntil, _ := arguments["wait_until"].(string)
-		
+
 		opts := &executor.NavigateOptions{
 			Timeout: 60 * time.Second, // 设置默认超时为 60 秒
 		}
 		if waitUntil != "" {
 			opts.WaitUntil = waitUntil
 		}
-		
+
 		result, err := s.executor.Navigate(ctx, url, opts)
 		if err != nil {
 			return nil, err
@@ -515,20 +515,25 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 	case "browser_click":
 		identifier, _ := arguments["identifier"].(string)
 		waitVisible, _ := arguments["wait_visible"].(bool)
-		
+
 		opts := &executor.ClickOptions{
 			WaitVisible: waitVisible,
 			Timeout:     30 * time.Second, // 设置默认超时为 30 秒
 		}
-		
+
 		result, err := s.executor.Click(ctx, identifier, opts)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
+		response := map[string]interface{}{
 			"success": result.Success,
 			"message": result.Message,
-		}, nil
+		}
+		// 如果有 Data 字段，包含它（特别是 semantic_tree）
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
 
 	case "browser_type":
 		identifier, _ := arguments["identifier"].(string)
@@ -537,50 +542,61 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		if clearArg, ok := arguments["clear"].(bool); ok {
 			clear = clearArg
 		}
-		
+
 		opts := &executor.TypeOptions{
 			Clear:   clear,
 			Timeout: 30 * time.Second, // 设置默认超时为 30 秒
 		}
-		
+
 		result, err := s.executor.Type(ctx, identifier, text, opts)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
+		response := map[string]interface{}{
 			"success": result.Success,
 			"message": result.Message,
-		}, nil
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
 
 	case "browser_select":
 		identifier, _ := arguments["identifier"].(string)
 		value, _ := arguments["value"].(string)
-		
+
 		opts := &executor.SelectOptions{
 			Timeout: 30 * time.Second, // 设置默认超时为 30 秒
 		}
-		
+
 		result, err := s.executor.Select(ctx, identifier, value, opts)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
+		response := map[string]interface{}{
 			"success": result.Success,
 			"message": result.Message,
-		}, nil
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
 
-	case "browser_screenshot":
+	case "browser_take_screenshot":
 		fullPage, _ := arguments["full_page"].(bool)
 		format, _ := arguments["format"].(string)
 		if format == "" {
 			format = "png"
 		}
-		
+
 		opts := &executor.ScreenshotOptions{
 			FullPage: fullPage,
 			Format:   format,
+			Quality:  80,
 		}
-		
+
 		result, err := s.executor.Screenshot(ctx, opts)
 		if err != nil {
 			return nil, err
@@ -601,13 +617,13 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 			extractType = "text"
 		}
 		multiple, _ := arguments["multiple"].(bool)
-		
+
 		opts := &executor.ExtractOptions{
 			Selector: selector,
 			Type:     extractType,
 			Multiple: multiple,
 		}
-		
+
 		result, err := s.executor.Extract(ctx, opts)
 		if err != nil {
 			return nil, err
@@ -626,17 +642,17 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		if simpleArg, ok := arguments["simple"].(bool); ok {
 			simple = simpleArg
 		}
-		
+
 		tree, err := s.executor.GetSemanticTree(ctx)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		response := map[string]interface{}{
 			"success": true,
 			"message": "Successfully retrieved semantic tree",
 		}
-		
+
 		if simple {
 			response["data"] = map[string]interface{}{
 				"semantic_tree": tree.SerializeToSimpleText(),
@@ -646,7 +662,7 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 				"semantic_tree": tree,
 			}
 		}
-		
+
 		return response, nil
 
 	case "browser_get_page_info":
@@ -669,24 +685,29 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 		if state == "" {
 			state = "visible"
 		}
-		
+
 		opts := &executor.WaitForOptions{
 			State:   state,
 			Timeout: 30 * time.Second, // 设置默认超时为 30 秒
 		}
-		
+
 		if timeout, ok := arguments["timeout"].(float64); ok && timeout > 0 {
 			opts.Timeout = time.Duration(timeout) * time.Second
 		}
-		
+
 		result, err := s.executor.WaitFor(ctx, identifier, opts)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{
+		response := map[string]interface{}{
 			"success": result.Success,
 			"message": result.Message,
-		}, nil
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
 
 	case "browser_scroll":
 		direction, _ := arguments["direction"].(string)
@@ -700,7 +721,7 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 				"message": result.Message,
 			}, nil
 		}
-		
+
 		// 滚动到顶部或元素
 		page := s.executor.GetRodPage()
 		if page != nil {
@@ -715,11 +736,200 @@ func (s *MCPServer) callExecutorTool(ctx context.Context, name string, arguments
 				}, nil
 			}
 		}
-		
+
 		return map[string]interface{}{
 			"success": false,
 			"message": "Invalid scroll direction",
 		}, nil
+
+	case "browser_evaluate":
+		script, _ := arguments["script"].(string)
+
+		result, err := s.executor.Evaluate(ctx, script)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_press_key":
+		key, _ := arguments["key"].(string)
+		ctrl, _ := arguments["ctrl"].(bool)
+		shift, _ := arguments["shift"].(bool)
+		alt, _ := arguments["alt"].(bool)
+		meta, _ := arguments["meta"].(bool)
+
+		opts := &executor.PressKeyOptions{
+			Ctrl:  ctrl,
+			Shift: shift,
+			Alt:   alt,
+			Meta:  meta,
+		}
+
+		result, err := s.executor.PressKey(ctx, key, opts)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_resize":
+		width := 0
+		height := 0
+
+		if w, ok := arguments["width"].(float64); ok {
+			width = int(w)
+		}
+		if h, ok := arguments["height"].(float64); ok {
+			height = int(h)
+		}
+
+		if width <= 0 || height <= 0 {
+			return nil, fmt.Errorf("invalid width or height")
+		}
+
+		result, err := s.executor.Resize(ctx, width, height)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_drag":
+		fromIdentifier, _ := arguments["from_identifier"].(string)
+		toIdentifier, _ := arguments["to_identifier"].(string)
+
+		result, err := s.executor.Drag(ctx, fromIdentifier, toIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_close":
+		result, err := s.executor.ClosePage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_file_upload":
+		identifier, _ := arguments["identifier"].(string)
+
+		var filePaths []string
+		if paths, ok := arguments["file_paths"].([]interface{}); ok {
+			for _, p := range paths {
+				if path, ok := p.(string); ok {
+					filePaths = append(filePaths, path)
+				}
+			}
+		}
+
+		if len(filePaths) == 0 {
+			return nil, fmt.Errorf("no file paths provided")
+		}
+
+		result, err := s.executor.FileUpload(ctx, identifier, filePaths)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_handle_dialog":
+		accept := false
+		if a, ok := arguments["accept"].(bool); ok {
+			accept = a
+		}
+
+		text := ""
+		if t, ok := arguments["text"].(string); ok {
+			text = t
+		}
+
+		result, err := s.executor.HandleDialog(ctx, accept, text)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		// 如果有 Data 字段，包含它
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_console_messages":
+		result, err := s.executor.GetConsoleMessages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
+
+	case "browser_network_requests":
+		result, err := s.executor.GetNetworkRequests(ctx)
+		if err != nil {
+			return nil, err
+		}
+		response := map[string]interface{}{
+			"success": result.Success,
+			"message": result.Message,
+		}
+		if len(result.Data) > 0 {
+			response["data"] = result.Data
+		}
+		return response, nil
 
 	default:
 		return nil, fmt.Errorf("unknown executor tool: %s", name)

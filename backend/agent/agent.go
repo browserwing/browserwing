@@ -29,6 +29,7 @@ var toolResultStore = localtools.GlobalToolResultStore
 
 const (
 	maxIterationsSimple  = 3  // 简单任务的最大迭代次数
+	maxIterationsMedium  = 7  // 中等任务的最大迭代次数
 	maxIterationsComplex = 12 // 复杂任务的最大迭代次数
 	maxIterationsEval    = 1  // 任务评估的最大迭代次数
 )
@@ -58,7 +59,7 @@ const (
 2. Use the appropriate tools to gather information
 3. Provide a comprehensive answer based on the tool results
 
-Always prefer using tools over making up information. If you have a tool that can help, use it.`
+Always prefer using tools over making up information. If you have a tool that can help, use it. Respond in the same language as the user's message.`
 )
 
 // ChatMessage 聊天消息
@@ -167,7 +168,7 @@ func (t *MCPTool) Execute(ctx context.Context, input string) (string, error) {
 		if data, ok := resultMap["data"].(map[string]interface{}); ok {
 			// 特殊处理 semantic_tree（直接追加文本）
 			if semanticTree, ok := data["semantic_tree"].(string); ok && semanticTree != "" {
-				responseText += "\n\n" + semanticTree
+				responseText += "\n\nSemantic Tree:\n" + semanticTree
 				logger.Info(ctx, "Added semantic_tree to response for tool: %s (tree length: %d)", t.name, len(semanticTree))
 			} else {
 				// 其他数据类型（extract结果、page info等）序列化为 JSON
@@ -241,6 +242,7 @@ func (t *MCPTool) Parameters() map[string]interfaces.ParameterSpec {
 // AgentInstances 存储不同类型的 Agent 实例
 type AgentInstances struct {
 	SimpleAgent  *agent.Agent // 简单任务 Agent (maxIterations=3)
+	MediumAgent  *agent.Agent // 中等任务 Agent (maxIterations=7)
 	ComplexAgent *agent.Agent // 复杂任务 Agent (maxIterations=12)
 	EvalAgent    *agent.Agent // 任务评估 Agent (maxIterations=1)
 }
@@ -362,8 +364,6 @@ func (am *AgentManager) initMCPTools() error {
 		// 注册到工具注册表
 		am.toolReg.Register(wrappedTool)
 		count++
-
-		logger.Info(am.ctx, "Registered script MCP tool (wrapped): %s", script.MCPCommandName)
 	}
 
 	if count == 0 {
@@ -732,6 +732,12 @@ func (am *AgentManager) createAgentInstances() (*AgentInstances, error) {
 		return nil, fmt.Errorf("failed to create simple agent: %w", err)
 	}
 
+	// 创建中等任务 Agent
+	mediumAgent, err := am.createAgentInstance(maxIterationsMedium)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create medium agent: %w", err)
+	}
+
 	// 创建复杂任务 Agent
 	complexAgent, err := am.createAgentInstance(maxIterationsComplex)
 	if err != nil {
@@ -746,6 +752,7 @@ func (am *AgentManager) createAgentInstances() (*AgentInstances, error) {
 
 	return &AgentInstances{
 		SimpleAgent:  simpleAgent,
+		MediumAgent:  mediumAgent,
 		ComplexAgent: complexAgent,
 		EvalAgent:    evalAgent,
 	}, nil
@@ -804,12 +811,18 @@ func (am *AgentManager) GetSession(sessionID string) (*ChatSession, error) {
 	return session, nil
 }
 
+const (
+	ComplexModeSimple  = "simple"
+	ComplexModeMedium  = "medium"
+	ComplexModeComplex = "complex"
+)
+
 // TaskComplexity 任务复杂度评估结果
 type TaskComplexity struct {
-	IsComplex   bool   `json:"is_complex"`  // true: 复杂任务, false: 简单任务
-	Reasoning   string `json:"reasoning"`   // 评估理由
-	Confidence  string `json:"confidence"`  // 置信度: high, medium, low
-	Explanation string `json:"explanation"` // 对用户的解释
+	ComplexMode string `json:"complex_mode"` // simple, medium, complex
+	Reasoning   string `json:"reasoning"`    // 评估理由
+	Confidence  string `json:"confidence"`   // 置信度: high, medium, low
+	Explanation string `json:"explanation"`  // 对用户的解释
 }
 
 // generateGreeting 生成友好的开场白回复
@@ -835,10 +848,10 @@ func (am *AgentManager) generateGreeting(ctx context.Context, sessionID, userMes
 User request: "%s"
 
 Examples of good greetings (match the language):
-- For Chinese: "收到，我将帮您查询今天的GitHub热门项目。"
-- For Chinese: "好的，让我来分析这个网站的性能数据。"
-- For English: "Got it, I'll help you find today's trending GitHub projects."
-- For English: "Sure, let me analyze the website performance data for you."
+- For Chinese: 收到，我将帮您查询今天的GitHub热门项目。
+- For Chinese: 好的，让我来分析这个网站的性能数据。
+- For English: Got it, I'll help you find today's trending GitHub projects.
+- For English: Sure, let me analyze the website performance data for you.
 
 Generate ONLY the greeting text (no JSON, no explanation), and respond in the same language as the user's request.`, userMessage)
 
@@ -872,23 +885,48 @@ func (am *AgentManager) evaluateTaskComplexity(ctx context.Context, sessionID, u
 	}
 
 	// 构建评估提示词
-	evalPrompt := fmt.Sprintf(`Analyze the following user request and determine if it is a SIMPLE task or a COMPLEX task.
+	evalPrompt := fmt.Sprintf(`Analyze the following user request and estimate the number of tool calls required, then classify the task complexity.
 
 User request: "%s"
 
-Guidelines:
-- SIMPLE tasks: Single step, straightforward queries, information lookup, simple calculations, basic tool usage (1-3 tool calls)
-  Examples: "What's the weather?", "Search for X", "Get trending repositories", "Calculate X+Y"
+Classification Guidelines (based on estimated tool calls):
 
-- COMPLEX tasks: Multi-step workflows, data processing pipelines, tasks requiring multiple tool calls and coordination (4+ tool calls)
-  Examples: "Analyze website performance and create a report", "Compare multiple data sources and summarize", "Set up automated workflow"
+**SIMPLE (1-3 tool calls):**
+- Single information queries (no browser automation)
+- Direct API calls or searches
+- Examples:
+  * "Search for today's trending GitHub repositories" → 1 call (web_search)
+  * "What's the weather in Beijing?" → 1 call (web_search)
+  * "Calculate the result of 123 * 456" → 1 call (calculate)
 
-Response format (JSON only, no explanation):
+**MEDIUM (4-7 tool calls):**
+- Browser automation with multiple steps
+- Multi-step information gathering and processing
+- Examples:
+  * "Open Baidu, search for 'AI news', click the first result" → 4-5 calls (navigate, type, press_key, click)
+  * "Go to GitHub trending page and get the top 3 projects" → 4-5 calls (navigate, get_semantic_tree, extract)
+  * "Fill a simple form and submit" → 4-6 calls (navigate, type×3, click)
+
+**COMPLEX (8+ tool calls):**
+- Multi-page workflows with data processing
+- Complex form filling with validation
+- Comprehensive data extraction and analysis
+- Examples:
+  * "Compare prices across 3 e-commerce sites and create a summary" → 12+ calls
+  * "Automate a complete user registration flow with email verification" → 10+ calls
+  * "Scrape data from multiple pages and generate a report" → 15+ calls
+
+**Important Notes:**
+- Browser automation tasks (navigate, type, click, etc.) are usually MEDIUM or COMPLEX, rarely SIMPLE
+- Count each browser operation separately: navigate=1, type=1, click=1, get_semantic_tree=1
+- If the task mentions "open browser", "search", "click", it's likely 4+ tool calls (MEDIUM)
+
+Response format (JSON only, no explanation, no markdown):
 {
-  "is_complex": true/false,
-  "reasoning": "Brief explanation of why this is simple/complex",
+  "complex_mode": "simple/medium/complex",
+  "reasoning": "Brief explanation with estimated tool call count",
   "confidence": "high/medium/low",
-  "explanation": "Short user-friendly explanation in Chinese"
+  "explanation": "Short user-friendly explanation"
 }`, userMessage)
 
 	// 创建评估上下文
@@ -902,7 +940,7 @@ Response format (JSON only, no explanation):
 	if err != nil {
 		logger.Warn(ctx, "[TaskEval] Failed to evaluate task complexity: %v, defaulting to simple", err)
 		return &TaskComplexity{
-			IsComplex:   false,
+			ComplexMode: ComplexModeSimple,
 			Reasoning:   "Evaluation failed, defaulting to simple task",
 			Confidence:  "low",
 			Explanation: "无法评估任务复杂度，使用简单模式",
@@ -911,12 +949,27 @@ Response format (JSON only, no explanation):
 
 	logger.Info(ctx, "[TaskEval] Raw response: %s", response)
 
+	response = strings.TrimSpace(response)
+	// 移除 ```json 和 ``` 标签
+	response = strings.ReplaceAll(response, "```json", "")
+	response = strings.ReplaceAll(response, "```", "")
+	response = strings.TrimSpace(response)
+	if response == "" {
+		logger.Warn(ctx, "[TaskEval] Empty response, defaulting to simple")
+		return &TaskComplexity{
+			ComplexMode: ComplexModeSimple,
+			Reasoning:   "Empty response, defaulting to simple",
+			Confidence:  "low",
+			Explanation: "评估结果为空，使用简单模式",
+		}, nil
+	}
+
 	// 解析 JSON 响应
 	var complexity TaskComplexity
 	if err := json.Unmarshal([]byte(response), &complexity); err != nil {
 		logger.Warn(ctx, "[TaskEval] Failed to parse JSON response: %v, defaulting to simple", err)
 		return &TaskComplexity{
-			IsComplex:   false,
+			ComplexMode: ComplexModeSimple,
 			Reasoning:   "Failed to parse evaluation result",
 			Confidence:  "low",
 			Explanation: "评估结果解析失败，使用简单模式",
@@ -924,7 +977,7 @@ Response format (JSON only, no explanation):
 	}
 
 	logger.Info(ctx, "[TaskEval] Task evaluated as %s (confidence: %s): %s",
-		map[bool]string{true: "COMPLEX", false: "SIMPLE"}[complexity.IsComplex],
+		complexity.ComplexMode,
 		complexity.Confidence,
 		complexity.Reasoning)
 
@@ -1059,7 +1112,7 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate task complexity: %v, using simple agent", err)
 		complexity = &TaskComplexity{
-			IsComplex:   false,
+			ComplexMode: ComplexModeSimple,
 			Reasoning:   "Evaluation error, defaulting to simple",
 			Confidence:  "low",
 			Explanation: "评估失败，使用简单模式",
@@ -1068,10 +1121,14 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 
 	// 根据评估结果选择合适的 Agent
 	var ag *agent.Agent
-	if complexity.IsComplex {
+	switch complexity.ComplexMode {
+	case ComplexModeComplex:
 		ag = agentInstances.ComplexAgent
 		logger.Info(ctx, "Using COMPLEX agent (max iterations: %d) for task: %s", maxIterationsComplex, complexity.Reasoning)
-	} else {
+	case ComplexModeMedium:
+		ag = agentInstances.MediumAgent
+		logger.Info(ctx, "Using MEDIUM agent (max iterations: %d) for task: %s", maxIterationsMedium, complexity.Reasoning)
+	default:
 		ag = agentInstances.SimpleAgent
 		logger.Info(ctx, "Using SIMPLE agent (max iterations: %d) for task: %s", maxIterationsSimple, complexity.Reasoning)
 	}

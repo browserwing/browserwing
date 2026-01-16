@@ -296,9 +296,6 @@ func (e *Executor) ExecuteBatch(ctx context.Context, operations []Operation) (*B
 			identifier, _ := op.Params["identifier"].(string)
 			result, err = e.WaitFor(ctx, identifier, nil)
 
-		case "screenshot":
-			result, err = e.Screenshot(ctx, nil)
-
 		default:
 			result = &OperationResult{
 				Success:   false,

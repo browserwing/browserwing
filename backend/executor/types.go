@@ -123,3 +123,11 @@ type HoverOptions struct {
 	Timeout     time.Duration // 超时时间
 }
 
+// PressKeyOptions 按键选项
+type PressKeyOptions struct {
+	Ctrl  bool // Ctrl 键
+	Shift bool // Shift 键
+	Alt   bool // Alt 键
+	Meta  bool // Meta 键 (Command on Mac, Windows key on Windows)
+}
+
