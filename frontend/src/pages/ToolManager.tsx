@@ -47,7 +47,8 @@ export default function ToolManager() {
   const loadTools = async () => {
     try {
       setLoading(true)
-      const response = await api.listToolConfigs()
+      // page_size=0 表示不分页，获取所有工具（避免脚本工具被截断）
+      const response = await api.listToolConfigs({ page_size: 0 })
       setTools(response.data.data || [])
     } catch (error: any) {
       console.error('Failed to load tools:', error)

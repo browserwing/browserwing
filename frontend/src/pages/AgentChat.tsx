@@ -5,6 +5,16 @@ import Toast from '../components/Toast'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import { useLanguage } from '../i18n'
 
+// 创建带认证的 fetch wrapper
+const authFetch = async (url: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem('token')
+  const headers = {
+    ...options.headers,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  }
+  return fetch(url, { ...options, headers })
+}
+
 // 消息类型
 interface ToolCall {
   tool_name: string
@@ -90,7 +100,7 @@ export default function AgentChat() {
   // 加载会话列表
   const loadSessions = async () => {
     try {
-      const response = await fetch('/api/v1/agent/sessions')
+      const response = await authFetch('/api/v1/agent/sessions')
       const data = await response.json()
       const sessions = data.sessions || []
       // 按更新时间降序排列（最新的在前面）
@@ -107,12 +117,13 @@ export default function AgentChat() {
   const loadMCPStatus = async () => {
     try {
       // 加载工具配置（预设工具和脚本工具）
-      const toolsResponse = await fetch('/api/v1/tool-configs')
+      // page_size=0 表示不分页，获取所有工具
+      const toolsResponse = await authFetch('/api/v1/tool-configs?page_size=0')
       const toolsData = await toolsResponse.json()
       const enabledTools = (toolsData.data || []).filter((t: any) => t.enabled)
       
       // 加载MCP服务列表
-      const mcpResponse = await fetch('/api/v1/mcp-services')
+      const mcpResponse = await authFetch('/api/v1/mcp-services')
       const mcpData = await mcpResponse.json()
       const mcpServices = mcpData.data || []
       
@@ -137,7 +148,7 @@ export default function AgentChat() {
   // 加载 LLM 配置列表
   const loadLLMConfigs = async () => {
     try {
-      const response = await fetch('/api/v1/llm-configs')
+      const response = await authFetch('/api/v1/llm-configs')
       const data = await response.json()
       const configs = data.configs || []
       setLlmConfigs(configs)
@@ -178,7 +189,7 @@ export default function AgentChat() {
   // 创建新会话
   const createSession = async () => {
     try {
-      const response = await fetch('/api/v1/agent/sessions', {
+      const response = await authFetch('/api/v1/agent/sessions', {
         method: 'POST',
       })
       const data = await response.json()
@@ -197,7 +208,7 @@ export default function AgentChat() {
   // 删除会话
   const deleteSession = async (sessionId: string) => {
     try {
-      await fetch(`/api/v1/agent/sessions/${sessionId}`, {
+      await authFetch(`/api/v1/agent/sessions/${sessionId}`, {
         method: 'DELETE',
       })
       
@@ -251,7 +262,7 @@ export default function AgentChat() {
 
     // 创建临时助手消息
     let assistantMsg: ChatMessage = {
-      id: '',
+      id: `temp-${Date.now()}`,
       role: 'assistant',
       content: '',
       timestamp: new Date().toISOString(),
@@ -259,7 +270,7 @@ export default function AgentChat() {
     }
 
     try {
-      const response = await fetch(`/api/v1/agent/sessions/${currentSession.id}/messages`, {
+      const response = await authFetch(`/api/v1/agent/sessions/${currentSession.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -339,14 +350,25 @@ export default function AgentChat() {
                 
                 // 更新界面
                 setCurrentSession(prev => {
-                  if (!prev) return prev
+                  if (!prev) {
+                    console.warn('[消息更新] prev session 为 null')
+                    return prev
+                  }
                   const messages = [...prev.messages]
                   const lastMsg = messages[messages.length - 1]
+                  
+                  console.log('[消息更新] 当前消息数:', messages.length, '最后一条消息ID:', lastMsg?.id, '助手消息ID:', assistantMsg.id)
                   
                   if (lastMsg?.role === 'assistant' && lastMsg.id === assistantMsg.id) {
                     messages[messages.length - 1] = { ...assistantMsg }
                   } else {
                     messages.push({ ...assistantMsg })
+                  }
+                  
+                  // 验证所有消息都有 id
+                  const invalidMessages = messages.filter(m => !m || !m.id)
+                  if (invalidMessages.length > 0) {
+                    console.error('[消息更新错误] 发现无效消息:', invalidMessages)
                   }
                   
                   return {
@@ -379,15 +401,26 @@ export default function AgentChat() {
 
                   // 更新界面
                   setCurrentSession(prev => {
-                    if (!prev) return prev
+                    if (!prev) {
+                      console.warn('[工具调用更新] prev session 为 null')
+                      return prev
+                    }
                     const messages = [...prev.messages]
                     const lastMsg = messages[messages.length - 1]
+                    
+                    console.log('[工具调用更新] 工具:', chunk.tool_call?.tool_name, '当前消息数:', messages.length, '最后一条消息ID:', lastMsg?.id, '助手消息ID:', assistantMsg.id)
                     
                     // 检查是否是同一条消息（通过 id 和 role）
                     if (lastMsg?.role === 'assistant' && lastMsg.id === assistantMsg.id) {
                       messages[messages.length - 1] = { ...assistantMsg }
                     } else {
                       messages.push({ ...assistantMsg })
+                    }
+                    
+                    // 验证所有消息都有 id
+                    const invalidMessages = messages.filter(m => !m || !m.id)
+                    if (invalidMessages.length > 0) {
+                      console.error('[工具调用更新错误] 发现无效消息:', invalidMessages)
                     }
                     
                     return {
@@ -419,16 +452,38 @@ export default function AgentChat() {
       setIsStreaming(false)
 
       // 重新加载会话以获取完整数据
-      const sessionResponse = await fetch(`/api/v1/agent/sessions/${currentSession.id}`)
+      console.log('[流式完成] 开始重新加载会话:', currentSession.id)
+      const sessionResponse = await authFetch(`/api/v1/agent/sessions/${currentSession.id}`)
       const sessionData = await sessionResponse.json()
       const updatedSession = sessionData.session
+      
+      console.log('[流式完成] 获取到更新的会话数据:', {
+        sessionId: updatedSession?.id,
+        messagesCount: updatedSession?.messages?.length,
+        messages: updatedSession?.messages?.map((m: any) => ({
+          id: m?.id,
+          role: m?.role,
+          hasContent: !!m?.content,
+          toolCallsCount: m?.tool_calls?.length
+        }))
+      })
+
+      // 验证会话数据完整性
+      if (updatedSession && updatedSession.messages) {
+        // 过滤掉可能的无效消息
+        updatedSession.messages = updatedSession.messages.filter((m: any) => m && m.id)
+        console.log('[流式完成] 过滤后的消息数量:', updatedSession.messages.length)
+      }
+
       setCurrentSession(updatedSession)
 
       // 更新会话列表中的该会话，并重新排序
       setSessions(prevSessions => {
+        console.log('[流式完成] 更新会话列表，当前会话数:', prevSessions.length)
         const updatedSessions = prevSessions.map(s => 
-          s.id === updatedSession.id ? updatedSession : s
-        )
+          s && s.id === updatedSession?.id ? updatedSession : s
+        ).filter(s => s && s.id) // 再次过滤，确保没有无效会话
+        
         // 按更新时间降序排列
         return updatedSessions.sort((a, b) => 
           new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -602,7 +657,7 @@ export default function AgentChat() {
 
             {showLlmDropdown && (
               <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-50 max-h-64 overflow-y-auto">
-                {llmConfigs.filter(c => c.is_active).map(config => (
+                {llmConfigs.filter(c => c && c.id && c.is_active).map(config => (
                   <button
                     key={config.id}
                     onClick={() => {
@@ -651,7 +706,17 @@ export default function AgentChat() {
           <div className="p-4">
             <h2 className="text-sm font-semibold text-gray-400 dark:text-gray-500 mb-3">{t('agentChat.sessionList')}</h2>
             <div className="space-y-2">
-              {sessions.map(session => (
+              {sessions.filter(s => {
+                if (!s) {
+                  console.warn('[会话列表] 发现 undefined 会话')
+                  return false
+                }
+                if (!s.id) {
+                  console.warn('[会话列表] 发现没有 id 的会话:', s)
+                  return false
+                }
+                return true
+              }).map(session => (
                 <div
                   key={session.id}
                   className={`p-3 rounded-lg cursor-pointer transition-colors group ${
@@ -664,10 +729,10 @@ export default function AgentChat() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="text-base font-medium truncate">
-                        {session.messages[0]?.content?.substring(0, 30) || '新会话'}
+                        {session.messages?.[0]?.content?.substring(0, 30) || '新会话'}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {session.messages.length} {t('agentChat.messages')}
+                        {session.messages?.length || 0} {t('agentChat.messages')}
                       </div>
                     </div>
                     <button
@@ -693,9 +758,19 @@ export default function AgentChat() {
               {/* 消息列表 */}
               <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
                 <div className="max-w-8xl mx-auto space-y-6">
-                  {currentSession.messages.map(message => (
+                  {currentSession.messages.filter(m => {
+                    if (!m) {
+                      console.warn('[渲染警告] 发现 undefined 消息')
+                      return false
+                    }
+                    if (!m.id) {
+                      console.warn('[渲染警告] 发现没有 id 的消息:', m)
+                      return false
+                    }
+                    return true
+                  }).map((message, index) => (
                     <div
-                      key={message.id}
+                      key={message.id || `temp-${index}`}
                       className={`flex ${
                         message.role === 'user' ? 'justify-end' : 'justify-start'
                       }`}
@@ -712,7 +787,17 @@ export default function AgentChat() {
                               {/* 工具调用说明和卡片（显示在内容上方）*/}
                               {message.tool_calls && message.tool_calls.length > 0 && (
                                 <div className="space-y-3 mb-3">
-                                  {message.tool_calls.map(tc => (
+                                  {message.tool_calls.filter(tc => {
+                                    if (!tc) {
+                                      console.warn('[渲染警告] 发现 undefined 工具调用，消息ID:', message.id)
+                                      return false
+                                    }
+                                    if (!tc.tool_name) {
+                                      console.warn('[渲染警告] 发现没有 tool_name 的工具调用:', tc, '消息ID:', message.id)
+                                      return false
+                                    }
+                                    return true
+                                  }).map(tc => (
                                     <div key={tc.tool_name}>
                                       {/* Instructions 显示在卡片上方 - 普通文字样式 */}
                                       {tc.instructions && (
@@ -721,7 +806,7 @@ export default function AgentChat() {
                                         </div>
                                       )}
                                       {/* 工具调用卡片 */}
-                                      {renderToolCall(tc, message.id, true)}
+                                      {renderToolCall(tc, message.id || 'temp', true)}
                                     </div>
                                   ))}
                                 </div>

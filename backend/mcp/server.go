@@ -286,16 +286,39 @@ func (s *MCPServer) createToolHandler(script *models.Script) func(ctx context.Co
 			logger.Warn(ctx, "Failed to close page: %v", err)
 		}
 
+		// 调试日志：检查 ExtractedData
+		logger.Info(ctx, "[MCP Script Tool] ExtractedData length: %d", len(playResult.ExtractedData))
+		if len(playResult.ExtractedData) > 0 {
+			logger.Info(ctx, "[MCP Script Tool] ExtractedData keys: %v", getKeysFromMap(playResult.ExtractedData))
+		}
+
+		// 构建返回结果，将 extracted_data 放在 data 字段中以便 Agent 处理
 		resultData := map[string]interface{}{
 			"success": playResult.Success,
 			"message": playResult.Message,
 		}
+
+		// 如果有抓取的数据，将其放在 data 字段中
 		if len(playResult.ExtractedData) > 0 {
-			resultData["extracted_data"] = playResult.ExtractedData
+			resultData["data"] = map[string]interface{}{
+				"extracted_data": playResult.ExtractedData,
+			}
+			logger.Info(ctx, "[MCP Script Tool] Added extracted_data to result")
+		} else {
+			logger.Info(ctx, "[MCP Script Tool] No extracted data to return")
 		}
 
 		return mcpgo.NewToolResultJSON(resultData)
 	}
+}
+
+// getKeysFromMap 获取 map 的所有 key（辅助函数，用于日志）
+func getKeysFromMap(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // replacePlaceholders 替换字符串中的占位符
@@ -451,14 +474,26 @@ func (s *MCPServer) CallTool(ctx context.Context, name string, arguments map[str
 		logger.Warn(ctx, "Failed to close page: %v", err)
 	}
 
-	// 返回结果
+	// 调试日志：检查 ExtractedData
+	logger.Info(ctx, "[MCP CallTool] ExtractedData length: %d", len(playResult.ExtractedData))
+	if len(playResult.ExtractedData) > 0 {
+		logger.Info(ctx, "[MCP CallTool] ExtractedData keys: %v", getKeysFromMap(playResult.ExtractedData))
+	}
+
+	// 构建返回结果，将 extracted_data 放在 data 字段中以便 Agent 处理
 	result := map[string]interface{}{
 		"success": playResult.Success,
 		"message": playResult.Message,
 	}
 
+	// 如果有抓取的数据，将其放在 data 字段中
 	if len(playResult.ExtractedData) > 0 {
-		result["extracted_data"] = playResult.ExtractedData
+		result["data"] = map[string]interface{}{
+			"extracted_data": playResult.ExtractedData,
+		}
+		logger.Info(ctx, "[MCP CallTool] Added extracted_data to result in data field")
+	} else {
+		logger.Info(ctx, "[MCP CallTool] No extracted data to return")
 	}
 
 	return result, nil

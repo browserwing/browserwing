@@ -1647,14 +1647,21 @@ func (h *Handler) ListToolConfigs(c *gin.Context) {
 	// 获取分页参数
 	page := 1
 	pageSize := 20
+	noPagination := false // 是否禁用分页
+
 	if pageStr := c.Query("page"); pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
 		}
 	}
 	if pageSizeStr := c.Query("page_size"); pageSizeStr != "" {
-		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
-			pageSize = ps
+		if ps, err := strconv.Atoi(pageSizeStr); err == nil {
+			if ps == 0 {
+				// page_size=0 表示不分页，返回所有数据
+				noPagination = true
+			} else if ps > 0 && ps <= 1000 {
+				pageSize = ps
+			}
 		}
 	}
 
@@ -1774,16 +1781,18 @@ func (h *Handler) ListToolConfigs(c *gin.Context) {
 
 	total := len(filteredTools)
 
-	// 应用分页
-	start := (page - 1) * pageSize
-	end := start + pageSize
-	if start >= total {
-		filteredTools = []ToolConfigResponse{}
-	} else {
-		if end > total {
-			end = total
+	// 应用分页（如果启用）
+	if !noPagination {
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if start >= total {
+			filteredTools = []ToolConfigResponse{}
+		} else {
+			if end > total {
+				end = total
+			}
+			filteredTools = filteredTools[start:end]
 		}
-		filteredTools = filteredTools[start:end]
 	}
 
 	// 确保至少返回空数组而不是 null

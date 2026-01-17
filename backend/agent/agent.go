@@ -159,13 +159,18 @@ func (t *MCPTool) Execute(ctx context.Context, input string) (string, error) {
 	// 处理返回结果，统一处理 data 字段
 	var responseText string
 	if resultMap, ok := result.(map[string]interface{}); ok {
+		logger.Info(ctx, "[Agent MCPTool] Result map keys: %v", getMapKeys(resultMap))
+
 		// 获取 message 字段作为主要响应
 		if message, ok := resultMap["message"].(string); ok {
 			responseText = message
+			logger.Info(ctx, "[Agent MCPTool] Got message: %s", message)
 		}
 
 		// 检查并处理 data 字段
 		if data, ok := resultMap["data"].(map[string]interface{}); ok {
+			logger.Info(ctx, "[Agent MCPTool] Found data field with keys: %v", getMapKeys(data))
+
 			// 特殊处理 semantic_tree（直接追加文本）
 			if semanticTree, ok := data["semantic_tree"].(string); ok && semanticTree != "" {
 				responseText += "\n\nSemantic Tree:\n" + semanticTree
@@ -176,11 +181,15 @@ func (t *MCPTool) Execute(ctx context.Context, input string) (string, error) {
 					dataJSON, err := json.MarshalIndent(data, "", "  ")
 					if err == nil {
 						responseText += "\n\nData:\n" + string(dataJSON)
-						logger.Info(ctx, "Added data to response for tool: %s (data keys: %v)", t.name, getMapKeys(data))
+						logger.Info(ctx, "[Agent MCPTool] Added data to response for tool: %s (data keys: %v)", t.name, getMapKeys(data))
 					}
 				}
 			}
+		} else {
+			logger.Info(ctx, "[Agent MCPTool] No data field found in result")
 		}
+	} else {
+		logger.Info(ctx, "[Agent MCPTool] Result is not a map, type: %T", result)
 	}
 
 	// 如果没有提取到文本响应，回退到 JSON 序列化

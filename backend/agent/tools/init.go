@@ -105,7 +105,31 @@ func (w *ToolWrapper) InputSchema() map[string]interface{} {
 	return schema
 }
 
-const instructionsDescription = "Please briefly explain: 1) Why you are calling this tool 2) What information or task you expect to accomplish with this tool. This explanation will be shown to users to help them understand the AI's thinking process. 3) In the explanation, use the specific tool name instead of saying 'this tool'. 4) Respond in the same language as the user's message. 5) Write a brief, friendly explanation (1-2 sentences) in first person that tells the user what you're about to do and why. "
+const instructionsDescription = `CRITICAL: You MUST respond in the EXACT SAME LANGUAGE as the user's message. If the user writes in Chinese, respond in Chinese. If English, respond in English.
+
+Write a brief, natural, and friendly explanation (1-2 sentences) in first person that tells the user what you're about to do and why. Use the specific tool name.
+
+IMPORTANT: Be creative and natural! Vary your expressions, add natural speech patterns, and make it conversational. Don't always use the same sentence structure.
+
+Style tips:
+- Feel free to add natural interjections (好的/好/嗯/让我来/那么/Okay/Alright/Let me/So)
+- Vary your sentence patterns
+- Use different verbs and expressions
+- Keep it friendly and conversational
+
+Examples (USE AS INSPIRATION, NOT TEMPLATES):
+Chinese variations:
+- 好的，让我用 browser_navigate 打开这个网页看看最新内容。
+- 嗯，我来用 browser_click 点击一下这个按钮，看看会发生什么。
+- 那我先用 browser_type 在这里输入文字，然后我们就能看到结果了。
+- 让我试试用 browser_extract 抓取这个页面的数据，应该能获取到你需要的信息。
+
+English variations:
+- Alright, I'll open this webpage with browser_navigate to grab the latest content.
+- Let me click that button using browser_click and see what happens.
+- Okay, I'm going to type the text here with browser_type so we can get the results.
+- I'll extract the data from this page using browser_extract to get what you need.
+`
 
 // Parameters 重写 Parameters 方法，添加 instructions 参数
 func (w *ToolWrapper) Parameters() map[string]interfaces.ParameterSpec {

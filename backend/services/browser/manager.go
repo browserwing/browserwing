@@ -886,10 +886,20 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 	}
 
 	// 返回回放结果，包含抓取的数据
+	extractedData := player.GetExtractedData()
+	logger.Info(ctx, "[PlayScript] Extracted data length: %d", len(extractedData))
+	if len(extractedData) > 0 {
+		keys := make([]string, 0, len(extractedData))
+		for k := range extractedData {
+			keys = append(keys, k)
+		}
+		logger.Info(ctx, "[PlayScript] Extracted data keys: %v", keys)
+	}
+
 	return &models.PlayResult{
 		Success:       true,
 		Message:       "Script replay completed",
-		ExtractedData: player.GetExtractedData(),
+		ExtractedData: extractedData,
 	}, page, nil
 }
 
