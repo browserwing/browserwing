@@ -208,6 +208,47 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			apiKeys.DELETE("/:id", handler.DeleteApiKey) // 删除API密钥
 		}
 
+		// Executor HTTP API（使用 JWT 或 ApiKey 认证，支持外部调用）
+		executorAPI := r.Group("/api/v1/executor")
+		executorAPI.Use(JWTOrApiKeyAuthenticationMiddleware(handler.config, handler.db))
+		{
+			// 帮助和命令列表
+			executorAPI.GET("/help", handler.ExecutorHelp)                // 获取所有可用命令和使用说明
+			executorAPI.GET("/export/skill", handler.ExportExecutorSkill) // 导出 SKILL.md 文件
+
+			// 页面导航和操作
+			executorAPI.POST("/navigate", handler.ExecutorNavigate)               // 导航到 URL
+			executorAPI.POST("/click", handler.ExecutorClick)                     // 点击元素
+			executorAPI.POST("/type", handler.ExecutorType)                       // 输入文本
+			executorAPI.POST("/select", handler.ExecutorSelect)                   // 选择下拉框
+			executorAPI.POST("/hover", handler.ExecutorHover)                     // 鼠标悬停
+			executorAPI.POST("/wait", handler.ExecutorWaitFor)                    // 等待元素
+			executorAPI.POST("/scroll-to-bottom", handler.ExecutorScrollToBottom) // 滚动到底部
+			executorAPI.POST("/go-back", handler.ExecutorGoBack)                  // 后退
+			executorAPI.POST("/go-forward", handler.ExecutorGoForward)            // 前进
+			executorAPI.POST("/reload", handler.ExecutorReload)                   // 刷新页面
+			executorAPI.POST("/press-key", handler.ExecutorPressKey)              // 按键
+			executorAPI.POST("/resize", handler.ExecutorResize)                   // 调整窗口大小
+
+			// 数据提取和获取
+			executorAPI.POST("/get-text", handler.ExecutorGetText)           // 获取元素文本
+			executorAPI.POST("/get-value", handler.ExecutorGetValue)         // 获取元素值
+			executorAPI.POST("/extract", handler.ExecutorExtract)            // 提取数据
+			executorAPI.GET("/page-info", handler.ExecutorGetPageInfo)       // 获取页面信息
+			executorAPI.GET("/page-content", handler.ExecutorGetPageContent) // 获取页面内容
+			executorAPI.GET("/page-text", handler.ExecutorGetPageText)       // 获取页面文本
+
+			// 语义树和元素查找
+			executorAPI.GET("/semantic-tree", handler.ExecutorGetSemanticTree)           // 获取语义树
+			executorAPI.GET("/clickable-elements", handler.ExecutorGetClickableElements) // 获取可点击元素
+			executorAPI.GET("/input-elements", handler.ExecutorGetInputElements)         // 获取输入元素
+
+			// 高级功能
+			executorAPI.POST("/screenshot", handler.ExecutorScreenshot) // 截图
+			executorAPI.POST("/evaluate", handler.ExecutorEvaluate)     // 执行 JavaScript
+			executorAPI.POST("/batch", handler.ExecutorBatch)           // 批量执行操作
+		}
+
 		// Agent 聊天相关
 		if agentHandler != nil {
 			type AgentHandlerInterface interface {

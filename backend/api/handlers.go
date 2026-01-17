@@ -15,6 +15,7 @@ import (
 	"github.com/browserwing/browserwing/agent"
 	localtools "github.com/browserwing/browserwing/agent/tools"
 	"github.com/browserwing/browserwing/config"
+	executor2 "github.com/browserwing/browserwing/executor"
 	"github.com/browserwing/browserwing/llm"
 	"github.com/browserwing/browserwing/models"
 	"github.com/browserwing/browserwing/pkg/logger"
@@ -38,6 +39,7 @@ type MCPHTTPHandler interface {
 type Handler struct {
 	db             *storage.BoltDB
 	browserManager *browser.Manager
+	executor       *executor2.Executor // Executor 实例
 	config         *config.Config
 	llmManager     *llm.Manager
 	mcpServer      MCPHTTPHandler // MCP 服务器（使用 interface{} 避免循环依赖）
@@ -53,6 +55,7 @@ func NewHandler(
 	return &Handler{
 		db:             db,
 		browserManager: browserMgr,
+		executor:       executor2.NewExecutor(browserMgr), // 初始化 Executor
 		config:         cfg,
 		llmManager:     llmMgr,
 		mcpServer:      nil, // 将在主程序中设置
@@ -3254,6 +3257,1617 @@ func generateSkillMD(scripts []*models.Script, host string, isExportAll bool, sc
 	sb.WriteString("- Scripts run in the actual browser, so execution may take a few seconds\n")
 	sb.WriteString("- Some scripts may require authentication cookies or specific browser state\n")
 	sb.WriteString("- Always replace `<host>` with the actual BrowserPilot API host address\n\n")
+
+	return sb.String()
+}
+
+// ============= Executor HTTP API =============
+
+// ExecutorHelp 获取所有可用命令的帮助信息
+func (h *Handler) ExecutorHelp(c *gin.Context) {
+	// 支持查询特定命令
+	command := c.Query("command")
+
+	commands := []map[string]interface{}{
+		{
+			"name":        "navigate",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/navigate",
+			"description": "Navigate to a URL",
+			"parameters": map[string]interface{}{
+				"url": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Target URL to navigate to",
+					"example":     "https://example.com",
+				},
+				"wait_until": map[string]interface{}{
+					"type":        "string",
+					"required":    false,
+					"description": "Wait condition: load, domcontentloaded, networkidle",
+					"default":     "load",
+				},
+				"timeout": map[string]interface{}{
+					"type":        "number",
+					"required":    false,
+					"description": "Timeout in seconds",
+					"default":     60,
+				},
+			},
+			"example": map[string]interface{}{
+				"url":        "https://example.com",
+				"wait_until": "load",
+			},
+			"returns": "Operation result with semantic tree",
+		},
+		{
+			"name":        "click",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/click",
+			"description": "Click an element on the page",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Element identifier: CSS selector, XPath, text, semantic index ([1], Clickable Element [1])",
+					"example":     "#button-id or [1]",
+				},
+				"wait_visible": map[string]interface{}{
+					"type":        "boolean",
+					"required":    false,
+					"description": "Wait for element to be visible",
+					"default":     true,
+				},
+				"timeout": map[string]interface{}{
+					"type":        "number",
+					"required":    false,
+					"description": "Timeout in seconds",
+					"default":     10,
+				},
+			},
+			"example": map[string]interface{}{
+				"identifier":   "#login-button",
+				"wait_visible": true,
+			},
+			"returns": "Operation result with updated semantic tree",
+		},
+		{
+			"name":        "type",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/type",
+			"description": "Type text into an input element",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Input element identifier",
+					"example":     "#email-input or Input Element [1]",
+				},
+				"text": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Text to type",
+					"example":     "user@example.com",
+				},
+				"clear": map[string]interface{}{
+					"type":        "boolean",
+					"required":    false,
+					"description": "Clear existing content first",
+					"default":     true,
+				},
+			},
+			"example": map[string]interface{}{
+				"identifier": "#email-input",
+				"text":       "user@example.com",
+				"clear":      true,
+			},
+			"returns": "Operation result",
+		},
+		{
+			"name":        "select",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/select",
+			"description": "Select an option from a dropdown",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Select element identifier",
+				},
+				"value": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Option value or text to select",
+				},
+			},
+			"example": map[string]interface{}{
+				"identifier": "#country-select",
+				"value":      "United States",
+			},
+		},
+		{
+			"name":        "extract",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/extract",
+			"description": "Extract data from page elements",
+			"parameters": map[string]interface{}{
+				"selector": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "CSS selector for elements to extract",
+				},
+				"type": map[string]interface{}{
+					"type":        "string",
+					"required":    false,
+					"description": "Extraction type: text, html, attribute, property",
+				},
+				"fields": map[string]interface{}{
+					"type":        "array",
+					"required":    false,
+					"description": "Fields to extract: text, html, href, src, value",
+					"example":     []string{"text", "href"},
+				},
+				"multiple": map[string]interface{}{
+					"type":        "boolean",
+					"required":    false,
+					"description": "Extract multiple elements",
+					"default":     false,
+				},
+			},
+			"example": map[string]interface{}{
+				"selector": ".product-item",
+				"fields":   []string{"text", "href"},
+				"multiple": true,
+			},
+			"returns": "Extracted data array or object",
+		},
+		{
+			"name":        "wait",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/wait",
+			"description": "Wait for an element to reach a certain state",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Element identifier",
+				},
+				"state": map[string]interface{}{
+					"type":        "string",
+					"required":    false,
+					"description": "State to wait for: visible, hidden, enabled",
+					"default":     "visible",
+				},
+				"timeout": map[string]interface{}{
+					"type":        "number",
+					"required":    false,
+					"description": "Timeout in seconds",
+					"default":     30,
+				},
+			},
+			"example": map[string]interface{}{
+				"identifier": "#loading-spinner",
+				"state":      "hidden",
+				"timeout":    10,
+			},
+		},
+		{
+			"name":        "hover",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/hover",
+			"description": "Hover mouse over an element",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Element identifier",
+				},
+			},
+			"example": map[string]interface{}{
+				"identifier": ".dropdown-trigger",
+			},
+		},
+		{
+			"name":        "press-key",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/press-key",
+			"description": "Press a keyboard key",
+			"parameters": map[string]interface{}{
+				"key": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Key to press: Enter, Tab, Escape, ArrowDown, etc.",
+					"example":     "Enter",
+				},
+				"ctrl": map[string]interface{}{
+					"type":        "boolean",
+					"required":    false,
+					"description": "Hold Ctrl key",
+				},
+				"shift": map[string]interface{}{
+					"type":        "boolean",
+					"required":    false,
+					"description": "Hold Shift key",
+				},
+			},
+			"example": map[string]interface{}{
+				"key": "Enter",
+			},
+		},
+		{
+			"name":        "scroll-to-bottom",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/scroll-to-bottom",
+			"description": "Scroll to the bottom of the page",
+			"parameters":  map[string]interface{}{},
+			"example":     map[string]interface{}{},
+		},
+		{
+			"name":        "go-back",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/go-back",
+			"description": "Navigate back in browser history",
+			"parameters":  map[string]interface{}{},
+		},
+		{
+			"name":        "go-forward",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/go-forward",
+			"description": "Navigate forward in browser history",
+			"parameters":  map[string]interface{}{},
+		},
+		{
+			"name":        "reload",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/reload",
+			"description": "Reload the current page",
+			"parameters":  map[string]interface{}{},
+		},
+		{
+			"name":        "get-text",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/get-text",
+			"description": "Get text content of an element",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Element identifier",
+				},
+			},
+			"example": map[string]interface{}{
+				"identifier": "h1",
+			},
+			"returns": "Text content",
+		},
+		{
+			"name":        "get-value",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/get-value",
+			"description": "Get value of an input element",
+			"parameters": map[string]interface{}{
+				"identifier": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "Input element identifier",
+				},
+			},
+			"returns": "Input value",
+		},
+		{
+			"name":        "semantic-tree",
+			"method":      "GET",
+			"endpoint":    "/api/v1/executor/semantic-tree",
+			"description": "Get the semantic tree of the current page (all interactive elements)",
+			"parameters":  map[string]interface{}{},
+			"returns":     "Semantic tree with all clickable and input elements",
+			"note":        "Use this first to understand page structure and get element indices",
+		},
+		{
+			"name":        "clickable-elements",
+			"method":      "GET",
+			"endpoint":    "/api/v1/executor/clickable-elements",
+			"description": "Get all clickable elements (buttons, links, etc.)",
+			"parameters":  map[string]interface{}{},
+			"returns":     "Array of clickable elements with indices",
+		},
+		{
+			"name":        "input-elements",
+			"method":      "GET",
+			"endpoint":    "/api/v1/executor/input-elements",
+			"description": "Get all input elements (text boxes, selects, etc.)",
+			"parameters":  map[string]interface{}{},
+			"returns":     "Array of input elements with indices",
+		},
+		{
+			"name":        "page-info",
+			"method":      "GET",
+			"endpoint":    "/api/v1/executor/page-info",
+			"description": "Get current page URL and title",
+			"parameters":  map[string]interface{}{},
+			"returns":     "Page info (url, title)",
+		},
+		{
+			"name":        "page-text",
+			"method":      "GET",
+			"endpoint":    "/api/v1/executor/page-text",
+			"description": "Get all text content from the page",
+			"parameters":  map[string]interface{}{},
+			"returns":     "Page text content",
+		},
+		{
+			"name":        "page-content",
+			"method":      "GET",
+			"endpoint":    "/api/v1/executor/page-content",
+			"description": "Get full HTML content of the page",
+			"parameters":  map[string]interface{}{},
+			"returns":     "HTML content",
+		},
+		{
+			"name":        "screenshot",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/screenshot",
+			"description": "Take a screenshot of the page",
+			"parameters": map[string]interface{}{
+				"full_page": map[string]interface{}{
+					"type":        "boolean",
+					"required":    false,
+					"description": "Capture full page or viewport only",
+					"default":     false,
+				},
+				"format": map[string]interface{}{
+					"type":        "string",
+					"required":    false,
+					"description": "Image format: png or jpeg",
+					"default":     "png",
+				},
+			},
+			"returns": "Base64 encoded image data",
+		},
+		{
+			"name":        "evaluate",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/evaluate",
+			"description": "Execute JavaScript code on the page",
+			"parameters": map[string]interface{}{
+				"script": map[string]interface{}{
+					"type":        "string",
+					"required":    true,
+					"description": "JavaScript code to execute",
+					"example":     "() => document.title",
+				},
+			},
+			"returns": "Script execution result",
+		},
+		{
+			"name":        "batch",
+			"method":      "POST",
+			"endpoint":    "/api/v1/executor/batch",
+			"description": "Execute multiple operations in sequence",
+			"parameters": map[string]interface{}{
+				"operations": map[string]interface{}{
+					"type":        "array",
+					"required":    true,
+					"description": "Array of operations to execute",
+					"example": []map[string]interface{}{
+						{
+							"type":          "navigate",
+							"params":        map[string]interface{}{"url": "https://example.com"},
+							"stop_on_error": true,
+						},
+						{
+							"type":          "click",
+							"params":        map[string]interface{}{"identifier": "#button"},
+							"stop_on_error": true,
+						},
+					},
+				},
+			},
+			"returns": "Batch execution results",
+		},
+	}
+
+	// 如果指定了特定命令，只返回该命令的信息
+	if command != "" {
+		for _, cmd := range commands {
+			if cmd["name"] == command {
+				c.JSON(http.StatusOK, gin.H{
+					"command": cmd,
+				})
+				return
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Command not found",
+		})
+		return
+	}
+
+	// 返回所有命令
+	c.JSON(http.StatusOK, gin.H{
+		"total_commands": len(commands),
+		"base_url":       "/api/v1/executor",
+		"authentication": map[string]interface{}{
+			"methods": []string{"JWT Token", "API Key"},
+			"jwt":     "Authorization: Bearer <token>",
+			"api_key": "X-BrowserWing-Key: <api-key>",
+		},
+		"workflow": []string{
+			"1. Call GET /semantic-tree to understand page structure",
+			"2. Use element indices ([1], [2]) or CSS selectors for operations",
+			"3. Call appropriate operation endpoints (navigate, click, type, etc.)",
+			"4. Extract data using /extract endpoint",
+			"5. Use /batch for multiple operations",
+		},
+		"element_identifiers": map[string]interface{}{
+			"css_selector":   "#id, .class, button[type='submit']",
+			"xpath":          "//button[@id='login']",
+			"text_content":   "Login, Sign Up (will find button/link with this text)",
+			"semantic_index": "[1], Clickable Element [1], Input Element [2]",
+			"aria_label":     "Searches for elements with aria-label attribute",
+			"recommendation": "Use semantic-tree first to get element indices",
+		},
+		"commands": commands,
+		"examples": map[string]interface{}{
+			"simple_workflow": map[string]interface{}{
+				"description": "Navigate and click a button",
+				"steps": []map[string]interface{}{
+					{
+						"step":     1,
+						"action":   "Navigate",
+						"endpoint": "POST /navigate",
+						"payload":  map[string]interface{}{"url": "https://example.com"},
+					},
+					{
+						"step":     2,
+						"action":   "Get page structure",
+						"endpoint": "GET /semantic-tree",
+					},
+					{
+						"step":     3,
+						"action":   "Click button",
+						"endpoint": "POST /click",
+						"payload":  map[string]interface{}{"identifier": "[1]"},
+					},
+				},
+			},
+			"data_extraction": map[string]interface{}{
+				"description": "Search and extract results",
+				"steps": []map[string]interface{}{
+					{
+						"step":     1,
+						"endpoint": "POST /navigate",
+						"payload":  map[string]interface{}{"url": "https://example.com/search"},
+					},
+					{
+						"step":     2,
+						"endpoint": "POST /type",
+						"payload":  map[string]interface{}{"identifier": "#search", "text": "query"},
+					},
+					{
+						"step":     3,
+						"endpoint": "POST /press-key",
+						"payload":  map[string]interface{}{"key": "Enter"},
+					},
+					{
+						"step":     4,
+						"endpoint": "POST /wait",
+						"payload":  map[string]interface{}{"identifier": ".results", "state": "visible"},
+					},
+					{
+						"step":     5,
+						"endpoint": "POST /extract",
+						"payload":  map[string]interface{}{"selector": ".item", "fields": []string{"text", "href"}, "multiple": true},
+					},
+				},
+			},
+		},
+	})
+}
+
+// ExecutorNavigate 导航到指定 URL
+func (h *Handler) ExecutorNavigate(c *gin.Context) {
+	var req struct {
+		URL       string `json:"url" binding:"required"`
+		WaitUntil string `json:"wait_until"` // load, domcontentloaded, networkidle
+		Timeout   int    `json:"timeout"`    // 秒
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	// 创建 executor 实例
+	executor := h.executor.WithContext(c.Request.Context())
+
+	// 设置选项
+	var opts *executor2.NavigateOptions
+	if req.WaitUntil != "" || req.Timeout > 0 {
+		opts = &executor2.NavigateOptions{}
+		if req.WaitUntil != "" {
+			opts.WaitUntil = req.WaitUntil
+		}
+		if req.Timeout > 0 {
+			opts.Timeout = time.Duration(req.Timeout) * time.Second
+		}
+	}
+
+	// 执行导航
+	result, err := executor.Navigate(c.Request.Context(), req.URL, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.navigationFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorClick 点击元素
+func (h *Handler) ExecutorClick(c *gin.Context) {
+	var req struct {
+		Identifier  string `json:"identifier" binding:"required"` // CSS selector, XPath, label, etc.
+		WaitVisible bool   `json:"wait_visible"`
+		WaitEnabled bool   `json:"wait_enabled"`
+		Timeout     int    `json:"timeout"` // 秒
+		Button      string `json:"button"`  // left, right, middle
+		ClickCount  int    `json:"click_count"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.ClickOptions{
+		WaitVisible: req.WaitVisible,
+		WaitEnabled: req.WaitEnabled,
+		Button:      req.Button,
+		ClickCount:  req.ClickCount,
+	}
+	if req.Timeout > 0 {
+		opts.Timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	result, err := executor.Click(c.Request.Context(), req.Identifier, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.clickFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorType 输入文本
+func (h *Handler) ExecutorType(c *gin.Context) {
+	var req struct {
+		Identifier  string `json:"identifier" binding:"required"` // CSS selector, XPath, label, etc.
+		Text        string `json:"text" binding:"required"`
+		Clear       bool   `json:"clear"`
+		WaitVisible bool   `json:"wait_visible"`
+		Timeout     int    `json:"timeout"` // 秒
+		Delay       int    `json:"delay"`   // 毫秒
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.TypeOptions{
+		Clear:       req.Clear,
+		WaitVisible: req.WaitVisible,
+	}
+	if req.Timeout > 0 {
+		opts.Timeout = time.Duration(req.Timeout) * time.Second
+	}
+	if req.Delay > 0 {
+		opts.Delay = time.Duration(req.Delay) * time.Millisecond
+	}
+
+	result, err := executor.Type(c.Request.Context(), req.Identifier, req.Text, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.typeFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorSelect 选择下拉框选项
+func (h *Handler) ExecutorSelect(c *gin.Context) {
+	var req struct {
+		Identifier  string `json:"identifier" binding:"required"`
+		Value       string `json:"value" binding:"required"`
+		WaitVisible bool   `json:"wait_visible"`
+		Timeout     int    `json:"timeout"` // 秒
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.SelectOptions{
+		WaitVisible: req.WaitVisible,
+	}
+	if req.Timeout > 0 {
+		opts.Timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	result, err := executor.Select(c.Request.Context(), req.Identifier, req.Value, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.selectFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGetText 获取元素文本
+func (h *Handler) ExecutorGetText(c *gin.Context) {
+	var req struct {
+		Identifier string `json:"identifier" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GetText(c.Request.Context(), req.Identifier)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getTextFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGetValue 获取元素值
+func (h *Handler) ExecutorGetValue(c *gin.Context) {
+	var req struct {
+		Identifier string `json:"identifier" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GetValue(c.Request.Context(), req.Identifier)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getValueFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorWaitFor 等待元素
+func (h *Handler) ExecutorWaitFor(c *gin.Context) {
+	var req struct {
+		Identifier string `json:"identifier" binding:"required"`
+		State      string `json:"state"`   // visible, hidden, enabled
+		Timeout    int    `json:"timeout"` // 秒
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.WaitForOptions{
+		State: req.State,
+	}
+	if req.Timeout > 0 {
+		opts.Timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	result, err := executor.WaitFor(c.Request.Context(), req.Identifier, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.waitForFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorExtract 提取数据
+func (h *Handler) ExecutorExtract(c *gin.Context) {
+	var req struct {
+		Selector string   `json:"selector" binding:"required"`
+		Type     string   `json:"type"`     // text, html, attribute, property
+		Attr     string   `json:"attr"`     // 当 type 为 attribute 或 property 时使用
+		Fields   []string `json:"fields"`   // 要提取的字段列表
+		Multiple bool     `json:"multiple"` // 是否提取多个元素
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.ExtractOptions{
+		Selector: req.Selector,
+		Type:     req.Type,
+		Attr:     req.Attr,
+		Fields:   req.Fields,
+		Multiple: req.Multiple,
+	}
+
+	result, err := executor.Extract(c.Request.Context(), opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.extractFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorHover 鼠标悬停
+func (h *Handler) ExecutorHover(c *gin.Context) {
+	var req struct {
+		Identifier  string `json:"identifier" binding:"required"`
+		WaitVisible bool   `json:"wait_visible"`
+		Timeout     int    `json:"timeout"` // 秒
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.HoverOptions{
+		WaitVisible: req.WaitVisible,
+	}
+	if req.Timeout > 0 {
+		opts.Timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	result, err := executor.Hover(c.Request.Context(), req.Identifier, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.hoverFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorScrollToBottom 滚动到底部
+func (h *Handler) ExecutorScrollToBottom(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.ScrollToBottom(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.scrollFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGoBack 后退
+func (h *Handler) ExecutorGoBack(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GoBack(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.goBackFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGoForward 前进
+func (h *Handler) ExecutorGoForward(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GoForward(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.goForwardFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorReload 刷新页面
+func (h *Handler) ExecutorReload(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.Reload(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.reloadFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorScreenshot 截图
+func (h *Handler) ExecutorScreenshot(c *gin.Context) {
+	var req struct {
+		FullPage bool   `json:"full_page"`
+		Quality  int    `json:"quality"` // 1-100
+		Format   string `json:"format"`  // png, jpeg
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.ScreenshotOptions{
+		FullPage: req.FullPage,
+		Quality:  req.Quality,
+		Format:   req.Format,
+	}
+
+	result, err := executor.Screenshot(c.Request.Context(), opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.screenshotFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorEvaluate 执行 JavaScript
+func (h *Handler) ExecutorEvaluate(c *gin.Context) {
+	var req struct {
+		Script string `json:"script" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.Evaluate(c.Request.Context(), req.Script)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.evaluateFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorPressKey 按键
+func (h *Handler) ExecutorPressKey(c *gin.Context) {
+	var req struct {
+		Key   string `json:"key" binding:"required"` // enter, tab, escape, etc.
+		Ctrl  bool   `json:"ctrl"`
+		Shift bool   `json:"shift"`
+		Alt   bool   `json:"alt"`
+		Meta  bool   `json:"meta"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.PressKeyOptions{
+		Ctrl:  req.Ctrl,
+		Shift: req.Shift,
+		Alt:   req.Alt,
+		Meta:  req.Meta,
+	}
+
+	result, err := executor.PressKey(c.Request.Context(), req.Key, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.pressKeyFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorResize 调整窗口大小
+func (h *Handler) ExecutorResize(c *gin.Context) {
+	var req struct {
+		Width  int `json:"width" binding:"required"`
+		Height int `json:"height" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.Resize(c.Request.Context(), req.Width, req.Height)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.resizeFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGetPageInfo 获取页面信息
+func (h *Handler) ExecutorGetPageInfo(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GetPageInfo(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getPageInfoFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGetPageContent 获取页面内容
+func (h *Handler) ExecutorGetPageContent(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GetPageContent(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getPageContentFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGetPageText 获取页面文本
+func (h *Handler) ExecutorGetPageText(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.GetPageText(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getPageTextFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorGetSemanticTree 获取语义树
+func (h *Handler) ExecutorGetSemanticTree(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	tree, err := executor.GetSemanticTree(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getSemanticTreeFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":   true,
+		"tree":      tree,
+		"tree_text": tree.SerializeToSimpleText(),
+	})
+}
+
+// ExecutorGetClickableElements 获取可点击元素
+func (h *Handler) ExecutorGetClickableElements(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	elements, err := executor.GetClickableElements(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getClickableElementsFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"elements": elements,
+		"count":    len(elements),
+	})
+}
+
+// ExecutorGetInputElements 获取输入元素
+func (h *Handler) ExecutorGetInputElements(c *gin.Context) {
+	executor := h.executor.WithContext(c.Request.Context())
+	elements, err := executor.GetInputElements(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.getInputElementsFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"elements": elements,
+		"count":    len(elements),
+	})
+}
+
+// ExecutorBatch 批量执行操作
+func (h *Handler) ExecutorBatch(c *gin.Context) {
+	var req struct {
+		Operations []executor2.Operation `json:"operations" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+	result, err := executor.ExecuteBatch(c.Request.Context(), req.Operations)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.batchExecutionFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExportExecutorSkill 导出 Executor API 为 Claude Skills 的 SKILL.md 格式
+func (h *Handler) ExportExecutorSkill(c *gin.Context) {
+	// 获取服务端地址
+	host := c.Request.Host
+
+	// 生成 SKILL.md 内容
+	skillContent := generateExecutorSkillMD(host)
+
+	fileName := fmt.Sprintf("EXECUTOR_SKILL_%s.md", time.Now().Format("20060102150405"))
+
+	// 返回内容
+	c.Header("Content-Type", "text/markdown; charset=utf-8")
+	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.String(http.StatusOK, skillContent)
+}
+
+// generateExecutorSkillMD 生成 Executor API 的 SKILL.md 内容
+func generateExecutorSkillMD(host string) string {
+	var sb strings.Builder
+
+	// YAML Frontmatter
+	sb.WriteString("---\n")
+	sb.WriteString("name: browserpilot-executor\n")
+	sb.WriteString("description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, semantic tree analysis, screenshot, JavaScript execution, and batch operations.\n")
+	sb.WriteString("---\n\n")
+
+	// 主标题
+	sb.WriteString("# BrowserPilot Executor API\n\n")
+
+	// 简介
+	sb.WriteString("## Overview\n\n")
+	sb.WriteString("BrowserPilot Executor provides comprehensive browser automation capabilities through HTTP APIs. You can control browser navigation, interact with page elements, extract data, and analyze page structure.\n\n")
+	sb.WriteString(fmt.Sprintf("**API Base URL:** `http://%s/api/v1/executor`\n\n", host))
+	sb.WriteString("**Authentication:** Use `X-BrowserWing-Key: <api-key>` header or `Authorization: Bearer <token>`\n\n")
+
+	// 核心功能
+	sb.WriteString("## Core Capabilities\n\n")
+	sb.WriteString("- **Page Navigation:** Navigate to URLs, go back/forward, reload\n")
+	sb.WriteString("- **Element Interaction:** Click, type, select, hover on page elements\n")
+	sb.WriteString("- **Data Extraction:** Extract text, attributes, values from elements\n")
+	sb.WriteString("- **Semantic Analysis:** Get semantic tree to understand page structure\n")
+	sb.WriteString("- **Advanced Operations:** Screenshot, JavaScript execution, keyboard input\n")
+	sb.WriteString("- **Batch Processing:** Execute multiple operations in sequence\n\n")
+
+	// API 端点
+	sb.WriteString("## API Endpoints\n\n")
+
+	// 1. 发现命令
+	sb.WriteString("### 1. Discover Available Commands\n\n")
+	sb.WriteString("**IMPORTANT:** Always call this endpoint first to see all available commands and their parameters.\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/help'\n", host))
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Response:** Returns complete list of all commands with parameters, examples, and usage guidelines.\n\n")
+	sb.WriteString("**Query specific command:**\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/help?command=extract'\n", host))
+	sb.WriteString("```\n\n")
+
+	// 2. 获取页面语义树
+	sb.WriteString("### 2. Get Semantic Tree\n\n")
+	sb.WriteString("**CRITICAL:** Always call this after navigation to understand page structure and get element indices.\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/semantic-tree'\n", host))
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Response Example:**\n")
+	sb.WriteString("```json\n")
+	sb.WriteString("{\n")
+	sb.WriteString("  \"success\": true,\n")
+	sb.WriteString("  \"tree_text\": \"Clickable Element [1]: Login Button\\nInput Element [1]: Email\\nInput Element [2]: Password\"\n")
+	sb.WriteString("}\n")
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Use Cases:**\n")
+	sb.WriteString("- Understand what interactive elements are on the page\n")
+	sb.WriteString("- Get element indices for reliable identification\n")
+	sb.WriteString("- See element labels and roles\n\n")
+
+	// 3. 主要操作端点
+	sb.WriteString("### 3. Common Operations\n\n")
+
+	// Navigate
+	sb.WriteString("#### Navigate to URL\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/navigate' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"url\": \"https://example.com\"}'\n")
+	sb.WriteString("```\n\n")
+
+	// Click
+	sb.WriteString("#### Click Element\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/click' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"identifier\": \"[1]\"}'\n")
+	sb.WriteString("```\n")
+	sb.WriteString("**Identifier formats:** `[1]`, `#button-id`, `.class-name`, `Login` (text), `Clickable Element [1]`\n\n")
+
+	// Type
+	sb.WriteString("#### Type Text\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/type' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"identifier\": \"Input Element [1]\", \"text\": \"user@example.com\"}'\n")
+	sb.WriteString("```\n\n")
+
+	// Extract
+	sb.WriteString("#### Extract Data\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/extract' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\n")
+	sb.WriteString("    \"selector\": \".product-item\",\n")
+	sb.WriteString("    \"fields\": [\"text\", \"href\"],\n")
+	sb.WriteString("    \"multiple\": true\n")
+	sb.WriteString("  }'\n")
+	sb.WriteString("```\n\n")
+
+	// Wait
+	sb.WriteString("#### Wait for Element\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/wait' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"identifier\": \".loading\", \"state\": \"hidden\", \"timeout\": 10}'\n")
+	sb.WriteString("```\n\n")
+
+	// Batch
+	sb.WriteString("#### Batch Operations\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/batch' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\n")
+	sb.WriteString("    \"operations\": [\n")
+	sb.WriteString("      {\"type\": \"navigate\", \"params\": {\"url\": \"https://example.com\"}, \"stop_on_error\": true},\n")
+	sb.WriteString("      {\"type\": \"click\", \"params\": {\"identifier\": \"[1]\"}, \"stop_on_error\": true},\n")
+	sb.WriteString("      {\"type\": \"type\", \"params\": {\"identifier\": \"[1]\", \"text\": \"query\"}, \"stop_on_error\": true}\n")
+	sb.WriteString("    ]\n")
+	sb.WriteString("  }'\n")
+	sb.WriteString("```\n\n")
+
+	// 使用说明
+	sb.WriteString("## Instructions\n\n")
+	sb.WriteString("**Step-by-step workflow:**\n\n")
+	sb.WriteString("1. **Discover commands:** Call `GET /help` to see all available operations and their parameters (do this first if unsure).\n\n")
+	sb.WriteString("2. **Navigate:** Use `POST /navigate` to open the target webpage.\n\n")
+	sb.WriteString("3. **Analyze page:** Call `GET /semantic-tree` to understand page structure and get element indices.\n\n")
+	sb.WriteString("4. **Interact:** Use element indices (like `[1]`, `Input Element [1]`) or CSS selectors to:\n")
+	sb.WriteString("   - Click elements: `POST /click`\n")
+	sb.WriteString("   - Input text: `POST /type`\n")
+	sb.WriteString("   - Select options: `POST /select`\n")
+	sb.WriteString("   - Wait for elements: `POST /wait`\n\n")
+	sb.WriteString("5. **Extract data:** Use `POST /extract` to get information from the page.\n\n")
+	sb.WriteString("6. **Present results:** Format and show extracted data to the user.\n\n")
+
+	// 完整示例
+	sb.WriteString("## Complete Example\n\n")
+	sb.WriteString("**User Request:** \"Search for 'laptop' on example.com and get the first 5 results\"\n\n")
+	sb.WriteString("**Your Actions:**\n\n")
+
+	sb.WriteString("1. Navigate to search page:\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/navigate' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"url\": \"https://example.com/search\"}'\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("2. Get page structure to find search input:\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/semantic-tree'\n", host))
+	sb.WriteString("```\n")
+	sb.WriteString("Response shows: `Input Element [1]: Search Box`\n\n")
+
+	sb.WriteString("3. Type search query:\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/type' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"identifier\": \"Input Element [1]\", \"text\": \"laptop\"}'\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("4. Press Enter to submit:\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/press-key' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"key\": \"Enter\"}'\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("5. Wait for results to load:\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/wait' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\"identifier\": \".search-results\", \"state\": \"visible\", \"timeout\": 10}'\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("6. Extract search results:\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/extract' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\n")
+	sb.WriteString("    \"selector\": \".result-item\",\n")
+	sb.WriteString("    \"fields\": [\"text\", \"href\"],\n")
+	sb.WriteString("    \"multiple\": true\n")
+	sb.WriteString("  }'\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("7. Present the extracted data:\n")
+	sb.WriteString("```\n")
+	sb.WriteString("Found 15 results for 'laptop':\n")
+	sb.WriteString("1. Gaming Laptop - $1299 (https://...)\n")
+	sb.WriteString("2. Business Laptop - $899 (https://...)\n")
+	sb.WriteString("...\n")
+	sb.WriteString("```\n\n")
+
+	// 关键命令速查
+	sb.WriteString("## Key Commands Reference\n\n")
+
+	// 导航类
+	sb.WriteString("### Navigation\n")
+	sb.WriteString("- `POST /navigate` - Navigate to URL\n")
+	sb.WriteString("- `POST /go-back` - Go back in history\n")
+	sb.WriteString("- `POST /go-forward` - Go forward in history\n")
+	sb.WriteString("- `POST /reload` - Reload current page\n\n")
+
+	// 元素交互类
+	sb.WriteString("### Element Interaction\n")
+	sb.WriteString("- `POST /click` - Click element (supports: CSS selector, semantic index `[1]`, text content)\n")
+	sb.WriteString("- `POST /type` - Type text into input (supports: `Input Element [1]`, CSS selector)\n")
+	sb.WriteString("- `POST /select` - Select dropdown option\n")
+	sb.WriteString("- `POST /hover` - Hover over element\n")
+	sb.WriteString("- `POST /wait` - Wait for element state (visible, hidden, enabled)\n")
+	sb.WriteString("- `POST /press-key` - Press keyboard key (Enter, Tab, Ctrl+S, etc.)\n\n")
+
+	// 数据提取类
+	sb.WriteString("### Data Extraction\n")
+	sb.WriteString("- `POST /extract` - Extract data from elements (supports multiple elements, custom fields)\n")
+	sb.WriteString("- `POST /get-text` - Get element text content\n")
+	sb.WriteString("- `POST /get-value` - Get input element value\n")
+	sb.WriteString("- `GET /page-info` - Get page URL and title\n")
+	sb.WriteString("- `GET /page-text` - Get all page text\n")
+	sb.WriteString("- `GET /page-content` - Get full HTML\n\n")
+
+	// 页面分析类
+	sb.WriteString("### Page Analysis\n")
+	sb.WriteString("- `GET /semantic-tree` - Get semantic tree (⭐ **ALWAYS call after navigation**)\n")
+	sb.WriteString("- `GET /clickable-elements` - Get all clickable elements\n")
+	sb.WriteString("- `GET /input-elements` - Get all input elements\n\n")
+
+	// 高级功能类
+	sb.WriteString("### Advanced\n")
+	sb.WriteString("- `POST /screenshot` - Take page screenshot (base64 encoded)\n")
+	sb.WriteString("- `POST /evaluate` - Execute JavaScript code\n")
+	sb.WriteString("- `POST /batch` - Execute multiple operations in sequence\n")
+	sb.WriteString("- `POST /scroll-to-bottom` - Scroll to page bottom\n")
+	sb.WriteString("- `POST /resize` - Resize browser window\n\n")
+
+	// 元素定位方式
+	sb.WriteString("## Element Identification\n\n")
+	sb.WriteString("You can identify elements using:\n\n")
+	sb.WriteString("1. **Semantic Index (Recommended):** `[1]`, `[2]`, `Clickable Element [1]`, `Input Element [2]`\n")
+	sb.WriteString("   - Most reliable method\n")
+	sb.WriteString("   - Get indices from `/semantic-tree` endpoint\n")
+	sb.WriteString("   - Example: `\"identifier\": \"[1]\"` or `\"identifier\": \"Input Element [1]\"`\n\n")
+	sb.WriteString("2. **CSS Selector:** `#id`, `.class`, `button[type=\"submit\"]`\n")
+	sb.WriteString("   - Standard CSS selectors\n")
+	sb.WriteString("   - Example: `\"identifier\": \"#login-button\"`\n\n")
+	sb.WriteString("3. **Text Content:** `Login`, `Sign Up`, `Submit`\n")
+	sb.WriteString("   - Searches buttons and links with matching text\n")
+	sb.WriteString("   - Example: `\"identifier\": \"Login\"`\n\n")
+	sb.WriteString("4. **XPath:** `//button[@id='login']`\n")
+	sb.WriteString("   - XPath expressions\n")
+	sb.WriteString("   - Example: `\"identifier\": \"//button[@id='login']\"`\n\n")
+	sb.WriteString("5. **ARIA Label:** Elements with `aria-label` attribute\n")
+	sb.WriteString("   - Automatically searched\n\n")
+
+	// Guidelines
+	sb.WriteString("## Guidelines\n\n")
+	sb.WriteString("**Before starting:**\n")
+	sb.WriteString("- Call `GET /help` if you're unsure about available commands or their parameters\n")
+	sb.WriteString("- Ensure browser is started (if not, it will auto-start on first operation)\n\n")
+	sb.WriteString("**During automation:**\n")
+	sb.WriteString("- **Always call `/semantic-tree` after navigation** to get page structure\n")
+	sb.WriteString("- **Prefer semantic indices** (like `[1]`) over CSS selectors for reliability\n")
+	sb.WriteString("- **Use `/wait`** for dynamic content that loads asynchronously\n")
+	sb.WriteString("- **Check element states** before interaction (visible, enabled)\n")
+	sb.WriteString("- **Use `/batch`** for multiple sequential operations to improve efficiency\n\n")
+	sb.WriteString("**Error handling:**\n")
+	sb.WriteString("- If operation fails, check element identifier and try different format\n")
+	sb.WriteString("- For timeout errors, increase timeout value\n")
+	sb.WriteString("- If element not found, call `/semantic-tree` again to refresh page structure\n")
+	sb.WriteString("- Explain errors clearly to user with suggested solutions\n\n")
+	sb.WriteString("**Data extraction:**\n")
+	sb.WriteString("- Use `fields` parameter to specify what to extract: `[\"text\", \"href\", \"src\"]`\n")
+	sb.WriteString("- Set `multiple: true` to extract from multiple elements\n")
+	sb.WriteString("- Format extracted data in a readable way for user\n\n")
+
+	// 完整工作流示例
+	sb.WriteString("## Complete Workflow Example\n\n")
+	sb.WriteString("**Scenario:** User wants to login to a website\n\n")
+	sb.WriteString("```\n")
+	sb.WriteString("User: \"Please log in to example.com with username 'john' and password 'secret123'\"\n")
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Your Actions:**\n\n")
+
+	sb.WriteString("**Step 1:** Navigate to login page\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("POST http://%s/api/v1/executor/navigate\n", host))
+	sb.WriteString("{\"url\": \"https://example.com/login\"}\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("**Step 2:** Get page structure\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("GET http://%s/api/v1/executor/semantic-tree\n", host))
+	sb.WriteString("```\n")
+	sb.WriteString("Response:\n")
+	sb.WriteString("```\n")
+	sb.WriteString("Input Element [1]: Username\n")
+	sb.WriteString("Input Element [2]: Password\n")
+	sb.WriteString("Clickable Element [1]: Login Button\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("**Step 3:** Enter username\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("POST http://%s/api/v1/executor/type\n", host))
+	sb.WriteString("{\"identifier\": \"Input Element [1]\", \"text\": \"john\"}\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("**Step 4:** Enter password\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("POST http://%s/api/v1/executor/type\n", host))
+	sb.WriteString("{\"identifier\": \"Input Element [2]\", \"text\": \"secret123\"}\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("**Step 5:** Click login button\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("POST http://%s/api/v1/executor/click\n", host))
+	sb.WriteString("{\"identifier\": \"Clickable Element [1]\"}\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("**Step 6:** Wait for login success (optional)\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("POST http://%s/api/v1/executor/wait\n", host))
+	sb.WriteString("{\"identifier\": \".welcome-message\", \"state\": \"visible\", \"timeout\": 10}\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("**Step 7:** Inform user\n")
+	sb.WriteString("```\n")
+	sb.WriteString("\"Successfully logged in to example.com!\"\n")
+	sb.WriteString("```\n\n")
+
+	// 批量操作示例
+	sb.WriteString("## Batch Operation Example\n\n")
+	sb.WriteString("**Scenario:** Fill out a form with multiple fields\n\n")
+	sb.WriteString("Instead of making 5 separate API calls, use one batch operation:\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString(fmt.Sprintf("curl -X POST 'http://%s/api/v1/executor/batch' \\\n", host))
+	sb.WriteString("  -H 'Content-Type: application/json' \\\n")
+	sb.WriteString("  -d '{\n")
+	sb.WriteString("    \"operations\": [\n")
+	sb.WriteString("      {\n")
+	sb.WriteString("        \"type\": \"navigate\",\n")
+	sb.WriteString("        \"params\": {\"url\": \"https://example.com/form\"},\n")
+	sb.WriteString("        \"stop_on_error\": true\n")
+	sb.WriteString("      },\n")
+	sb.WriteString("      {\n")
+	sb.WriteString("        \"type\": \"type\",\n")
+	sb.WriteString("        \"params\": {\"identifier\": \"#name\", \"text\": \"John Doe\"},\n")
+	sb.WriteString("        \"stop_on_error\": true\n")
+	sb.WriteString("      },\n")
+	sb.WriteString("      {\n")
+	sb.WriteString("        \"type\": \"type\",\n")
+	sb.WriteString("        \"params\": {\"identifier\": \"#email\", \"text\": \"john@example.com\"},\n")
+	sb.WriteString("        \"stop_on_error\": true\n")
+	sb.WriteString("      },\n")
+	sb.WriteString("      {\n")
+	sb.WriteString("        \"type\": \"select\",\n")
+	sb.WriteString("        \"params\": {\"identifier\": \"#country\", \"value\": \"United States\"},\n")
+	sb.WriteString("        \"stop_on_error\": true\n")
+	sb.WriteString("      },\n")
+	sb.WriteString("      {\n")
+	sb.WriteString("        \"type\": \"click\",\n")
+	sb.WriteString("        \"params\": {\"identifier\": \"#submit\"},\n")
+	sb.WriteString("        \"stop_on_error\": true\n")
+	sb.WriteString("      }\n")
+	sb.WriteString("    ]\n")
+	sb.WriteString("  }'\n")
+	sb.WriteString("```\n\n")
+
+	// 最佳实践
+	sb.WriteString("## Best Practices\n\n")
+	sb.WriteString("1. **Discovery first:** If unsure, call `/help` or `/help?command=<name>` to learn about commands\n")
+	sb.WriteString("2. **Structure first:** Always call `/semantic-tree` after navigation to understand the page\n")
+	sb.WriteString("3. **Use semantic indices:** They're more reliable than CSS selectors (elements might have dynamic classes)\n")
+	sb.WriteString("4. **Wait for dynamic content:** Use `/wait` before interacting with elements that load asynchronously\n")
+	sb.WriteString("5. **Batch when possible:** Use `/batch` for multiple sequential operations\n")
+	sb.WriteString("6. **Handle errors gracefully:** Provide clear explanations and suggestions when operations fail\n")
+	sb.WriteString("7. **Verify results:** After operations, check if desired outcome was achieved\n\n")
+
+	// 常见场景
+	sb.WriteString("## Common Scenarios\n\n")
+
+	sb.WriteString("### Form Filling\n")
+	sb.WriteString("1. Navigate to form page\n")
+	sb.WriteString("2. Get semantic tree to find input elements\n")
+	sb.WriteString("3. Use `/type` for each field: `Input Element [1]`, `Input Element [2]`, etc.\n")
+	sb.WriteString("4. Use `/select` for dropdowns\n")
+	sb.WriteString("5. Click submit button\n\n")
+
+	sb.WriteString("### Data Scraping\n")
+	sb.WriteString("1. Navigate to target page\n")
+	sb.WriteString("2. Wait for content to load with `/wait`\n")
+	sb.WriteString("3. Use `/extract` with CSS selector and `multiple: true`\n")
+	sb.WriteString("4. Specify fields to extract: `[\"text\", \"href\", \"src\"]`\n\n")
+
+	sb.WriteString("### Search Operations\n")
+	sb.WriteString("1. Navigate to search page\n")
+	sb.WriteString("2. Get semantic tree to locate search input\n")
+	sb.WriteString("3. Type search query into input\n")
+	sb.WriteString("4. Press Enter or click search button\n")
+	sb.WriteString("5. Wait for results\n")
+	sb.WriteString("6. Extract results data\n\n")
+
+	sb.WriteString("### Login Automation\n")
+	sb.WriteString("1. Navigate to login page\n")
+	sb.WriteString("2. Get semantic tree\n")
+	sb.WriteString("3. Type username: `Input Element [1]`\n")
+	sb.WriteString("4. Type password: `Input Element [2]`\n")
+	sb.WriteString("5. Click login button: `Clickable Element [1]`\n")
+	sb.WriteString("6. Wait for success indicator\n\n")
+
+	// 重要提示
+	sb.WriteString("## Important Notes\n\n")
+	sb.WriteString("- Browser must be running (it will auto-start on first operation if needed)\n")
+	sb.WriteString("- Operations are executed on the **currently active browser tab**\n")
+	sb.WriteString("- Semantic tree updates after each navigation and click operation\n")
+	sb.WriteString("- All timeouts are in seconds\n")
+	sb.WriteString("- Use `wait_visible: true` (default) for reliable element interaction\n")
+	sb.WriteString(fmt.Sprintf("- Replace `%s` with actual API host address\n", host))
+	sb.WriteString("- Authentication required: use `X-BrowserWing-Key` header or JWT token\n\n")
+
+	// 故障排除
+	sb.WriteString("## Troubleshooting\n\n")
+	sb.WriteString("**Element not found:**\n")
+	sb.WriteString("- Call `/semantic-tree` to see available elements\n")
+	sb.WriteString("- Try different identifier format (semantic index, CSS selector, text)\n")
+	sb.WriteString("- Check if page has finished loading\n\n")
+	sb.WriteString("**Timeout errors:**\n")
+	sb.WriteString("- Increase timeout value in request\n")
+	sb.WriteString("- Check if element actually appears on page\n")
+	sb.WriteString("- Use `/wait` with appropriate state before interaction\n\n")
+	sb.WriteString("**Extraction returns empty:**\n")
+	sb.WriteString("- Verify CSS selector matches target elements\n")
+	sb.WriteString("- Check if content has loaded (use `/wait` first)\n")
+	sb.WriteString("- Try different extraction fields or type\n\n")
+
+	// 快速参考
+	sb.WriteString("## Quick Reference\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString("# Discover commands\n")
+	sb.WriteString(fmt.Sprintf("GET %s/api/v1/executor/help\n\n", host))
+	sb.WriteString("# Navigate\n")
+	sb.WriteString(fmt.Sprintf("POST %s/api/v1/executor/navigate {\"url\": \"...\"}\n\n", host))
+	sb.WriteString("# Get page structure\n")
+	sb.WriteString(fmt.Sprintf("GET %s/api/v1/executor/semantic-tree\n\n", host))
+	sb.WriteString("# Click element\n")
+	sb.WriteString(fmt.Sprintf("POST %s/api/v1/executor/click {\"identifier\": \"[1]\"}\n\n", host))
+	sb.WriteString("# Type text\n")
+	sb.WriteString(fmt.Sprintf("POST %s/api/v1/executor/type {\"identifier\": \"[1]\", \"text\": \"...\"}\n\n", host))
+	sb.WriteString("# Extract data\n")
+	sb.WriteString(fmt.Sprintf("POST %s/api/v1/executor/extract {\"selector\": \"...\", \"fields\": [...], \"multiple\": true}\n", host))
+	sb.WriteString("```\n\n")
+
+	// 响应格式
+	sb.WriteString("## Response Format\n\n")
+	sb.WriteString("All operations return:\n")
+	sb.WriteString("```json\n")
+	sb.WriteString("{\n")
+	sb.WriteString("  \"success\": true,\n")
+	sb.WriteString("  \"message\": \"Operation description\",\n")
+	sb.WriteString("  \"timestamp\": \"2026-01-15T10:30:00Z\",\n")
+	sb.WriteString("  \"data\": {\n")
+	sb.WriteString("    // Operation-specific data\n")
+	sb.WriteString("  }\n")
+	sb.WriteString("}\n")
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Error response:**\n")
+	sb.WriteString("```json\n")
+	sb.WriteString("{\n")
+	sb.WriteString("  \"error\": \"error.operationFailed\",\n")
+	sb.WriteString("  \"detail\": \"Detailed error message\"\n")
+	sb.WriteString("}\n")
+	sb.WriteString("```\n\n")
 
 	return sb.String()
 }
