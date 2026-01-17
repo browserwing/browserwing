@@ -1697,28 +1697,26 @@ func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action mod
 					return fmt.Errorf("failed to release Cmd: %w", err)
 				}
 
-				if err == nil {
-					// 等待一下看粘贴是否生效
-					time.Sleep(500 * time.Millisecond)
+				// 等待一下看粘贴是否生效
+				time.Sleep(500 * time.Millisecond)
 
-					// 检查内容是否发生变化
-					if element != nil {
-						valueResult, _ := element.Eval(`() => this.value || this.textContent || this.innerText || ''`)
-						if valueResult != nil {
-							afterValue := valueResult.Value.String()
-							// 内容发生变化才认为粘贴成功
-							if afterValue != beforeValue {
-								pasteSuccess = true
-								logger.Info(ctx, "✓ Paste successful via KeyActions, content changed (length: %d -> %d)", len(beforeValue), len(afterValue))
-								break
-							}
+				// 检查内容是否发生变化
+				if element != nil {
+					valueResult, _ := element.Eval(`() => this.value || this.textContent || this.innerText || ''`)
+					if valueResult != nil {
+						afterValue := valueResult.Value.String()
+						// 内容发生变化才认为粘贴成功
+						if afterValue != beforeValue {
+							pasteSuccess = true
+							logger.Info(ctx, "✓ Paste successful via KeyActions, content changed (length: %d -> %d)", len(beforeValue), len(afterValue))
+							break
 						}
-					} else {
-						// 没有目标元素，假设成功
-						pasteSuccess = true
-						logger.Info(ctx, "✓ Paste completed via KeyActions (no target element to verify)")
-						break
 					}
+				} else {
+					// 没有目标元素，假设成功
+					pasteSuccess = true
+					logger.Info(ctx, "✓ Paste completed via KeyActions (no target element to verify)")
+					break
 				}
 			}
 
