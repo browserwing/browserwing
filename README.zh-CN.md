@@ -10,6 +10,9 @@
 
 ## ✨ 特性亮点
 
+- **🎯 Claude Skills 原生集成**：安装后直接使用 `SKILL.md` 作为 Claude 技能（类似 playwright-mcp）
+- **📝 脚本导出为 Skill**：将录制的脚本一键转换为 `SKILL.md` 格式供 Claude 使用
+- **🚀 完整 Executor API**：26 个 HTTP 端点，全面支持浏览器自动化与 Claude Skills
 - 浏览器管理：启动、控制与会话持久化（Cookie 等）
 - 脚本录制：点击、输入、导航等步骤捕获，并可视化编辑
 - MCP 集成：将脚本转换为 Model Context Protocol 命令
@@ -37,6 +40,34 @@ chmod +x ./browserwing
 ./browserwing.exe --port 8080
 ```
 
+### 🎯 Claude Skills 集成（新功能！）
+
+**直接在 Claude 中使用 BrowserWing：**
+
+1. 启动 BrowserWing（见上方）
+2. 将 `SKILL.md` 导入 Claude Desktop：
+   - 打开 Claude Desktop → 设置 → Skills
+   - 添加 Skill → 选择仓库根目录的 `SKILL.md`
+   - 启用该技能
+3. 开始自动化！Claude 现在可以通过自然语言控制你的浏览器
+
+**示例对话：**
+```
+你: "帮我在淘宝搜索 'MacBook' 并提取前 5 个商品的价格"
+Claude: [使用 BrowserWing API 自动导航、交互和提取数据]
+```
+
+**将录制的脚本导出为 Skills：**
+```bash
+# 导出所有脚本
+curl -X POST 'http://localhost:8080/api/v1/scripts/export/skill' \
+  -H 'Content-Type: application/json' \
+  -d '{"script_ids": []}' \
+  -o MY_SCRIPTS_SKILL.md
+
+# 导入 Claude 后即可使用你的自定义自动化脚本！
+```
+
 ### 方式 B — 源码构建
 
 ```bash
@@ -54,10 +85,13 @@ make package
 
 ## 🤖 为什么选择 BrowserWing
 
+- **🎯 原生 Claude Skills 支持**：开箱即用，与 Claude Desktop 无缝集成
+- **📝 脚本导出为 Skills**：将录制的自动化流程转换为可复用的 Claude 技能
+- **🚀 26+ API 端点**：完整的 HTTP API，支持编程式浏览器控制
 - 活跃生态与丰富脚本，助你快速完成任务
 - Token 友好、速度较快
 - 以可回放脚本自动化复杂网页任务，稳定、可靠
-- 通过 MCP 将录制动作桥接到 LLM 工作流
+- 通过 MCP 和 Claude Skills 将录制动作桥接到 LLM 工作流
 - 会话持久化与配置管理，避免频繁登录与失效
 - 适用于数据抽取、RPA、测试与智能体驱动的浏览
 
@@ -81,10 +115,29 @@ flowchart LR
 
 ## 📖 使用步骤
 
+### Claude Skills 用户（推荐）
+
+1. **安装技能**：将 `SKILL.md` 导入 Claude Desktop
+2. **开始自动化**：用自然语言让 Claude 执行网页任务
+3. **导出自定义脚本**：将录制的脚本转换为 Skills 供重复使用
+
+### 高级用户
+
 1. 管理浏览器：启动实例、配置档案、处理 Cookie
 2. 录制脚本：捕获步骤并保存用于回放/编辑
-3. 转为 MCP：将脚本暴露为 MCP 工具/命令
-4. LLM 调用：通过 MCP 让模型编排浏览器自动化
+3. 转为 MCP/Skills：将脚本暴露为 MCP 工具或 Claude 技能
+4. LLM 调用：通过 MCP 或 HTTP API 让模型编排浏览器自动化
+
+### API 端点
+
+BrowserWing 提供 26+ 个 HTTP API 端点用于浏览器自动化：
+- 页面导航和控制
+- 元素交互（点击、输入、选择）
+- 数据提取和语义分析
+- 截图和 JavaScript 执行
+- 批量操作
+
+**完整 API 文档**：查看 `docs/EXECUTOR_HTTP_API.md`
 
 ## 🤝 参与贡献
 
