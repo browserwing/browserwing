@@ -1,8 +1,8 @@
-.PHONY: help install dev build clean backend frontend build-embedded build-linux build-windows build-all package
+.PHONY: help install dev build clean backend frontend build-embedded build-linux build-windows build-mac build-all release package
 
 # 应用信息
 APP_NAME = browserwing
-VERSION = "v0.0.1"
+VERSION = "v0.0.2"
 BUILD_TIME = $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GO_VERSION = $(shell go version | awk '{print $$3}')
 
@@ -44,7 +44,9 @@ help:
 	@echo "  make build-embedded       - 构建当前平台的集成版本（前端嵌入后端）"
 	@echo "  make build-linux          - 构建 Linux 版本（amd64 和 arm64）"
 	@echo "  make build-windows        - 构建 Windows 版本（amd64 和 arm64）"
+	@echo "  make build-mac            - 构建 macOS 版本（amd64 和 arm64）"
 	@echo "  make build-all            - 构建所有平台的集成版本"
+	@echo "  make release              - 准备 GitHub Release 文件（直接二进制）"
 	@echo "  make package              - 打包所有平台并生成压缩包"
 	@echo ""
 	@echo "$(COLOR_GREEN)其他命令:$(COLOR_RESET)"
@@ -120,14 +122,14 @@ build-mac: $(BUILD_DIR) copy-frontend
 build-mac-arm64: copy-frontend
 	@echo "$(COLOR_YELLOW)🍎 构建 macOS arm64 版本...$(COLOR_RESET)"
 	@cd $(BACKEND_DIR) && GOOS=darwin GOARCH=arm64 go build $(BUILD_TAGS) $(LDFLAGS) \
-		-o ../$(BUILD_DIR)/$(APP_NAME)-mac-arm64 .
-	@echo "$(COLOR_GREEN)✓ macOS arm64: $(BUILD_DIR)/$(APP_NAME)-mac-arm64$(COLOR_RESET)"
+		-o ../$(BUILD_DIR)/$(APP_NAME)-darwin-arm64 .
+	@echo "$(COLOR_GREEN)✓ macOS arm64: $(BUILD_DIR)/$(APP_NAME)-darwin-arm64$(COLOR_RESET)"
 
 build-mac-amd64: copy-frontend
 	@echo "$(COLOR_YELLOW)🍎 构建 macOS amd64 版本...$(COLOR_RESET)"
 	@cd $(BACKEND_DIR) && GOOS=darwin GOARCH=amd64 go build $(BUILD_TAGS) $(LDFLAGS) \
-		-o ../$(BUILD_DIR)/$(APP_NAME)-mac-amd64 .
-	@echo "$(COLOR_GREEN)✓ macOS amd64: $(BUILD_DIR)/$(APP_NAME)-mac-amd64$(COLOR_RESET)"
+		-o ../$(BUILD_DIR)/$(APP_NAME)-darwin-amd64 .
+	@echo "$(COLOR_GREEN)✓ macOS amd64: $(BUILD_DIR)/$(APP_NAME)-darwin-amd64$(COLOR_RESET)"
 
 # 构建 Linux 版本
 build-linux: $(BUILD_DIR) copy-frontend
@@ -165,13 +167,49 @@ build-all: build-linux build-windows build-mac
 	@ls -lh $(BUILD_DIR)/ | grep -v "^total" | awk '{printf "  %-40s %10s\n", $$9, $$5}'
 	@echo ""
 	@echo "$(COLOR_YELLOW)使用说明:$(COLOR_RESET)"
+	@echo "  macOS:   ./$(BUILD_DIR)/$(APP_NAME)-darwin-arm64 --port 8080"
 	@echo "  Linux:   ./$(BUILD_DIR)/$(APP_NAME)-linux-amd64 --port 8080"
 	@echo "  Windows: $(BUILD_DIR)\\$(APP_NAME)-windows-amd64.exe --port 8080"
+
+# 准备 GitHub Release 文件（二进制 + 压缩包）
+release: build-all
+	@echo "$(COLOR_YELLOW)📦 准备 GitHub Release 文件...$(COLOR_RESET)"
+	@mkdir -p $(BUILD_DIR)/release
+	
+	@echo "$(COLOR_BLUE)复制二进制文件...$(COLOR_RESET)"
+	@cp $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(BUILD_DIR)/release/
+	@cp $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(BUILD_DIR)/release/
+	@cp $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(BUILD_DIR)/release/
+	@cp $(BUILD_DIR)/$(APP_NAME)-linux-arm64 $(BUILD_DIR)/release/
+	@cp $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(BUILD_DIR)/release/
+	@cp $(BUILD_DIR)/$(APP_NAME)-windows-arm64.exe $(BUILD_DIR)/release/
+	
+	@echo "$(COLOR_BLUE)创建 mac 别名（用户友好）...$(COLOR_RESET)"
+	@cp $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(BUILD_DIR)/release/$(APP_NAME)-mac-amd64
+	@cp $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(BUILD_DIR)/release/$(APP_NAME)-mac-arm64
+	
+	@echo "$(COLOR_BLUE)生成压缩包...$(COLOR_RESET)"
+	@cd $(BUILD_DIR)/release && tar -czf $(APP_NAME)-darwin-amd64.tar.gz $(APP_NAME)-darwin-amd64
+	@cd $(BUILD_DIR)/release && tar -czf $(APP_NAME)-darwin-arm64.tar.gz $(APP_NAME)-darwin-arm64
+	@cd $(BUILD_DIR)/release && tar -czf $(APP_NAME)-mac-amd64.tar.gz $(APP_NAME)-mac-amd64
+	@cd $(BUILD_DIR)/release && tar -czf $(APP_NAME)-mac-arm64.tar.gz $(APP_NAME)-mac-arm64
+	@cd $(BUILD_DIR)/release && tar -czf $(APP_NAME)-linux-amd64.tar.gz $(APP_NAME)-linux-amd64
+	@cd $(BUILD_DIR)/release && tar -czf $(APP_NAME)-linux-arm64.tar.gz $(APP_NAME)-linux-arm64
+	@cd $(BUILD_DIR)/release && zip -q $(APP_NAME)-windows-amd64.zip $(APP_NAME)-windows-amd64.exe
+	@cd $(BUILD_DIR)/release && zip -q $(APP_NAME)-windows-arm64.zip $(APP_NAME)-windows-arm64.exe
+	
+	@echo "$(COLOR_GREEN)✓ Release 文件已准备完成:$(COLOR_RESET)"
+	@ls -lh $(BUILD_DIR)/release/ | grep -v "^total" | awk '{printf "  %-50s %10s\n", $$9, $$5}'
+	@echo ""
+	@echo "$(COLOR_BLUE)💡 上传这些文件到 GitHub Release 和 Gitee Release:$(COLOR_RESET)"
+	@echo "   $(BUILD_DIR)/release/*"
 
 # 打包发布（生成压缩包）
 package: build-all
 	@echo "$(COLOR_YELLOW)📦 打包发布版本...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)/releases
+	@cd $(BUILD_DIR) && tar -czf releases/$(APP_NAME)-darwin-amd64-$(VERSION).tar.gz $(APP_NAME)-darwin-amd64
+	@cd $(BUILD_DIR) && tar -czf releases/$(APP_NAME)-darwin-arm64-$(VERSION).tar.gz $(APP_NAME)-darwin-arm64
 	@cd $(BUILD_DIR) && tar -czf releases/$(APP_NAME)-linux-amd64-$(VERSION).tar.gz $(APP_NAME)-linux-amd64
 	@cd $(BUILD_DIR) && tar -czf releases/$(APP_NAME)-linux-arm64-$(VERSION).tar.gz $(APP_NAME)-linux-arm64
 	@cd $(BUILD_DIR) && zip -q releases/$(APP_NAME)-windows-amd64-$(VERSION).zip $(APP_NAME)-windows-amd64.exe

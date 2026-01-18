@@ -53,6 +53,8 @@ pnpm add -g browserwing
 browserwing --port 8080
 ```
 
+The npm package automatically tests GitHub and Gitee mirrors during installation and selects the fastest one.
+
 **Using Homebrew (macOS/Linux):**
 ```bash
 # Coming soon
@@ -71,13 +73,19 @@ curl -fsSL https://raw.githubusercontent.com/browserwing/browserwing/main/instal
 iwr -useb https://raw.githubusercontent.com/browserwing/browserwing/main/install.ps1 | iex
 ```
 
-The script automatically detects your OS/architecture, downloads the binary, and adds to PATH.
+The script automatically:
+- Detects your OS/architecture
+- Tests GitHub and Gitee mirrors, selects the fastest one
+- Downloads and extracts the binary
+- Adds to PATH
 
 **Then start BrowserWing:**
 ```bash
 browserwing --port 8080
 # Open http://localhost:8080 in your browser
 ```
+
+**Note for users in China:** The installation script automatically uses Gitee mirror if GitHub is slow.
 
 ### Option C — Manual Download
 

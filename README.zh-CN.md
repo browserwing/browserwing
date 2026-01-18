@@ -40,6 +40,8 @@ pnpm add -g browserwing
 browserwing --port 8080
 ```
 
+npm 包在安装时会自动测试 GitHub 和 Gitee 镜像，选择最快的源进行下载。
+
 **使用 Homebrew (macOS/Linux)：**
 ```bash
 # 即将支持
@@ -58,13 +60,19 @@ curl -fsSL https://raw.githubusercontent.com/browserwing/browserwing/main/instal
 iwr -useb https://raw.githubusercontent.com/browserwing/browserwing/main/install.ps1 | iex
 ```
 
-脚本将自动检测系统和架构，下载二进制文件并添加到 PATH。
+脚本将自动：
+- 检测系统和架构
+- 测试 GitHub 和 Gitee 镜像，选择最快的源
+- 下载并解压二进制文件
+- 添加到 PATH
 
 **然后启动 BrowserWing：**
 ```bash
 browserwing --port 8080
 # 在浏览器中打开 http://localhost:8080
 ```
+
+**国内用户友好：** 安装脚本会自动检测并使用 Gitee 镜像（如果 GitHub 较慢）。
 
 ### 方式 C — 手动下载
 

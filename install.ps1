@@ -22,6 +22,11 @@ function Write-Warning-Custom {
     Write-Host "[WARNING] $Message" -ForegroundColor Yellow
 }
 
+function Write-Debug-Custom {
+    param($Message)
+    Write-Host "[DEBUG] $Message" -ForegroundColor Cyan
+}
+
 # Detect architecture
 function Get-Architecture {
     $arch = $env:PROCESSOR_ARCHITECTURE
@@ -39,43 +44,160 @@ function Get-Architecture {
 function Get-LatestVersion {
     Write-Info "Fetching latest release..."
     
+    # Try GitHub API first
     try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$REPO/releases/latest"
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$REPO/releases/latest" -TimeoutSec 5 -ErrorAction Stop
         $version = $release.tag_name
         Write-Info "Latest version: $version"
         return $version
     }
     catch {
-        Write-Error-Custom "Failed to fetch latest version: $_"
-        exit 1
+        Write-Warning-Custom "GitHub API failed, trying Gitee..."
+    }
+    
+    # Try Gitee API
+    try {
+        $release = Invoke-RestMethod -Uri "https://gitee.com/api/v5/repos/browserwing/browserwing/releases/latest" -TimeoutSec 5 -ErrorAction Stop
+        $version = $release.tag_name
+        Write-Info "Latest version: $version"
+        return $version
+    }
+    catch {
+        Write-Warning-Custom "Gitee API failed, using default version: v0.0.1"
+        return "v0.0.1"
+    }
+}
+
+# Test download speed and select fastest mirror
+function Select-Mirror {
+    param($Version, $Arch)
+    
+    Write-Info "Testing download mirrors..."
+    
+    $archiveName = "browserwing-windows-$Arch.zip"
+    
+    # Test GitHub
+    $githubUrl = "https://github.com/$REPO/releases/download/$Version/$archiveName"
+    try {
+        $githubTime = Measure-Command { 
+            Invoke-WebRequest -Uri $githubUrl -Method Head -TimeoutSec 5 -ErrorAction Stop | Out-Null
+        }
+        $githubMs = $githubTime.TotalMilliseconds
+        Write-Debug-Custom "GitHub response time: $githubMs ms"
+    }
+    catch {
+        $githubMs = 999999
+        Write-Debug-Custom "GitHub not reachable"
+    }
+    
+    # Test Gitee
+    $giteeUrl = "https://gitee.com/browserwing/browserwing/releases/download/$Version/$archiveName"
+    try {
+        $giteeTime = Measure-Command { 
+            Invoke-WebRequest -Uri $giteeUrl -Method Head -TimeoutSec 5 -ErrorAction Stop | Out-Null
+        }
+        $giteeMs = $giteeTime.TotalMilliseconds
+        Write-Debug-Custom "Gitee response time: $giteeMs ms"
+    }
+    catch {
+        $giteeMs = 999999
+        Write-Debug-Custom "Gitee not reachable"
+    }
+    
+    # Select fastest mirror
+    if ($githubMs -lt $giteeMs) {
+        $mirror = "github"
+        $mirrorUrl = "https://github.com/$REPO/releases/download"
+        Write-Info "Using GitHub mirror (faster)"
+    }
+    else {
+        $mirror = "gitee"
+        $mirrorUrl = "https://gitee.com/browserwing/browserwing/releases/download"
+        Write-Info "Using Gitee mirror (faster)"
+    }
+    
+    return @{
+        Name = $mirror
+        Url = $mirrorUrl
     }
 }
 
 # Download and install binary
 function Install-BrowserWing {
-    param($Version, $Arch)
+    param($Version, $Arch, $Mirror)
     
     Write-Info "Downloading BrowserWing..."
     
+    $archiveName = "browserwing-windows-$Arch.zip"
     $binaryName = "browserwing-windows-$Arch.exe"
-    $downloadUrl = "https://github.com/$REPO/releases/download/$Version/$binaryName"
+    $downloadUrl = "$($Mirror.Url)/$Version/$archiveName"
     
     Write-Info "Download URL: $downloadUrl"
     
     # Create temp directory
     $tempDir = New-Item -ItemType Directory -Path "$env:TEMP\browserwing-install-$(Get-Random)"
-    $downloadPath = Join-Path $tempDir $binaryName
+    $archivePath = Join-Path $tempDir $archiveName
     
+    # Download with retry
+    $maxRetries = 3
+    $retryCount = 0
+    $downloadSuccess = $false
+    
+    while ($retryCount -lt $maxRetries -and -not $downloadSuccess) {
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -TimeoutSec 60
+            Write-Info "Download completed"
+            $downloadSuccess = $true
+        }
+        catch {
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+                Write-Warning-Custom "Download failed, retrying ($retryCount/$maxRetries)..."
+                
+                # Switch mirror on failure
+                if ($Mirror.Name -eq "github") {
+                    $Mirror.Name = "gitee"
+                    $Mirror.Url = "https://gitee.com/browserwing/browserwing/releases/download"
+                    Write-Info "Switching to Gitee mirror..."
+                }
+                else {
+                    $Mirror.Name = "github"
+                    $Mirror.Url = "https://github.com/$REPO/releases/download"
+                    Write-Info "Switching to GitHub mirror..."
+                }
+                
+                $downloadUrl = "$($Mirror.Url)/$Version/$archiveName"
+                Start-Sleep -Seconds 2
+            }
+            else {
+                Write-Error-Custom "Failed to download after $maxRetries attempts: $_"
+                Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+                exit 1
+            }
+        }
+    }
+    
+    # Extract archive
+    Write-Info "Extracting archive..."
     try {
-        # Download binary directly
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
+        Expand-Archive -Path $archivePath -DestinationPath $tempDir -Force
+        
+        # Verify binary exists
+        $extractedBinary = Join-Path $tempDir $binaryName
+        if (-not (Test-Path $extractedBinary)) {
+            Write-Error-Custom "Binary not found after extraction: $binaryName"
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+            exit 1
+        }
+        
+        Write-Info "Extraction completed"
         
         # Install
         Write-Info "Installing BrowserWing..."
         New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
         
         $binaryPath = Join-Path $INSTALL_DIR "browserwing.exe"
-        Copy-Item -Path $downloadPath -Destination $binaryPath -Force
+        Copy-Item -Path $extractedBinary -Destination $binaryPath -Force
         
         Write-Info "Installation complete!"
         
@@ -104,7 +226,7 @@ function Show-Success {
     param($BinaryPath)
     
     Write-Host ""
-    Write-Info "BrowserWing installed successfully!" -ForegroundColor Green
+    Write-Info "BrowserWing installed successfully!"
     Write-Host ""
     Write-Host "Installation location: $BinaryPath"
     Write-Host ""
@@ -113,6 +235,7 @@ function Show-Success {
     Write-Host "  2. Open: http://localhost:8080"
     Write-Host ""
     Write-Host "Documentation: https://github.com/$REPO"
+    Write-Host "中文文档: https://gitee.com/browserwing/browserwing"
     Write-Host "Report issues: https://github.com/$REPO/issues"
     Write-Host ""
 }
@@ -129,7 +252,8 @@ function Main {
     Write-Info "Detected platform: windows-$arch"
     
     $version = Get-LatestVersion
-    $binaryPath = Install-BrowserWing -Version $version -Arch $arch
+    $mirror = Select-Mirror -Version $version -Arch $arch
+    $binaryPath = Install-BrowserWing -Version $version -Arch $arch -Mirror $mirror
     Show-Success -BinaryPath $binaryPath
 }
 
