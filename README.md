@@ -53,9 +53,9 @@ iwr -useb https://raw.githubusercontent.com/browserwing/browserwing/main/install
 
 The installation script will:
 - Automatically detect your OS and architecture
-- Download the latest release from GitHub
+- Download the latest binary from GitHub Releases
 - Install to `~/.browserwing/` (or `%USERPROFILE%\.browserwing` on Windows)
-- Add to PATH and make executable
+- Add to system PATH and set executable permissions
 
 **Then start BrowserWing:**
 ```bash

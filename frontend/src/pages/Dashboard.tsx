@@ -83,7 +83,7 @@ export default function Dashboard() {
               </div>
             </div>
             
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4 relative border border-gray-200 dark:border-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4 relative border border-gray-200 dark:border-gray-700" style={{ height: '192px' }}>
               <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre font-mono">
                 {mcpConfig}
               </pre>

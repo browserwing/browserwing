@@ -82,20 +82,18 @@ get_latest_version() {
     print_info "Latest version: $VERSION"
 }
 
-# Download and extract binary
+# Download binary
 download_binary() {
     print_info "Downloading BrowserWing..."
     
-    # Construct download URL
+    # Construct download URL and binary name
     if [ "$OS" = "windows" ]; then
         BINARY_NAME="browserwing-${OS}-${ARCH}.exe"
-        ARCHIVE_NAME="browserwing-${OS}-${ARCH}.zip"
     else
         BINARY_NAME="browserwing-${OS}-${ARCH}"
-        ARCHIVE_NAME="browserwing-${OS}-${ARCH}.tar.gz"
     fi
     
-    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${ARCHIVE_NAME}"
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
     
     print_info "Download URL: $DOWNLOAD_URL"
     
@@ -103,20 +101,14 @@ download_binary() {
     TMP_DIR=$(mktemp -d)
     cd "$TMP_DIR"
     
-    # Download
-    if ! curl -fsSL -o "$ARCHIVE_NAME" "$DOWNLOAD_URL"; then
+    # Download binary directly
+    if ! curl -fsSL -o "$BINARY_NAME" "$DOWNLOAD_URL"; then
         print_error "Failed to download binary"
         rm -rf "$TMP_DIR"
         exit 1
     fi
     
-    # Extract
-    print_info "Extracting archive..."
-    if [ "$OS" = "windows" ]; then
-        unzip -q "$ARCHIVE_NAME"
-    else
-        tar -xzf "$ARCHIVE_NAME"
-    fi
+    print_info "Binary downloaded successfully"
 }
 
 # Install binary
@@ -185,11 +177,6 @@ main() {
     # Check dependencies
     if ! command -v curl &> /dev/null; then
         print_error "curl is required but not installed"
-        exit 1
-    fi
-    
-    if ! command -v tar &> /dev/null && [ "$OS" != "windows" ]; then
-        print_error "tar is required but not installed"
         exit 1
     fi
     

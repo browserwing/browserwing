@@ -57,29 +57,25 @@ function Install-BrowserWing {
     
     Write-Info "Downloading BrowserWing..."
     
-    $archiveName = "browserwing-windows-$Arch.zip"
-    $downloadUrl = "https://github.com/$REPO/releases/download/$Version/$archiveName"
+    $binaryName = "browserwing-windows-$Arch.exe"
+    $downloadUrl = "https://github.com/$REPO/releases/download/$Version/$binaryName"
     
     Write-Info "Download URL: $downloadUrl"
     
     # Create temp directory
     $tempDir = New-Item -ItemType Directory -Path "$env:TEMP\browserwing-install-$(Get-Random)"
-    $archivePath = Join-Path $tempDir $archiveName
+    $downloadPath = Join-Path $tempDir $binaryName
     
     try {
-        # Download
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
-        
-        # Extract
-        Write-Info "Extracting archive..."
-        Expand-Archive -Path $archivePath -DestinationPath $tempDir -Force
+        # Download binary directly
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath
         
         # Install
         Write-Info "Installing BrowserWing..."
         New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
         
         $binaryPath = Join-Path $INSTALL_DIR "browserwing.exe"
-        Copy-Item -Path (Join-Path $tempDir "browserwing-windows-$Arch.exe") -Destination $binaryPath -Force
+        Copy-Item -Path $downloadPath -Destination $binaryPath -Force
         
         Write-Info "Installation complete!"
         
