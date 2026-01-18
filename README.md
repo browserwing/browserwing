@@ -18,7 +18,7 @@
 <p align="center"><a href="https://browserwing.com">browserwing.com</a></p>
 
 
-https://github.com/user-attachments/assets/7018126f-01c8-468f-a30d-3ca36f769876
+https://github.com/user-attachments/assets/e5377892-4b88-433a-8620-43b38a2fb28f
 
 
 ## Highlights
