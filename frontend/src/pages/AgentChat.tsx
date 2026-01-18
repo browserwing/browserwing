@@ -631,6 +631,9 @@ export default function AgentChat() {
     )
   }
 
+  // 判断是否应该显示配置引导页面
+  const shouldShowConfigGuide = llmConfigs.length === 0 && sessions.length === 0
+
   return (
     <div className="border border-gray-300 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-900 h-[calc(100vh-11rem)] overflow-hidden">
       {/* 顶部状态栏 */}
@@ -645,33 +648,57 @@ export default function AgentChat() {
           <div className="relative" ref={llmDropdownRef}>
             <button
               onClick={() => setShowLlmDropdown(!showLlmDropdown)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm text-gray-700 dark:text-gray-300"
               disabled={isStreaming}
             >
-              <Bot className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-              <span className="text-gray-700 dark:text-gray-300">
-                {llmConfigs.find(c => c.id === selectedLlm)?.model || t('agentChat.selectModel')}
+              <Bot className="w-4 h-4" />
+              <span>
+                {llmConfigs.length === 0
+                  ? t('agentChat.noModel')
+                  : llmConfigs.find(c => c.id === selectedLlm)?.model || t('agentChat.selectModel')}
               </span>
-              <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <ChevronDown className="w-4 h-4" />
             </button>
 
             {showLlmDropdown && (
-              <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-gray-700 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 py-1 z-50 max-h-64 overflow-y-auto">
-                {llmConfigs.filter(c => c && c.id && c.is_active).map(config => (
-                  <button
-                    key={config.id}
-                    onClick={() => {
-                      setSelectedLlm(config.id)
-                      setShowLlmDropdown(false)
-                    }}
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors ${
-                      selectedLlm === config.id ? 'bg-gray-100 dark:bg-gray-600' : ''
-                    }`}
-                  >
-                    <div className="font-medium text-gray-900 dark:text-gray-100">{config.model}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{config.provider}</div>
-                  </button>
-                ))}
+              <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto">
+                {llmConfigs.filter(c => c && c.id && c.is_active).length > 0 ? (
+                  <div className="py-1">
+                    {llmConfigs.filter(c => c && c.id && c.is_active).map(config => (
+                      <button
+                        key={config.id}
+                        onClick={() => {
+                          setSelectedLlm(config.id)
+                          setShowLlmDropdown(false)
+                        }}
+                        className={`w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                          selectedLlm === config.id ? 'bg-gray-100 dark:bg-gray-700' : ''
+                        }`}
+                      >
+                        <div className="font-medium text-gray-900 dark:text-gray-100">{config.model}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{config.provider}</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-4 px-4">
+                    <div className="text-center">
+                      <Bot className="w-10 h-10 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        {t('agentChat.noModelDesc')}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setShowLlmDropdown(false)
+                          navigate('/llm')
+                        }}
+                        className="w-full px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                      >
+                        {t('agentChat.goToConfig')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -692,7 +719,9 @@ export default function AgentChat() {
           {/* 新建会话按钮 */}
           <button
             onClick={createSession}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
+            disabled={llmConfigs.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={llmConfigs.length === 0 ? t('agentChat.noModelDesc') : ''}
           >
             <MessageSquarePlus className="w-4 h-4" />
             <span>{t('agentChat.newSession')}</span>
@@ -701,59 +730,83 @@ export default function AgentChat() {
       </div>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* 会话列表 */}
-        <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto flex-shrink-0">
-          <div className="p-4">
-            <h2 className="text-sm font-semibold text-gray-400 dark:text-gray-500 mb-3">{t('agentChat.sessionList')}</h2>
-            <div className="space-y-2">
-              {sessions.filter(s => {
-                if (!s) {
-                  console.warn('[会话列表] 发现 undefined 会话')
-                  return false
-                }
-                if (!s.id) {
-                  console.warn('[会话列表] 发现没有 id 的会话:', s)
-                  return false
-                }
-                return true
-              }).map(session => (
-                <div
-                  key={session.id}
-                  className={`p-3 rounded-lg cursor-pointer transition-colors group ${
-                    currentSession?.id === session.id
-                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                  onClick={() => setCurrentSession(session)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-base font-medium truncate">
-                        {session.messages?.[0]?.content?.substring(0, 30) || '新会话'}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {session.messages?.length || 0} {t('agentChat.messages')}
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteSession(session.id)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+        {/* 如果没有模型且没有会话，显示配置引导页面 */}
+        {shouldShowConfigGuide ? (
+          <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
+            <div className="text-center max-w-md px-6">
+              <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
+                <Bot className="w-12 h-12 text-gray-400 dark:text-gray-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                {t('agentChat.noModelTitle')}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                {t('agentChat.noModelDesc')}
+              </p>
+              <button
+                onClick={() => navigate('/llm')}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors font-medium shadow-sm"
+              >
+                <Bot className="w-5 h-5" />
+                {t('agentChat.goToConfig')}
+              </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* 会话列表 */}
+            <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto flex-shrink-0">
+              <div className="p-4">
+                <h2 className="text-sm font-semibold text-gray-400 dark:text-gray-500 mb-3">{t('agentChat.sessionList')}</h2>
+                <div className="space-y-2">
+                  {sessions.filter(s => {
+                    if (!s) {
+                      console.warn('[会话列表] 发现 undefined 会话')
+                      return false
+                    }
+                    if (!s.id) {
+                      console.warn('[会话列表] 发现没有 id 的会话:', s)
+                      return false
+                    }
+                    return true
+                  }).map(session => (
+                    <div
+                      key={session.id}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors group ${
+                        currentSession?.id === session.id
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                      onClick={() => setCurrentSession(session)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-base font-medium truncate">
+                            {session.messages?.[0]?.content?.substring(0, 30) || '新会话'}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {session.messages?.length || 0} {t('agentChat.messages')}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteSession(session.id)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-        {/* 聊天区域 */}
-        <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 min-h-0">
-          {currentSession ? (
+            {/* 聊天区域 */}
+            <div className="flex-1 flex flex-col bg-white dark:bg-gray-800 min-h-0">
+              {currentSession ? (
             <>
               {/* 消息列表 */}
               <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
@@ -912,9 +965,11 @@ export default function AgentChat() {
                   <Bot className="w-16 h-16 mx-auto mb-4 opacity-30 text-gray-300 dark:text-gray-600" />
                 <p className="text-lg">{t('agentChat.noSession')}</p>
               </div>
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+          </>
+        )}
       </div>
 
       {/* Toast 提示 */}

@@ -1614,6 +1614,14 @@ export default function ScriptManager() {
                 <FileCode className="w-16 h-16 mx-auto mb-4 opacity-30" />
                 <p className="text-lg font-medium">{t('script.noScripts')}</p>
                 <p className="text-sm mt-2">{t('script.noScriptsHint')}</p>
+                <a
+                  href={language.startsWith('zh-') ? 'https://browserwing.com/zh/scripts' : 'https://browserwing.com/scripts'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 transition-colors"
+                >
+                  <span>{t('script.marketplace')} &gt;&gt;</span>
+                </a>
               </div>
             ) : (
               <>

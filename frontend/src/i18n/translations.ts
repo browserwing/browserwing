@@ -649,6 +649,10 @@ export const translations = {
     'agentChat.toolParameters': '参数',
     'agentChat.toolResult': '结果',
     'agentChat.status': '状态',
+    'agentChat.noModel': '未配置模型',
+    'agentChat.noModelTitle': '请先配置 LLM 模型',
+    'agentChat.noModelDesc': '开始使用 AI 对话前，需要先配置至少一个 LLM 模型',
+    'agentChat.goToConfig': '前往配置',
 
     // 工具管理
     'toolManager.title': '工具管理',
@@ -1214,6 +1218,10 @@ export const translations = {
     'agentChat.toolParameters': '參數',
     'agentChat.toolResult': '結果',
     'agentChat.status': '狀態',
+    'agentChat.noModel': '未配置模型',
+    'agentChat.noModelTitle': '請先配置 LLM 模型',
+    'agentChat.noModelDesc': '開始使用 AI 對話前，需要先配置至少一個 LLM 模型',
+    'agentChat.goToConfig': '前往配置',
 
     // 工具管理
     'toolManager.title': '工具管理',
@@ -2619,6 +2627,10 @@ export const translations = {
     'agentChat.toolParameters': 'Parameters',
     'agentChat.toolResult': 'Result',
     'agentChat.status': 'Status',
+    'agentChat.noModel': 'No Model Configured',
+    'agentChat.noModelTitle': 'Please Configure LLM Model First',
+    'agentChat.noModelDesc': 'Before using AI chat, you need to configure at least one LLM model',
+    'agentChat.goToConfig': 'Go to Configuration',
 
     // Tool Manager
     'toolManager.title': 'Tool Management',
@@ -3645,6 +3657,10 @@ export const translations = {
     'agentChat.toolParameters': 'Parámetros',
     'agentChat.toolResult': 'Resultado',
     'agentChat.status': 'Estado',
+    'agentChat.noModel': 'Sin Modelo Configurado',
+    'agentChat.noModelTitle': 'Por Favor Configure el Modelo LLM Primero',
+    'agentChat.noModelDesc': 'Antes de usar el chat de IA, necesita configurar al menos un modelo LLM',
+    'agentChat.goToConfig': 'Ir a Configuración',
 
     // Gestión del Navegador
     'browser.title': 'Gestión del Navegador',
@@ -4638,6 +4654,10 @@ export const translations = {
     'agentChat.toolParameters': 'パラメータ',
     'agentChat.toolResult': '結果',
     'agentChat.status': 'ステータス',
+    'agentChat.noModel': 'モデル未設定',
+    'agentChat.noModelTitle': 'まずLLMモデルを設定してください',
+    'agentChat.noModelDesc': 'AI チャットを使用する前に、少なくとも1つのLLMモデルを設定する必要があります',
+    'agentChat.goToConfig': '設定に移動',
 
     // ブラウザ管理
     'browser.title': 'ブラウザ管理',
