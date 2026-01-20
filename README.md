@@ -41,6 +41,12 @@ https://github.com/user-attachments/assets/e5377892-4b88-433a-8620-43b38a2fb28f
 
 <img width="600" alt="BrowserWing Homepage" src="https://raw.githubusercontent.com/browserwing/browserwing/main/docs/assets/screenshot_homepage.png">
 
+### Turn Scripts Into Claude Skill
+
+You can now combine any scripts into a SKILL.md.
+
+<img width="600" alt="BrowserWing Skill" src="https://raw.githubusercontent.com/browserwing/browserwing/main/docs/assets/screenshot_skill.png">
+
 ## Quick Start
 
 ### Option A — Install via Package Manager (recommended)
