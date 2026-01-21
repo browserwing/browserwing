@@ -716,7 +716,17 @@ export default function ScriptManager() {
     const scriptsToExport = scripts.filter(s => selectedScripts.has(s.id)).map(script => {
       // 导出时不包含分组和标签
       const { group, tags, ...scriptData } = script
-      return scriptData
+
+      // 过滤掉 action 中的语义相关字段
+      const cleanedActions = scriptData.actions.map(action => {
+        const { intent, accessibility, context, evidence, ...cleanAction } = action
+        return cleanAction
+      })
+
+      return {
+        ...scriptData,
+        actions: cleanedActions
+      }
     })
 
     const exportData = {
