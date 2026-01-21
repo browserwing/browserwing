@@ -33,6 +33,10 @@ type Player struct {
 	pages            map[int]*rod.Page               // 多标签页支持 (key: tab index)
 	currentPage      *rod.Page                       // 当前活动页面
 	tabCounter       int                             // 标签页计数器
+	downloadedFiles  []string                        // 下载的文件路径列表
+	downloadPath     string                          // 下载目录路径
+	downloadCtx      context.Context                 // 下载监听上下文
+	downloadCancel   context.CancelFunc              // 取消下载监听
 }
 
 // highlightElement 高亮显示元素
@@ -93,12 +97,146 @@ type elementContext struct {
 // NewPlayer 创建回放器
 func NewPlayer() *Player {
 	return &Player{
-		extractedData: make(map[string]interface{}),
-		successCount:  0,
-		failCount:     0,
-		pages:         make(map[int]*rod.Page),
-		tabCounter:    0,
+		extractedData:   make(map[string]interface{}),
+		successCount:    0,
+		failCount:       0,
+		pages:           make(map[int]*rod.Page),
+		tabCounter:      0,
+		downloadedFiles: make([]string, 0),
 	}
+}
+
+// SetDownloadPath 设置下载路径
+func (p *Player) SetDownloadPath(downloadPath string) {
+	p.downloadPath = downloadPath
+}
+
+// StartDownloadListener 启动下载事件监听
+func (p *Player) StartDownloadListener(ctx context.Context, browser *rod.Browser) {
+	if p.downloadPath == "" {
+		logger.Warn(ctx, "Download path not set, skipping download listener")
+		return
+	}
+
+	// 创建可取消的上下文
+	p.downloadCtx, p.downloadCancel = context.WithCancel(ctx)
+
+	logger.Info(ctx, "Starting download event listener for path: %s", p.downloadPath)
+
+	// 记录每个下载的 GUID 到文件名的映射
+	downloadMap := make(map[string]string)
+
+	// 监听下载开始事件 (BrowserDownloadWillBegin)
+	go browser.Context(p.downloadCtx).EachEvent(func(e *proto.BrowserDownloadWillBegin) {
+		// 记录 GUID 和建议的文件名
+		downloadMap[e.GUID] = e.SuggestedFilename
+		logger.Info(ctx, "📥 Download will begin: %s (GUID: %s)", e.SuggestedFilename, e.GUID)
+	})()
+
+	// 监听下载进度事件 (BrowserDownloadProgress)
+	go browser.Context(p.downloadCtx).EachEvent(func(e *proto.BrowserDownloadProgress) {
+		if e.State == proto.BrowserDownloadProgressStateCompleted {
+			// 下载完成，从映射中获取文件名
+			fileName, exists := downloadMap[e.GUID]
+			if !exists {
+				logger.Warn(ctx, "Download completed but filename not found (GUID: %s)", e.GUID)
+				return
+			}
+
+			// 构建完整路径
+			fullPath := filepath.Join(p.downloadPath, fileName)
+			
+			// 检查文件是否实际存在（可能浏览器自动重命名了）
+			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+				// 文件不存在，可能被重命名了（如 file.pdf -> file (1).pdf）
+				// 尝试查找类似的文件
+				if actualFile := p.findSimilarFile(fileName); actualFile != "" {
+					fullPath = filepath.Join(p.downloadPath, actualFile)
+					fileName = actualFile
+					logger.Info(ctx, "File was renamed by browser: %s -> %s", downloadMap[e.GUID], actualFile)
+				}
+			}
+
+			// 检查是否已经记录过这个文件
+			alreadyRecorded := false
+			for _, existing := range p.downloadedFiles {
+				if existing == fullPath {
+					alreadyRecorded = true
+					break
+				}
+			}
+
+			if !alreadyRecorded {
+				p.downloadedFiles = append(p.downloadedFiles, fullPath)
+				logger.Info(ctx, "✓ Download completed: %s (%.2f MB, GUID: %s)", 
+					fullPath, float64(e.TotalBytes)/(1024*1024), e.GUID)
+			}
+
+			// 清理映射
+			delete(downloadMap, e.GUID)
+		} else if e.State == proto.BrowserDownloadProgressStateCanceled {
+			logger.Warn(ctx, "Download canceled (GUID: %s)", e.GUID)
+			delete(downloadMap, e.GUID)
+		}
+	})()
+
+	logger.Info(ctx, "Download event listener started")
+}
+
+// findSimilarFile 查找相似的文件名（处理浏览器自动重命名的情况）
+func (p *Player) findSimilarFile(originalName string) string {
+	entries, err := os.ReadDir(p.downloadPath)
+	if err != nil {
+		return ""
+	}
+
+	// 提取文件名和扩展名
+	ext := filepath.Ext(originalName)
+	nameWithoutExt := strings.TrimSuffix(originalName, ext)
+
+	// 查找匹配的模式：file.pdf -> file (1).pdf, file (2).pdf, etc.
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		// 检查是否匹配 "原名 (数字).扩展名" 的模式
+		if strings.HasPrefix(name, nameWithoutExt) && strings.HasSuffix(name, ext) {
+			// 精确匹配或带数字后缀
+			if name == originalName || 
+			   (len(name) > len(nameWithoutExt)+len(ext) && 
+			    name[len(nameWithoutExt)] == ' ' && 
+			    name[len(nameWithoutExt)+1] == '(') {
+				return name
+			}
+		}
+	}
+
+	return ""
+}
+
+// StopDownloadListener 停止下载事件监听
+func (p *Player) StopDownloadListener(ctx context.Context) {
+	if p.downloadCancel != nil {
+		p.downloadCancel()
+		logger.Info(ctx, "Download event listener stopped")
+	}
+	
+	// 记录最终下载的文件
+	if len(p.downloadedFiles) > 0 {
+		logger.Info(ctx, "✓ Total downloaded files: %d", len(p.downloadedFiles))
+		for i, file := range p.downloadedFiles {
+			logger.Info(ctx, "  #%d: %s", i+1, file)
+		}
+	} else {
+		logger.Info(ctx, "No files downloaded during script execution")
+	}
+}
+
+// GetDownloadedFiles 获取下载的文件列表
+func (p *Player) GetDownloadedFiles() []string {
+	return p.downloadedFiles
 }
 
 // GetExtractedData 获取抓取的数据

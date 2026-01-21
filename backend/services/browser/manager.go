@@ -272,8 +272,9 @@ func (m *Manager) Start(ctx context.Context) error {
 	}
 
 	downloadBehavior := &proto.BrowserSetDownloadBehavior{
-		Behavior:     proto.BrowserSetDownloadBehaviorBehaviorAllow,
-		DownloadPath: downloadPath, // ⚠ 必须是已存在目录
+		Behavior:      proto.BrowserSetDownloadBehaviorBehaviorAllow,
+		DownloadPath:  downloadPath, // ⚠ 必须是已存在目录
+		EventsEnabled: true,
 	}
 	err = downloadBehavior.Call(browser)
 	if err != nil {
@@ -799,6 +800,13 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 
 	player := NewPlayer()
 
+	// 设置下载路径并启动下载监听
+	if m.downloadPath != "" {
+		player.SetDownloadPath(m.downloadPath)
+		player.StartDownloadListener(ctx, m.browser)
+		logger.Info(ctx, "Download tracking enabled for playback, path: %s", m.downloadPath)
+	}
+
 	// 检查是否需要录制视频
 	recordingConfig := m.db.GetDefaultRecordingConfig()
 	var videoPath string
@@ -836,6 +844,11 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 
 	// 执行回放
 	playErr := player.PlayScript(ctx, page, script)
+
+	// 停止下载监听
+	if m.downloadPath != "" {
+		player.StopDownloadListener(ctx)
+	}
 
 	// 停止视频录制
 	if videoPath != "" {
@@ -894,6 +907,16 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 			keys = append(keys, k)
 		}
 		logger.Info(ctx, "[PlayScript] Extracted data keys: %v", keys)
+	}
+
+	// 添加下载的文件路径到提取数据
+	downloadedFiles := player.GetDownloadedFiles()
+	if len(downloadedFiles) > 0 {
+		extractedData["downloaded_files"] = downloadedFiles
+		logger.Info(ctx, "[PlayScript] Downloaded files count: %d", len(downloadedFiles))
+		for i, file := range downloadedFiles {
+			logger.Info(ctx, "[PlayScript] Downloaded file #%d: %s", i+1, file)
+		}
 	}
 
 	return &models.PlayResult{
