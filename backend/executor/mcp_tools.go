@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/browserwing/browserwing/pkg/logger"
+	"github.com/go-rod/rod"
 	mcpgo "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -455,7 +456,8 @@ func (r *MCPToolRegistry) registerScrollTool() error {
 			// Scroll to top
 			page := r.executor.GetRodPage()
 			if page != nil {
-				_, err = page.Eval(`() => window.scrollTo(0, 0)`)
+				// 使用安全的滚动操作,防止 panic
+				err = safeScrollToTop(ctx, page)
 				if err == nil {
 					result = &OperationResult{
 						Success: true,
@@ -981,4 +983,16 @@ type ToolParameter struct {
 	Type        string `json:"type"`
 	Required    bool   `json:"required"`
 	Description string `json:"description"`
+}
+
+// safeScrollToTop 安全地滚动到顶部,捕获可能的 panic
+func safeScrollToTop(ctx context.Context, page *rod.Page) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during scroll to top: %v", r)
+		}
+	}()
+
+	_, err = page.Eval(`() => window.scrollTo(0, 0)`)
+	return err
 }

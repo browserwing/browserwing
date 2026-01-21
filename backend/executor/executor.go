@@ -241,7 +241,8 @@ func (e *Executor) GetPageText(ctx context.Context) (*OperationResult, error) {
 		}, fmt.Errorf("no active page")
 	}
 
-	result, err := page.Eval(`() => document.body.innerText`)
+	// 使用安全的 Eval 调用,防止 panic
+	result, err := safeGetPageText(ctx, page)
 	if err != nil {
 		return &OperationResult{
 			Success:   false,
@@ -255,9 +256,30 @@ func (e *Executor) GetPageText(ctx context.Context) (*OperationResult, error) {
 		Message:   "Successfully retrieved page text",
 		Timestamp: time.Now(),
 		Data: map[string]interface{}{
-			"text": result.Value.Str(),
+			"text": result,
 		},
 	}, nil
+}
+
+// safeGetPageText 安全地获取页面文本,捕获可能的 panic
+func safeGetPageText(ctx context.Context, page *rod.Page) (text string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during get page text: %v", r)
+			text = ""
+		}
+	}()
+
+	result, evalErr := page.Eval(`() => document.body.innerText`)
+	if evalErr != nil {
+		return "", evalErr
+	}
+
+	if result != nil {
+		text = result.Value.Str()
+	}
+
+	return text, nil
 }
 
 // ========== 批量操作 ==========

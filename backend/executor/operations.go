@@ -79,17 +79,15 @@ func (e *Executor) Navigate(ctx context.Context, url string, opts *NavigateOptio
 		logger.Info(ctx, "[Navigate] Navigation completed")
 	}
 
-	// 等待页面加载
+	// 等待页面加载 - 使用 panic 恢复机制防止 rod 库内部错误
 	logger.Info(ctx, "[Navigate] Waiting for page load (condition: %s)...", opts.WaitUntil)
-	switch opts.WaitUntil {
-	case "domcontentloaded":
-		page.WaitLoad()
-	case "networkidle":
-		page.WaitIdle(2 * time.Second)
-	default:
-		page.WaitLoad()
+	waitErr := safeWaitForPageLoad(ctx, page, opts.WaitUntil)
+	if waitErr != nil {
+		logger.Warn(ctx, "[Navigate] Wait for page load failed: %v (continuing anyway)", waitErr)
+		// 不返回错误,因为页面可能已经部分加载了,继续处理
+	} else {
+		logger.Info(ctx, "[Navigate] Page load completed")
 	}
-	logger.Info(ctx, "[Navigate] Page load completed")
 
 	logger.Info(ctx, "[Navigate] Successfully navigated to %s", url)
 
@@ -859,9 +857,8 @@ func (e *Executor) ScrollToBottom(ctx context.Context) (*OperationResult, error)
 		return nil, fmt.Errorf("no active page")
 	}
 
-	_, err := page.Eval(`() => {
-		window.scrollTo(0, document.body.scrollHeight);
-	}`)
+	// 使用安全的 Eval 包装,防止 panic
+	err := safeScrollEval(ctx, page)
 	if err != nil {
 		return &OperationResult{
 			Success:   false,
@@ -1007,7 +1004,9 @@ func (e *Executor) Evaluate(ctx context.Context, script string) (*OperationResul
 		return nil, fmt.Errorf("no active page")
 	}
 
-	result, err := page.Eval(script)
+	// 使用安全的执行方式,防止 rod 库 panic
+	var result interface{}
+	err := safeEvaluate(ctx, page, script, &result)
 	if err != nil {
 		return &OperationResult{
 			Success:   false,
@@ -1021,7 +1020,7 @@ func (e *Executor) Evaluate(ctx context.Context, script string) (*OperationResul
 		Message:   "Successfully executed script",
 		Timestamp: time.Now(),
 		Data: map[string]interface{}{
-			"result": result.Value,
+			"result": result,
 		},
 	}, nil
 }
@@ -1417,4 +1416,61 @@ func (e *Executor) GetNetworkRequests(ctx context.Context) (*OperationResult, er
 			"requests": requests,
 		},
 	}, nil
+}
+
+// safeWaitForPageLoad 安全地等待页面加载,捕获可能的 panic
+func safeWaitForPageLoad(ctx context.Context, page *rod.Page, waitUntil string) (err error) {
+	// 使用 defer recover 来捕获 rod 库可能产生的 panic
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during page wait: %v", r)
+		}
+	}()
+
+	// 根据不同的等待条件执行相应的等待操作
+	switch waitUntil {
+	case "domcontentloaded", "load":
+		err = page.WaitLoad()
+	case "networkidle", "idle":
+		page.WaitIdle(2 * time.Second)
+	default:
+		err = page.WaitLoad()
+	}
+
+	return err
+}
+
+// safeScrollEval 安全地执行滚动操作,捕获可能的 panic
+func safeScrollEval(ctx context.Context, page *rod.Page) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during scroll eval: %v", r)
+		}
+	}()
+
+	_, err = page.Eval(`() => {
+		window.scrollTo(0, document.body.scrollHeight);
+	}`)
+	return err
+}
+
+// safeEvaluate 安全地执行 JavaScript,捕获可能的 panic
+func safeEvaluate(ctx context.Context, page *rod.Page, script string, result interface{}) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during evaluate: %v", r)
+		}
+	}()
+
+	evalResult, evalErr := page.Eval(script)
+	if evalErr != nil {
+		return evalErr
+	}
+
+	// 尝试解析结果
+	if evalResult != nil {
+		*result.(*interface{}) = evalResult.Value.Val()
+	}
+
+	return nil
 }

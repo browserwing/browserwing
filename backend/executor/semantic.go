@@ -340,15 +340,11 @@ func markCursorPointerElements(ctx context.Context, page *rod.Page, tree *Semant
 	}
 	`
 
-	result, err := page.Eval(script)
+	// 使用安全的 Eval 调用,防止 rod 库 panic
+	var cursorPointerElements []map[string]interface{}
+	err := safePageEvalUnmarshal(ctx, page, script, &cursorPointerElements)
 	if err != nil {
 		return fmt.Errorf("failed to execute cursor pointer detection script: %w", err)
-	}
-
-	// 解析结果
-	var cursorPointerElements []map[string]interface{}
-	if err := result.Value.Unmarshal(&cursorPointerElements); err != nil {
-		return fmt.Errorf("failed to unmarshal cursor pointer elements: %w", err)
 	}
 
 	logger.Info(ctx, "[markCursorPointerElements] Found %d elements with cursor:pointer", len(cursorPointerElements))
@@ -727,4 +723,29 @@ func ScrollToElement(ctx context.Context, elem *rod.Element) error {
 // GetElementScreenshot 获取元素截图
 func GetElementScreenshot(ctx context.Context, elem *rod.Element) ([]byte, error) {
 	return elem.Screenshot(proto.PageCaptureScreenshotFormatPng, 100)
+}
+
+// safePageEvalUnmarshal 安全地执行页面 JavaScript 并解析结果,捕获可能的 panic
+func safePageEvalUnmarshal(ctx context.Context, page *rod.Page, script string, result interface{}) (err error) {
+	// 使用 defer recover 来捕获 rod 库可能产生的 panic
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during page eval: %v", r)
+		}
+	}()
+
+	// 执行 JavaScript
+	evalResult, evalErr := page.Eval(script)
+	if evalErr != nil {
+		return evalErr
+	}
+
+	// 解析结果
+	if evalResult != nil {
+		if unmarshalErr := evalResult.Value.Unmarshal(result); unmarshalErr != nil {
+			return fmt.Errorf("failed to unmarshal result: %w", unmarshalErr)
+		}
+	}
+
+	return nil
 }
