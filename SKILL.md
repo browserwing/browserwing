@@ -1,13 +1,13 @@
 ---
-name: browserpilot-executor
+name: browserwing-executor
 description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, semantic tree analysis, screenshot, JavaScript execution, and batch operations.
 ---
 
-# BrowserPilot Executor API
+# BrowserWing Executor API
 
 ## Overview
 
-BrowserPilot Executor provides comprehensive browser automation capabilities through HTTP APIs. You can control browser navigation, interact with page elements, extract data, and analyze page structure.
+BrowserWing Executor provides comprehensive browser automation capabilities through HTTP APIs. You can control browser navigation, interact with page elements, extract data, and analyze page structure.
 
 **API Base URL:** `http://localhost:8080/api/v1/executor`, `host=localhost:8080`
 

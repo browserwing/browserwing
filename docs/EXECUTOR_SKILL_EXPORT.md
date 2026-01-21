@@ -2,7 +2,7 @@
 
 ## 概述
 
-现在你可以一键导出 Executor API 的完整 Claude Skills 文档（SKILL.md 格式），让 Claude 可以直接使用 BrowserPilot 进行浏览器自动化。
+现在你可以一键导出 Executor API 的完整 Claude Skills 文档（SKILL.md 格式），让 Claude 可以直接使用 BrowserWing 进行浏览器自动化。
 
 ## 导出接口
 
@@ -30,13 +30,13 @@ curl -X GET 'http://localhost:8080/api/v1/executor/export/skill' \
 ### 1. YAML Frontmatter
 ```yaml
 ---
-name: browserpilot-executor
+name: browserwing-executor
 description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, semantic tree analysis, screenshot, JavaScript execution, and batch operations.
 ---
 ```
 
 ### 2. 概述信息
-- BrowserPilot Executor 的功能介绍
+- BrowserWing Executor 的功能介绍
 - API 基础 URL
 - 认证方式说明
 - 核心能力列表
@@ -335,15 +335,15 @@ Claude: 这是动态任务，使用 Executor API 灵活操作
 
 ```markdown
 ---
-name: browserpilot-executor
+name: browserwing-executor
 description: Control browser automation through HTTP API...
 ---
 
-# BrowserPilot Executor API
+# BrowserWing Executor API
 
 ## Overview
 
-BrowserPilot Executor provides comprehensive browser automation...
+BrowserWing Executor provides comprehensive browser automation...
 
 **API Base URL:** `http://localhost:8080/api/v1/executor`
 
@@ -439,7 +439,7 @@ cat EXECUTOR_SKILL.md
 用户: 你能帮我控制浏览器吗？
 
 Claude: 
-是的！我可以通过 BrowserPilot Executor API 控制浏览器。
+是的！我可以通过 BrowserWing Executor API 控制浏览器。
 
 我有以下能力：
 - 页面导航和浏览器控制

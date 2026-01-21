@@ -275,8 +275,8 @@ default:
 
 ## 相关文件
 
-- `/root/code/browserpilot/backend/agent/agent.go` - 主要修改
-- `/root/code/browserpilot/backend/executor/mcp_tools.go` - 修复返回格式
+- `/root/code/browserwing/backend/agent/agent.go` - 主要修改
+- `/root/code/browserwing/backend/executor/mcp_tools.go` - 修复返回格式
 
 ## 后续优化建议
 

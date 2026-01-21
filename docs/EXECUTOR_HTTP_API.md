@@ -913,11 +913,11 @@ curl -X POST "$BASE_URL/batch" \
 **SKILL.md**:
 ```markdown
 ---
-name: browserpilot-executor
+name: browserwing-executor
 description: Control browser automation through HTTP API. Supports navigation, clicking, typing, data extraction, and more.
 ---
 
-# BrowserPilot Executor Skill
+# BrowserWing Executor Skill
 
 This skill provides browser automation capabilities through HTTP APIs.
 

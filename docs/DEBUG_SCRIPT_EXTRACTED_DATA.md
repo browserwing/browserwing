@@ -135,7 +135,7 @@ if data, ok := resultMap["data"].(map[string]interface{}); ok {
 ### 步骤 2: 启动后端并查看日志
 
 ```bash
-cd /root/code/browserpilot/backend
+cd /root/code/browserwing/backend
 ./browserwing 2>&1 | tee debug.log
 ```
 
@@ -322,7 +322,7 @@ logger.Info(ctx, "[DEBUG] First 500 chars: %s", responseText[:min(500, len(respo
 
 1. **重启后端**:
    ```bash
-   cd /root/code/browserpilot/backend
+   cd /root/code/browserwing/backend
    pkill -f browserwing
    ./browserwing 2>&1 | tee debug.log
    ```

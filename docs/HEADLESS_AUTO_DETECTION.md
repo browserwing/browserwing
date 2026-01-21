@@ -238,7 +238,7 @@ if runtime.GOOS == "linux" {
 
 4. **Docker 测试**：
    ```bash
-   docker run --rm -it browserpilot
+   docker run --rm -it browserwing
    # 应该显示 headless=true
    ```
 

@@ -70,11 +70,11 @@ Dashboard 页面已按照极简黑白灰风格重新设计，采用 **Notion 风
 ```json
 {
   "mcpServers": {
-    "browserpilot": {
+    "browserwing": {
       "command": "npx",
       "args": ["-y", "browserwing-mcp-server"],
       "env": {
-        "BROWSERPILOT_API_URL": "http://localhost:8080"
+        "BROWSERWING_API_URL": "http://localhost:8080"
       }
     }
   }
@@ -87,7 +87,7 @@ Dashboard 页面已按照极简黑白灰风格重新设计，采用 **Notion 风
   - 下载按钮带状态反馈（下载中...）
   - 下载 `/SKILL.md` 文件到本地
 - **特性**：
-  - 自动命名：`BROWSERPILOT_SKILL.md`
+  - 自动命名：`BROWSERWING_SKILL.md`
   - 包含 26+ 浏览器操作 API
 
 ---
@@ -202,12 +202,12 @@ const [downloadingSkill, setDownloadingSkill] = useState(false)
 ## 📦 文件清单
 
 ### 修改的文件：
-1. ✅ `/root/code/browserpilot/frontend/src/pages/Dashboard.tsx` - 主页面
-2. ✅ `/root/code/browserpilot/frontend/src/i18n/translations.ts` - 翻译（简体中文）
+1. ✅ `/root/code/browserwing/frontend/src/pages/Dashboard.tsx` - 主页面
+2. ✅ `/root/code/browserwing/frontend/src/i18n/translations.ts` - 翻译（简体中文）
 
 ### 新建的文件：
-3. ✅ `/root/code/browserpilot/frontend/src/i18n/dashboard-translations-patch.ts` - 其他语言翻译补丁
-4. ✅ `/root/code/browserpilot/docs/DASHBOARD_REDESIGN.md` - 本文档
+3. ✅ `/root/code/browserwing/frontend/src/i18n/dashboard-translations-patch.ts` - 其他语言翻译补丁
+4. ✅ `/root/code/browserwing/docs/DASHBOARD_REDESIGN.md` - 本文档
 
 ---
 
@@ -215,7 +215,7 @@ const [downloadingSkill, setDownloadingSkill] = useState(false)
 
 ### 1. 启动前端
 ```bash
-cd /root/code/browserpilot/frontend
+cd /root/code/browserwing/frontend
 pnpm install
 pnpm dev
 ```
@@ -234,7 +234,7 @@ pnpm dev
 #### Claude Skill 卡片：
 - [ ] 点击"下载 SKILL.md"按钮
 - [ ] 按钮显示"下载中..."
-- [ ] 文件下载到本地（`BROWSERPILOT_SKILL.md`）
+- [ ] 文件下载到本地（`BROWSERWING_SKILL.md`）
 - [ ] 文件内容正确
 
 #### 3 步快速开始：

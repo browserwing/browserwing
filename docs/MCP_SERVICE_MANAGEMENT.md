@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档记录了BrowserPilot项目中MCP(Model Context Protocol)服务管理功能的完整实现。该功能允许用户添加、配置和管理外部MCP服务,并自动发现和启用这些服务提供的工具。
+本文档记录了BrowserWing项目中MCP(Model Context Protocol)服务管理功能的完整实现。该功能允许用户添加、配置和管理外部MCP服务,并自动发现和启用这些服务提供的工具。
 
 ## 功能特性
 
@@ -298,5 +298,5 @@ const [expandedMCPId, setExpandedMCPId] = useState<string | null>(null)
 
 ---
 
-**维护者**: BrowserPilot Team  
+**维护者**: BrowserWing Team  
 **最后更新**: 2024-01

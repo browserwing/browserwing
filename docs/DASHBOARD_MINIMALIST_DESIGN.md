@@ -247,23 +247,23 @@ Dashboard 页面已按照 Notion 风格重新设计，采用**黑白灰极简高
 ## 📦 文件变更
 
 ### 修改的文件
-1. ✅ `/root/code/browserpilot/frontend/src/pages/Dashboard.tsx`
+1. ✅ `/root/code/browserwing/frontend/src/pages/Dashboard.tsx`
    - 移除所有彩色类名
    - 统一布局宽度为 `max-w-6xl`
    - 简化图标和文字大小
    - 改进卡片样式和 hover 效果
 
-2. ✅ `/root/code/browserpilot/frontend/src/i18n/translations.ts`
+2. ✅ `/root/code/browserwing/frontend/src/i18n/translations.ts`
    - 移除所有 emoji
    - 修改文案去除 Claude 强调
    - 改用通用的 AI 工具表述
 
 ### 删除的文件
-3. ✅ `/root/code/browserpilot/frontend/src/i18n/dashboard-translations-patch.ts`
+3. ✅ `/root/code/browserwing/frontend/src/i18n/dashboard-translations-patch.ts`
    - 不再需要单独的补丁文件
 
 ### 新建的文件
-4. ✅ `/root/code/browserpilot/docs/DASHBOARD_MINIMALIST_DESIGN.md`
+4. ✅ `/root/code/browserwing/docs/DASHBOARD_MINIMALIST_DESIGN.md`
    - 本文档
 
 ---
@@ -290,14 +290,14 @@ Dashboard 页面已按照 Notion 风格重新设计，采用**黑白灰极简高
 
 ### 测试页面
 ```bash
-cd /root/code/browserpilot/frontend
+cd /root/code/browserwing/frontend
 pnpm dev
 # 访问 http://localhost:5173
 ```
 
 ### 构建生产版本
 ```bash
-cd /root/code/browserpilot/backend
+cd /root/code/browserwing/backend
 make build-embedded
 ```
 

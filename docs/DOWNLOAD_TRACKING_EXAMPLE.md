@@ -157,8 +157,8 @@ func (p *Player) findSimilarFile(originalName string) string {
 ### 执行日志
 
 ```
-[INFO] Download tracking enabled for playback, path: /root/code/browserpilot/downloads
-[INFO] Starting download event listener for path: /root/code/browserpilot/downloads
+[INFO] Download tracking enabled for playback, path: /root/code/browserwing/downloads
+[INFO] Starting download event listener for path: /root/code/browserwing/downloads
 [INFO] Download event listener started
 
 [INFO] 执行步骤 1: 访问 https://example.com/downloads
@@ -166,18 +166,18 @@ func (p *Player) findSimilarFile(originalName string) string {
 [INFO] 📥 Download will begin: report.pdf (GUID: 12345-abc)
 
 [INFO] 执行步骤 3: 等待 2 秒
-[INFO] ✓ Download completed: /root/code/browserpilot/downloads/report.pdf (2.35 MB, GUID: 12345-abc)
+[INFO] ✓ Download completed: /root/code/browserwing/downloads/report.pdf (2.35 MB, GUID: 12345-abc)
 
 [INFO] 执行步骤 4: 点击 "Download Invoice"
 [INFO] 📥 Download will begin: invoice.xlsx (GUID: 67890-xyz)
 
 [INFO] 执行步骤 5: 等待 2 秒
-[INFO] ✓ Download completed: /root/code/browserpilot/downloads/invoice.xlsx (0.85 MB, GUID: 67890-xyz)
+[INFO] ✓ Download completed: /root/code/browserwing/downloads/invoice.xlsx (0.85 MB, GUID: 67890-xyz)
 
 [INFO] Download event listener stopped
 [INFO] ✓ Total downloaded files: 2
-[INFO]   #1: /root/code/browserpilot/downloads/report.pdf
-[INFO]   #2: /root/code/browserpilot/downloads/invoice.xlsx
+[INFO]   #1: /root/code/browserwing/downloads/report.pdf
+[INFO]   #2: /root/code/browserwing/downloads/invoice.xlsx
 ```
 
 ### API 返回
@@ -188,8 +188,8 @@ func (p *Player) findSimilarFile(originalName string) string {
   "message": "Script replay completed",
   "extracted_data": {
     "downloaded_files": [
-      "/root/code/browserpilot/downloads/report.pdf",
-      "/root/code/browserpilot/downloads/invoice.xlsx"
+      "/root/code/browserwing/downloads/report.pdf",
+      "/root/code/browserwing/downloads/invoice.xlsx"
     ]
   }
 }

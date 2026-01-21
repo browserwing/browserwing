@@ -424,4 +424,4 @@ curl -X GET 'http://localhost:8080/api/v1/executor/export/skill' \
 
 **一键导出 Claude Skill**: `GET /api/v1/executor/export/skill`
 
-现在你可以通过 HTTP 接口完全控制 BrowserPilot 的浏览器自动化能力，并一键生成 Claude Skills 文档了！🎉
+现在你可以通过 HTTP 接口完全控制 BrowserWing 的浏览器自动化能力，并一键生成 Claude Skills 文档了！🎉

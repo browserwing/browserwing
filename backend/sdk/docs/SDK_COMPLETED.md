@@ -183,7 +183,7 @@ response, _ := client.Agent().SendMessage(ctx, sessionID,
 
 ```bash
 # 编译 SDK
-cd /root/code/browserpilot/backend
+cd /root/code/browserwing/backend
 go build ./sdk/...
 
 # 运行基础示例

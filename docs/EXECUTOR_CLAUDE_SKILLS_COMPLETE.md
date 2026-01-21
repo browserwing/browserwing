@@ -120,7 +120,7 @@ curl -X GET 'http://localhost:8080/api/v1/executor/export/skill' \
 
 **使用**:
 ```bash
-export BROWSERPILOT_API_KEY="your-key"
+export BROWSERWING_API_KEY="your-key"
 ./examples/export-executor-skill.sh
 ```
 
@@ -400,7 +400,7 @@ Claude:
                   │ (with API Key)
                   ↓
 ┌─────────────────────────────────────────────────┐
-│         BrowserPilot HTTP API Server            │
+│         BrowserWing HTTP API Server            │
 │                                                  │
 │  GET /help         → 返回所有命令信息            │
 │  GET /export/skill → 导出 SKILL.md              │
@@ -725,7 +725,7 @@ POST /click {...}
 
 ## 🎊 总结
 
-通过这次完整实现，BrowserPilot 现在拥有：
+通过这次完整实现，BrowserWing 现在拥有：
 
 ### 🔧 完整的 HTTP API
 - **26 个端点**覆盖所有浏览器操作

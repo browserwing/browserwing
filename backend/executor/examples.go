@@ -49,7 +49,7 @@ func ExampleClickAndType() error {
 	executor.Navigate(ctx, "https://www.google.com", nil)
 
 	// 在搜索框中输入
-	result, err := executor.Type(ctx, "input[name='q']", "browserpilot", &TypeOptions{
+	result, err := executor.Type(ctx, "input[name='q']", "browserwing", &TypeOptions{
 		Clear: true,
 	})
 	if err != nil {

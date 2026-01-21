@@ -224,7 +224,7 @@ AI: [调用 browser_type]
 
 ### 修改位置
 
-**文件**: `/root/code/browserpilot/backend/agent/tools/init.go`
+**文件**: `/root/code/browserwing/backend/agent/tools/init.go`
 
 **函数**: `WrapTool()` 使用这个常量作为 instructions 参数的描述
 
@@ -360,6 +360,6 @@ curl -X POST http://localhost:8080/api/agent/chat \
 
 ## 相关文件
 
-- `/root/code/browserpilot/backend/agent/tools/init.go` - 主要修改
-- `/root/code/browserpilot/backend/agent/agent.go` - 使用 instructions
-- `/root/code/browserpilot/docs/TOOL_INSTRUCTIONS_IMPROVEMENT.md` - 本文档
+- `/root/code/browserwing/backend/agent/tools/init.go` - 主要修改
+- `/root/code/browserwing/backend/agent/agent.go` - 使用 instructions
+- `/root/code/browserwing/docs/TOOL_INSTRUCTIONS_IMPROVEMENT.md` - 本文档

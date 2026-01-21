@@ -126,7 +126,7 @@ operations := []executor.Operation{
         Type: "type",
         Params: map[string]interface{}{
             "identifier": "input[name='search']",
-            "text":       "browserpilot",
+            "text":       "browserwing",
         },
     },
     {
@@ -151,7 +151,7 @@ import (
 )
 
 // 创建 MCP 服务器
-mcpServer := server.NewMCPServer("browserpilot", "1.0.0")
+mcpServer := server.NewMCPServer("browserwing", "1.0.0")
 
 // 创建 Executor
 exec := executor.NewExecutor(browserMgr)

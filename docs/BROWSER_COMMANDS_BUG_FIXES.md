@@ -161,7 +161,7 @@ case "browser_network_requests":
 
 ### 编译验证
 ```bash
-cd /root/code/browserpilot/backend && go build
+cd /root/code/browserwing/backend && go build
 # ✅ 编译成功
 ```
 

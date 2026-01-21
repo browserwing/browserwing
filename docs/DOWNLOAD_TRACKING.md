@@ -70,8 +70,8 @@ curl -X POST http://localhost:8080/api/v1/scripts/{script_id}/play
     "product_title": "MacBook Pro",
     "price": "$1999",
     "downloaded_files": [
-      "/root/code/browserpilot/downloads/product_spec.pdf",
-      "/root/code/browserpilot/downloads/warranty_info.pdf"
+      "/root/code/browserwing/downloads/product_spec.pdf",
+      "/root/code/browserwing/downloads/warranty_info.pdf"
     ]
   }
 }
@@ -90,7 +90,7 @@ curl -X POST http://localhost:8080/api/v1/scripts/{script_id}/play
 ```json
 {
   "downloaded_files": [
-    "/root/code/browserpilot/downloads/document_2025.pdf"
+    "/root/code/browserwing/downloads/document_2025.pdf"
   ]
 }
 ```
@@ -107,9 +107,9 @@ curl -X POST http://localhost:8080/api/v1/scripts/{script_id}/play
 ```json
 {
   "downloaded_files": [
-    "/root/code/browserpilot/downloads/sales_report_jan.xlsx",
-    "/root/code/browserpilot/downloads/sales_report_feb.xlsx",
-    "/root/code/browserpilot/downloads/sales_report_mar.xlsx"
+    "/root/code/browserwing/downloads/sales_report_jan.xlsx",
+    "/root/code/browserwing/downloads/sales_report_feb.xlsx",
+    "/root/code/browserwing/downloads/sales_report_mar.xlsx"
   ]
 }
 ```
@@ -129,8 +129,8 @@ curl -X POST http://localhost:8080/api/v1/scripts/{script_id}/play
   "price": "$999",
   "stock_status": "In Stock",
   "downloaded_files": [
-    "/root/code/browserpilot/downloads/iphone15_manual.pdf",
-    "/root/code/browserpilot/downloads/iphone15_tech_specs.pdf"
+    "/root/code/browserwing/downloads/iphone15_manual.pdf",
+    "/root/code/browserwing/downloads/iphone15_tech_specs.pdf"
   ]
 }
 ```
@@ -222,20 +222,20 @@ export DOWNLOAD_PATH=/custom/path/to/downloads
 ### 成功场景
 
 ```
-[INFO] Download tracking enabled for playback, path: /root/code/browserpilot/downloads
-[INFO] Starting download event listener for path: /root/code/browserpilot/downloads
+[INFO] Download tracking enabled for playback, path: /root/code/browserwing/downloads
+[INFO] Starting download event listener for path: /root/code/browserwing/downloads
 [INFO] Download event listener started
 [INFO] 📥 Download will begin: report.pdf (GUID: 12345-abcde-67890)
-[INFO] ✓ Download completed: /root/code/browserpilot/downloads/report.pdf (2.35 MB, GUID: 12345-abcde-67890)
+[INFO] ✓ Download completed: /root/code/browserwing/downloads/report.pdf (2.35 MB, GUID: 12345-abcde-67890)
 [INFO] 📥 Download will begin: invoice.xlsx (GUID: 98765-fghij-43210)
-[INFO] ✓ Download completed: /root/code/browserpilot/downloads/invoice.xlsx (0.85 MB, GUID: 98765-fghij-43210)
+[INFO] ✓ Download completed: /root/code/browserwing/downloads/invoice.xlsx (0.85 MB, GUID: 98765-fghij-43210)
 [INFO] Download event listener stopped
 [INFO] ✓ Total downloaded files: 2
-[INFO]   #1: /root/code/browserpilot/downloads/report.pdf
-[INFO]   #2: /root/code/browserpilot/downloads/invoice.xlsx
+[INFO]   #1: /root/code/browserwing/downloads/report.pdf
+[INFO]   #2: /root/code/browserwing/downloads/invoice.xlsx
 [INFO] [PlayScript] Downloaded files count: 2
-[INFO] [PlayScript] Downloaded file #1: /root/code/browserpilot/downloads/report.pdf
-[INFO] [PlayScript] Downloaded file #2: /root/code/browserpilot/downloads/invoice.xlsx
+[INFO] [PlayScript] Downloaded file #1: /root/code/browserwing/downloads/report.pdf
+[INFO] [PlayScript] Downloaded file #2: /root/code/browserwing/downloads/invoice.xlsx
 ```
 
 ### 浏览器自动重命名文件
@@ -243,14 +243,14 @@ export DOWNLOAD_PATH=/custom/path/to/downloads
 ```
 [INFO] 📥 Download will begin: document.pdf (GUID: abc-123)
 [INFO] File was renamed by browser: document.pdf -> document (1).pdf
-[INFO] ✓ Download completed: /root/code/browserpilot/downloads/document (1).pdf (1.20 MB, GUID: abc-123)
+[INFO] ✓ Download completed: /root/code/browserwing/downloads/document (1).pdf (1.20 MB, GUID: abc-123)
 ```
 
 ### 无下载场景
 
 ```
-[INFO] Download tracking enabled for playback, path: /root/code/browserpilot/downloads
-[INFO] Starting download event listener for path: /root/code/browserpilot/downloads
+[INFO] Download tracking enabled for playback, path: /root/code/browserwing/downloads
+[INFO] Starting download event listener for path: /root/code/browserwing/downloads
 [INFO] Download event listener started
 [INFO] Download event listener stopped
 [INFO] No files downloaded during script execution

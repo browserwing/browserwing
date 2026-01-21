@@ -11,7 +11,7 @@ assignment to entry in nil map
 ```
 
 ### 调用栈
-- `/root/code/browserpilot/backend/executor/operations.go:90` - Navigate 函数中的 `page.WaitLoad()` 调用
+- `/root/code/browserwing/backend/executor/operations.go:90` - Navigate 函数中的 `page.WaitLoad()` 调用
 - 经过 rod 库的 `page_eval.go` 相关代码
 - 从 `mcp_tools.go:163` 触发
 

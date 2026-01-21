@@ -2902,16 +2902,16 @@ func generateSkillMD(scripts []*models.Script, host string, isExportAll bool, sc
 
 	// YAML Frontmatter
 	sb.WriteString("---\n")
-	sb.WriteString("name: browserpilot-scripts\n")
+	sb.WriteString("name: browserwing-scripts\n")
 	sb.WriteString("description: " + skillDescription + "\n")
 	sb.WriteString("---\n\n")
 
 	// 主标题
-	sb.WriteString("# BrowserPilot Automation Scripts\n\n")
+	sb.WriteString("# BrowserWing Automation Scripts\n\n")
 
 	// 简介
 	sb.WriteString("## Overview\n\n")
-	sb.WriteString("BrowserPilot provides browser automation capabilities through HTTP APIs. You can execute pre-configured scripts to automate web tasks.\n\n")
+	sb.WriteString("BrowserWing provides browser automation capabilities through HTTP APIs. You can execute pre-configured scripts to automate web tasks.\n\n")
 	sb.WriteString(fmt.Sprintf("**Total Scripts Available:** %d\n\n", len(scripts)))
 	sb.WriteString(fmt.Sprintf("**API Base URL:** `http://%s/api/v1`\n\n", host))
 
@@ -3256,7 +3256,7 @@ func generateSkillMD(scripts []*models.Script, host string, isExportAll bool, sc
 	sb.WriteString("- The browser must be started before executing scripts\n")
 	sb.WriteString("- Scripts run in the actual browser, so execution may take a few seconds\n")
 	sb.WriteString("- Some scripts may require authentication cookies or specific browser state\n")
-	sb.WriteString("- Always replace `<host>` with the actual BrowserPilot API host address\n\n")
+	sb.WriteString("- Always replace `<host>` with the actual BrowserWing API host address\n\n")
 
 	return sb.String()
 }
@@ -4401,16 +4401,16 @@ func generateExecutorSkillMD(host string) string {
 
 	// YAML Frontmatter
 	sb.WriteString("---\n")
-	sb.WriteString("name: browserpilot-executor\n")
+	sb.WriteString("name: browserwing-executor\n")
 	sb.WriteString("description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, semantic tree analysis, screenshot, JavaScript execution, and batch operations.\n")
 	sb.WriteString("---\n\n")
 
 	// 主标题
-	sb.WriteString("# BrowserPilot Executor API\n\n")
+	sb.WriteString("# BrowserWing Executor API\n\n")
 
 	// 简介
 	sb.WriteString("## Overview\n\n")
-	sb.WriteString("BrowserPilot Executor provides comprehensive browser automation capabilities through HTTP APIs. You can control browser navigation, interact with page elements, extract data, and analyze page structure.\n\n")
+	sb.WriteString("BrowserWing Executor provides comprehensive browser automation capabilities through HTTP APIs. You can control browser navigation, interact with page elements, extract data, and analyze page structure.\n\n")
 	sb.WriteString(fmt.Sprintf("**API Base URL:** `http://%s/api/v1/executor`\n\n", host))
 	sb.WriteString("**Authentication:** Use `X-BrowserWing-Key: <api-key>` header or `Authorization: Bearer <token>`\n\n")
 

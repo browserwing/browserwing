@@ -203,11 +203,11 @@ POST /api/v1/executor/click
 
 ```markdown
 ---
-name: browserpilot-automation
+name: browserwing-automation
 description: Browser automation with self-discovery capability
 ---
 
-# BrowserPilot Automation Skill
+# BrowserWing Automation Skill
 
 ## How It Works
 
@@ -254,7 +254,7 @@ My actions:
 ```python
 import requests
 
-class BrowserPilot:
+class BrowserWing:
     def __init__(self, base_url, api_key):
         self.base = base_url
         self.key = api_key
@@ -300,7 +300,7 @@ class BrowserPilot:
         return r.json()
 
 # 使用
-bp = BrowserPilot('http://localhost:8080', 'your-key')
+bp = BrowserWing('http://localhost:8080', 'your-key')
 
 # 1. 发现命令
 bp.discover()
@@ -374,4 +374,4 @@ curl -X GET 'http://localhost:8080/api/v1/executor/help' \
   -H 'X-BrowserWing-Key: your-api-key'
 ```
 
-现在就开始让 Claude 使用 BrowserPilot 进行浏览器自动化吧！🚀
+现在就开始让 Claude 使用 BrowserWing 进行浏览器自动化吧！🚀

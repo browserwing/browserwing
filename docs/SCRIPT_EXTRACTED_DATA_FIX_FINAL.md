@@ -118,7 +118,7 @@ Data:
 
 ### 1. 重新编译
 ```bash
-cd /root/code/browserpilot/backend
+cd /root/code/browserwing/backend
 go build
 ```
 

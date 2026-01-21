@@ -250,11 +250,11 @@ curl -X GET 'http://localhost:8080/api/v1/executor/help?command=click' \
 
 ```markdown
 ---
-name: browserpilot-automation
+name: browserwing-automation
 description: Browser automation through HTTP API with self-discovery
 ---
 
-# BrowserPilot Automation Skill
+# BrowserWing Automation Skill
 
 ## Discovery
 
@@ -308,7 +308,7 @@ Your actions:
 ```python
 import requests
 
-class BrowserPilotClient:
+class BrowserWingClient:
     def __init__(self, base_url, api_key):
         self.base_url = base_url
         self.headers = {'X-BrowserWing-Key': api_key}
@@ -371,7 +371,7 @@ class BrowserPilotClient:
         return response.json()
 
 # 使用示例
-client = BrowserPilotClient('http://localhost:8080', 'your-api-key')
+client = BrowserWingClient('http://localhost:8080', 'your-api-key')
 
 # 发现命令
 commands = client.discover_commands()
@@ -399,7 +399,7 @@ print("Click result:", result)
 ```javascript
 const axios = require('axios');
 
-class BrowserPilotClient {
+class BrowserWingClient {
   constructor(baseUrl, apiKey) {
     this.baseUrl = baseUrl;
     this.headers = { 'X-BrowserWing-Key': apiKey };
@@ -463,7 +463,7 @@ class BrowserPilotClient {
 
 // 使用示例
 (async () => {
-  const client = new BrowserPilotClient(
+  const client = new BrowserWingClient(
     'http://localhost:8080',
     'your-api-key'
   );
@@ -573,7 +573,7 @@ class BrowserPilotClient {
 ### 示例 1: 自动发现
 
 ```
-用户: 帮我使用 BrowserPilot 自动化浏览器
+用户: 帮我使用 BrowserWing 自动化浏览器
 
 Claude: 让我先看看有哪些可用的操作...
 

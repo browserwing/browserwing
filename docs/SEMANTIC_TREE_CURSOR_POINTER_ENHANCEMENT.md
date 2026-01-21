@@ -485,8 +485,8 @@ type SemanticTreeOptions struct {
 
 ### 📁 修改的文件
 
-- `/root/code/browserpilot/backend/executor/semantic.go` - 主要改动
-- `/root/code/browserpilot/docs/SEMANTIC_TREE_CURSOR_POINTER_ENHANCEMENT.md` - 文档
+- `/root/code/browserwing/backend/executor/semantic.go` - 主要改动
+- `/root/code/browserwing/docs/SEMANTIC_TREE_CURSOR_POINTER_ENHANCEMENT.md` - 文档
 
 ### 🎉 用户体验提升
 

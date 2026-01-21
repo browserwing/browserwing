@@ -154,7 +154,7 @@ border-gray-200 dark:border-gray-700
 ### 1. 启动应用
 ```bash
 # 后端已在运行
-cd /root/code/browserpilot/backend
+cd /root/code/browserwing/backend
 ./browserwing
 
 # 访问

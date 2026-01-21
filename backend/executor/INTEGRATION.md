@@ -1,6 +1,6 @@
 # Executor 模块集成指南
 
-本文档说明如何将 Executor 模块集成到现有的 browserpilot 项目中，并作为 MCP 工具提供给外部调用。
+本文档说明如何将 Executor 模块集成到现有的 browserwing 项目中，并作为 MCP 工具提供给外部调用。
 
 ## 架构概览
 
@@ -198,8 +198,8 @@ func main() {
 ```json
 {
   "mcpServers": {
-    "browserpilot": {
-      "command": "browserpilot",
+    "browserwing": {
+      "command": "browserwing",
       "args": ["--mcp"],
       "env": {}
     }

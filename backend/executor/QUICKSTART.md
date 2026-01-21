@@ -211,7 +211,7 @@ func batchTest(exec *executor.Executor) error {
             Type: "type",
             Params: map[string]interface{}{
                 "identifier": "搜索",
-                "text":       "browserpilot",
+                "text":       "browserwing",
             },
             StopOnError: true,
         },
@@ -254,8 +254,8 @@ func batchTest(exec *executor.Executor) error {
 ```json
 {
   "mcpServers": {
-    "browserpilot": {
-      "command": "/path/to/browserpilot",
+    "browserwing": {
+      "command": "/path/to/browserwing",
       "args": ["--mcp"]
     }
   }
@@ -264,12 +264,12 @@ func batchTest(exec *executor.Executor) error {
 
 2. 在 Claude 中使用：
 ```
-用户: 请帮我打开 https://github.com 并搜索 "browserpilot"
+用户: 请帮我打开 https://github.com 并搜索 "browserwing"
 
 Claude 会自动调用:
 1. browser_navigate(url="https://github.com")
 2. browser_get_semantic_tree() 
-3. browser_type(identifier="搜索框", text="browserpilot")
+3. browser_type(identifier="搜索框", text="browserwing")
 4. browser_click(identifier="搜索按钮")
 ```
 
