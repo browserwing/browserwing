@@ -1,6 +1,6 @@
 ---
 name: browserwing-executor
-description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, semantic tree analysis, screenshot, JavaScript execution, and batch operations.
+description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, accessibility snapshot analysis, screenshot, JavaScript execution, and batch operations.
 ---
 
 # BrowserWing Executor API
@@ -16,7 +16,7 @@ BrowserWing Executor provides comprehensive browser automation capabilities thro
 - **Page Navigation:** Navigate to URLs, go back/forward, reload
 - **Element Interaction:** Click, type, select, hover on page elements
 - **Data Extraction:** Extract text, attributes, values from elements
-- **Semantic Analysis:** Get semantic tree to understand page structure
+- **Accessibility Analysis:** Get accessibility snapshot to understand page structure
 - **Advanced Operations:** Screenshot, JavaScript execution, keyboard input
 - **Batch Processing:** Execute multiple operations in sequence
 
@@ -37,19 +37,19 @@ curl -X GET 'http://{host}/api/v1/executor/help'
 curl -X GET 'http://{host}/api/v1/executor/help?command=extract'
 ```
 
-### 2. Get Semantic Tree
+### 2. Get Accessibility Snapshot
 
 **CRITICAL:** Always call this after navigation to understand page structure and get element indices.
 
 ```bash
-curl -X GET 'http://{host}/api/v1/executor/semantic-tree'
+curl -X GET 'http://{host}/api/v1/executor/snapshot'
 ```
 
 **Response Example:**
 ```json
 {
   "success": true,
-  "tree_text": "Clickable Element [1]: Login Button\nInput Element [1]: Email\nInput Element [2]: Password"
+  "snapshot_text": "Clickable Element [1]: Login Button\nInput Element [1]: Email\nInput Element [2]: Password"
 }
 ```
 
@@ -57,6 +57,7 @@ curl -X GET 'http://{host}/api/v1/executor/semantic-tree'
 - Understand what interactive elements are on the page
 - Get element indices for reliable identification
 - See element labels and roles
+- The accessibility tree is cleaner than raw DOM and better for understanding page structure
 
 ### 3. Common Operations
 
@@ -111,6 +112,195 @@ curl -X POST 'http://{host}/api/v1/executor/batch' \
       {"type": "type", "params": {"identifier": "[1]", "text": "query"}, "stop_on_error": true}
     ]
   }'
+```
+
+### 4. Tab Management (NEW)
+
+**List all tabs:**
+```bash
+curl -X POST 'http://{host}/api/v1/mcp/message' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "browser_tabs",
+      "arguments": {"action": "list"}
+    }
+  }'
+```
+
+**Create new tab:**
+```bash
+curl -X POST 'http://{host}/api/v1/mcp/message' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "browser_tabs",
+      "arguments": {
+        "action": "new",
+        "url": "https://example.com"
+      }
+    }
+  }'
+```
+
+**Switch to tab (by index):**
+```bash
+curl -X POST 'http://{host}/api/v1/mcp/message' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "browser_tabs",
+      "arguments": {
+        "action": "switch",
+        "index": 1
+      }
+    }
+  }'
+```
+
+**Close tab (by index):**
+```bash
+curl -X POST 'http://{host}/api/v1/mcp/message' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "browser_tabs",
+      "arguments": {
+        "action": "close",
+        "index": 2
+      }
+    }
+  }'
+```
+
+**Note:** Tab indices are 0-based (first tab is 0, second tab is 1, etc.)
+
+**Alternative: Direct HTTP API (without MCP):**
+```bash
+# List tabs
+curl -X POST 'http://{host}/api/v1/executor/tabs' \
+  -H 'Content-Type: application/json' \
+  -d '{"action": "list"}'
+
+# Create new tab
+curl -X POST 'http://{host}/api/v1/executor/tabs' \
+  -H 'Content-Type: application/json' \
+  -d '{"action": "new", "url": "https://example.com"}'
+
+# Switch to tab
+curl -X POST 'http://{host}/api/v1/executor/tabs' \
+  -H 'Content-Type: application/json' \
+  -d '{"action": "switch", "index": 1}'
+
+# Close tab
+curl -X POST 'http://{host}/api/v1/executor/tabs' \
+  -H 'Content-Type: application/json' \
+  -d '{"action": "close", "index": 2}'
+```
+
+### 5. Form Filling (NEW)
+
+**Fill a login form:**
+```bash
+curl -X POST 'http://{host}/api/v1/mcp/message' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "browser_fill_form",
+      "arguments": {
+        "fields": [
+          {"name": "username", "value": "john@example.com"},
+          {"name": "password", "value": "secret123"},
+          {"name": "remember", "value": true}
+        ],
+        "submit": true
+      }
+    }
+  }'
+```
+
+**Fill a registration form:**
+```bash
+curl -X POST 'http://{host}/api/v1/mcp/message' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "browser_fill_form",
+      "arguments": {
+        "fields": [
+          {"name": "email", "value": "user@example.com"},
+          {"name": "name", "value": "John Doe"},
+          {"name": "age", "value": 25},
+          {"name": "country", "value": "United States"},
+          {"name": "subscribe", "value": true}
+        ],
+        "submit": false
+      }
+    }
+  }'
+```
+
+**Supported field types:**
+- Text inputs (text, email, password, url, tel, number)
+- Textareas (multiline text)
+- Checkboxes (true/false)
+- Radio buttons (true/false)
+- Select dropdowns (by text or value)
+
+**Field finding strategies:**
+- input[name='...']
+- input[id='...']
+- input[placeholder='...']
+- input[aria-label='...']
+- Associated label text
+
+**Alternative: Direct HTTP API (without MCP):**
+```bash
+# Fill a login form
+curl -X POST 'http://{host}/api/v1/executor/fill-form' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": [
+      {"name": "username", "value": "john@example.com"},
+      {"name": "password", "value": "secret123"},
+      {"name": "remember", "value": true}
+    ],
+    "submit": true,
+    "timeout": 10
+  }'
+
+# Fill a registration form (without submit)
+curl -X POST 'http://{host}/api/v1/executor/fill-form' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": [
+      {"name": "email", "value": "user@example.com"},
+      {"name": "name", "value": "John Doe"},
+      {"name": "age", "value": 25},
+      {"name": "country", "value": "United States"}
+    ],
+    "submit": false
+  }'
+```
+
+**Response Example:**
+```json
+{
+  "success": true,
+  "message": "Successfully filled 3/3 fields and submitted form",
+  "data": {
+    "filled_count": 3,
+    "total_fields": 3,
+    "errors": [],
+    "submitted": true
+  }
+}
 ```
 
 ## Instructions

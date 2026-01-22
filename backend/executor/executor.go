@@ -54,24 +54,24 @@ func (e *Executor) GetPage() *Page {
 	return page
 }
 
-// GetSemanticTree 获取页面的语义树
-func (e *Executor) GetSemanticTree(ctx context.Context) (*SemanticTree, error) {
+// GetAccessibilitySnapshot 获取页面的可访问性快照
+func (e *Executor) GetAccessibilitySnapshot(ctx context.Context) (*AccessibilitySnapshot, error) {
 	page := e.Browser.GetActivePage()
 	if page == nil {
 		return nil, fmt.Errorf("no active page")
 	}
 
-	return ExtractSemanticTree(ctx, page)
+	return GetAccessibilitySnapshot(ctx, page)
 }
 
-// RefreshSemanticTree 刷新语义树
-func (e *Executor) RefreshSemanticTree(ctx context.Context, page *Page) error {
-	tree, err := ExtractSemanticTree(ctx, page.RodPage)
+// RefreshAccessibilitySnapshot 刷新可访问性快照
+func (e *Executor) RefreshAccessibilitySnapshot(ctx context.Context, page *Page) error {
+	snapshot, err := GetAccessibilitySnapshot(ctx, page.RodPage)
 	if err != nil {
 		return err
 	}
 
-	page.SemanticTree = tree
+	page.AccessibilitySnapshot = snapshot
 	page.LastUpdated = time.Now()
 	return nil
 }
@@ -79,13 +79,13 @@ func (e *Executor) RefreshSemanticTree(ctx context.Context, page *Page) error {
 // ========== 智能元素查找 ==========
 
 // FindElementByLabel 通过标签查找元素
-func (e *Executor) FindElementByLabel(ctx context.Context, label string) (*SemanticNode, error) {
-	tree, err := e.GetSemanticTree(ctx)
+func (e *Executor) FindElementByLabel(ctx context.Context, label string) (*AccessibilityNode, error) {
+	snapshot, err := e.GetAccessibilitySnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	node := tree.FindElementByLabel(label)
+	node := snapshot.FindElementByLabel(label)
 	if node == nil {
 		return nil, fmt.Errorf("element not found with label: %s", label)
 	}
@@ -94,33 +94,33 @@ func (e *Executor) FindElementByLabel(ctx context.Context, label string) (*Seman
 }
 
 // FindElementsByType 通过类型查找元素
-func (e *Executor) FindElementsByType(ctx context.Context, elemType string) ([]*SemanticNode, error) {
-	tree, err := e.GetSemanticTree(ctx)
+func (e *Executor) FindElementsByType(ctx context.Context, elemType string) ([]*AccessibilityNode, error) {
+	snapshot, err := e.GetAccessibilitySnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return tree.FindElementsByType(elemType), nil
+	return snapshot.FindElementsByType(elemType), nil
 }
 
 // GetClickableElements 获取所有可点击元素
-func (e *Executor) GetClickableElements(ctx context.Context) ([]*SemanticNode, error) {
-	tree, err := e.GetSemanticTree(ctx)
+func (e *Executor) GetClickableElements(ctx context.Context) ([]*AccessibilityNode, error) {
+	snapshot, err := e.GetAccessibilitySnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return tree.GetClickableElements(), nil
+	return snapshot.GetClickableElements(), nil
 }
 
 // GetInputElements 获取所有输入元素
-func (e *Executor) GetInputElements(ctx context.Context) ([]*SemanticNode, error) {
-	tree, err := e.GetSemanticTree(ctx)
+func (e *Executor) GetInputElements(ctx context.Context) ([]*AccessibilityNode, error) {
+	snapshot, err := e.GetAccessibilitySnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return tree.GetInputElements(), nil
+	return snapshot.GetInputElements(), nil
 }
 
 // ========== 智能操作方法 ==========

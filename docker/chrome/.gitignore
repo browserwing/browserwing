@@ -1,0 +1,7 @@
+# Chrome 用户数据
+chrome-data/
+*.log
+
+# Docker 相关
+.env
+

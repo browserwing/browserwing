@@ -19,11 +19,33 @@ model = "gpt-3.5-turbo"
 [browser]
 headless = false  # 是否无头模式运行
 bin_path = ""  # 浏览器可执行文件路径，留空使用系统默认
-control_url = ""  # 远程调试URL，例如: "http://localhost:9222"
+
+# 远程 Chrome 调试 URL（可选）
+# 如果配置了此项，将连接到远程 Chrome 而不是启动本地浏览器
+# 
+# 使用场景：
+#   1. 连接到远程服务器上的 Chrome（例如 Docker 容器中的 Chrome）
+#   2. 连接到已经运行的 Chrome 实例
+#   3. 多个服务共享同一个 Chrome 实例
+# 
+# 远程启动 Chrome 命令示例：
+#   google-chrome --remote-debugging-port=9222 --no-first-run
+# 
+# URL 格式示例：
+#   - WebSocket: "ws://192.168.1.100:9222"
+#   - HTTP:      "http://192.168.1.100:9222"
+#   - 本地:      "http://localhost:9222"
+# 
+# ⚠️ 注意：如果设置了 control_url，bin_path 和 user_data_dir 将被忽略
+control_url = ""
+
 # 用户数据目录：用于保存登录状态、Cookie、缓存等数据
 # ⚠️ 重要：必须设置此项才能保持登录状态！
-# Windows: "C:/Users/YourName/AppData/Local/browserwing/chrome_data"
-# Linux/Mac: "./chrome_user_data" 或 "/home/user/.browserwing/chrome_data"
+# 注意：仅在本地启动模式下使用（control_url 为空时）
+# 
+# 路径示例：
+#   Windows: "C:/Users/YourName/AppData/Local/browserwing/chrome_data"
+#   Linux/Mac: "./chrome_user_data" 或 "/home/user/.browserwing/chrome_data"
 user_data_dir = "./chrome_user_data"
 
 # 资源目录配置

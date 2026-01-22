@@ -93,7 +93,7 @@ func (e *Executor) Navigate(ctx context.Context, url string, opts *NavigateOptio
 
 	// 获取页面语义树（带超时控制）
 	// 注意：这里同步调用，但用带超时的 context
-	var semanticTreeText string
+	var accessibilitySnapshotText string
 
 	logger.Info(ctx, "[Navigate] Starting semantic tree extraction...")
 	// 创建一个带超时的 context（10秒超时）
@@ -101,19 +101,19 @@ func (e *Executor) Navigate(ctx context.Context, url string, opts *NavigateOptio
 	defer cancel()
 
 	// 直接调用，不使用 goroutine 避免资源竞争
-	tree, err := e.GetSemanticTree(treeCtx)
+	snapshot, err := e.GetAccessibilitySnapshot(treeCtx)
 	if err != nil {
 		if err == context.DeadlineExceeded {
-			logger.Warn(ctx, "[Navigate] Semantic tree extraction timed out after 10s")
+			logger.Warn(ctx, "[Navigate] Accessibility snapshot extraction timed out after 10s")
 		} else if err != context.Canceled {
-			logger.Warn(ctx, "[Navigate] Failed to extract semantic tree: %s", err.Error())
+			logger.Warn(ctx, "[Navigate] Failed to extract accessibility snapshot: %s", err.Error())
 		}
-		// 不影响导航成功，只是没有语义树
-	} else if tree != nil {
-		semanticTreeText = tree.SerializeToSimpleText()
-		logger.Info(ctx, "[Navigate] Successfully extracted semantic tree with %d elements", len(tree.Elements))
+		// 不影响导航成功，只是没有可访问性快照
+	} else if snapshot != nil {
+		accessibilitySnapshotText = snapshot.SerializeToSimpleText()
+		logger.Info(ctx, "[Navigate] Successfully extracted accessibility snapshot with %d elements", len(snapshot.Elements))
 	} else {
-		logger.Warn(ctx, "[Navigate] Semantic tree is nil")
+		logger.Warn(ctx, "[Navigate] Accessibility snapshot is nil")
 	}
 
 	result := &OperationResult{
@@ -125,9 +125,9 @@ func (e *Executor) Navigate(ctx context.Context, url string, opts *NavigateOptio
 		},
 	}
 
-	// 如果获取到语义树，添加到返回结果中
-	if semanticTreeText != "" {
-		result.Data["semantic_tree"] = semanticTreeText
+	// 如果获取到可访问性快照，添加到返回结果中
+	if accessibilitySnapshotText != "" {
+		result.Data["accessibility_snapshot"] = accessibilitySnapshotText
 	}
 
 	return result, nil
@@ -218,14 +218,14 @@ func (e *Executor) Click(ctx context.Context, identifier string, opts *ClickOpti
 		}
 	}
 
-	// 同时返回当前的页面语义树
-	tree, err := e.GetSemanticTree(ctx)
+	// 同时返回当前的页面可访问性快照
+	snapshot, err := e.GetAccessibilitySnapshot(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to get semantic tree: %s", err.Error())
+		logger.Error(ctx, "Failed to get accessibility snapshot: %s", err.Error())
 	}
-	var semanticTreeText string
-	if tree != nil {
-		semanticTreeText = tree.SerializeToSimpleText()
+	var accessibilitySnapshotText string
+	if snapshot != nil {
+		accessibilitySnapshotText = snapshot.SerializeToSimpleText()
 	}
 
 	return &OperationResult{
@@ -233,7 +233,7 @@ func (e *Executor) Click(ctx context.Context, identifier string, opts *ClickOpti
 		Message:   fmt.Sprintf("Successfully clicked element: %s", identifier),
 		Timestamp: time.Now(),
 		Data: map[string]interface{}{
-			"semantic_tree": semanticTreeText,
+			"semantic_tree": accessibilitySnapshotText,
 		},
 	}, nil
 }
@@ -662,7 +662,7 @@ func (e *Executor) findElementWithTimeout(ctx context.Context, page *rod.Page, i
 	timeoutPage := page.Timeout(timeout)
 
 	// 0. 尝试解析语义树索引格式，例如 "Input Element [1]", "Clickable Element [2]", "[3]"
-	if elem, err := e.findElementBySemanticIndex(ctx, page, identifier); err == nil && elem != nil {
+	if elem, err := e.findElementByAccessibilityIndex(ctx, page, identifier); err == nil && elem != nil {
 		return elem, nil
 	}
 
@@ -699,14 +699,14 @@ func (e *Executor) findElementWithTimeout(ctx context.Context, page *rod.Page, i
 	return nil, fmt.Errorf("element not found: %s (timeout after %v)", identifier, timeout)
 }
 
-// findElementBySemanticIndex 通过语义树索引查找元素
+// findElementByAccessibilityIndex 通过可访问性索引查找元素
 // 支持格式：
 // - "Input Element [1]"
 // - "Clickable Element [2]"
 // - "[3]"
 // - "input [1]"
 // - "clickable [2]"
-func (e *Executor) findElementBySemanticIndex(ctx context.Context, page *rod.Page, identifier string) (*rod.Element, error) {
+func (e *Executor) findElementByAccessibilityIndex(ctx context.Context, page *rod.Page, identifier string) (*rod.Element, error) {
 	// 使用正则解析索引格式
 	identifier = strings.TrimSpace(identifier)
 
@@ -752,38 +752,38 @@ func (e *Executor) findElementBySemanticIndex(ctx context.Context, page *rod.Pag
 	}
 
 	if index <= 0 {
-		return nil, fmt.Errorf("invalid semantic index")
+		return nil, fmt.Errorf("invalid accessibility index")
 	}
 
-	// 获取语义树
-	tree, err := e.GetSemanticTree(ctx)
+	// 获取可访问性快照
+	snapshot, err := e.GetAccessibilitySnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// 根据类型查找对应的元素
-	var targetNode *SemanticNode
+	var targetNode *AccessibilityNode
 
 	switch elementType {
 	case "input":
-		inputs := tree.GetInputElements()
+		inputs := snapshot.GetInputElements()
 		if index > 0 && index <= len(inputs) {
 			targetNode = inputs[index-1]
 		}
 	case "clickable":
-		clickables := tree.GetClickableElements()
+		clickables := snapshot.GetClickableElements()
 		if index > 0 && index <= len(clickables) {
 			targetNode = clickables[index-1]
 		}
 	case "any":
 		// 先尝试输入元素
-		inputs := tree.GetInputElements()
+		inputs := snapshot.GetInputElements()
 		if index > 0 && index <= len(inputs) {
 			targetNode = inputs[index-1]
 		}
 		// 如果没找到，再尝试可点击元素
 		if targetNode == nil {
-			clickables := tree.GetClickableElements()
+			clickables := snapshot.GetClickableElements()
 			if index > 0 && index <= len(clickables) {
 				targetNode = clickables[index-1]
 			}
@@ -794,7 +794,7 @@ func (e *Executor) findElementBySemanticIndex(ctx context.Context, page *rod.Pag
 		return nil, fmt.Errorf("element not found at index %d", index)
 	}
 
-	// 通过语义节点查找实际的 Rod 元素
+	// 通过可访问性节点查找实际的 Rod 元素
 	return GetElementFromPage(ctx, page, targetNode)
 }
 
@@ -1473,4 +1473,553 @@ func safeEvaluate(ctx context.Context, page *rod.Page, script string, result int
 	}
 
 	return nil
+}
+
+// TabsAction 标签页操作类型
+type TabsAction string
+
+const (
+	TabsActionList   TabsAction = "list"
+	TabsActionNew    TabsAction = "new"
+	TabsActionSwitch TabsAction = "switch"
+	TabsActionClose  TabsAction = "close"
+)
+
+// TabsOptions 标签页操作选项
+type TabsOptions struct {
+	Action TabsAction // 操作类型：list, new, switch, close
+	URL    string     // 新建标签页时的 URL（action=new 时必需）
+	Index  int        // 标签页索引（action=switch 或 close 时使用，0-based）
+}
+
+// TabInfo 标签页信息
+type TabInfo struct {
+	Index  int    `json:"index"`   // 标签页索引（0-based）
+	Title  string `json:"title"`   // 页面标题
+	URL    string `json:"url"`     // 页面 URL
+	Active bool   `json:"active"`  // 是否为当前活动标签页
+	Type   string `json:"type"`    // 标签页类型
+}
+
+// Tabs 标签页管理
+func (e *Executor) Tabs(ctx context.Context, opts *TabsOptions) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	browser := page.Browser()
+	if browser == nil {
+		return nil, fmt.Errorf("no browser instance")
+	}
+
+	switch opts.Action {
+	case TabsActionList:
+		return e.listTabs(ctx, browser, page)
+	case TabsActionNew:
+		if opts.URL == "" {
+			return nil, fmt.Errorf("URL is required for new tab action")
+		}
+		return e.newTab(ctx, browser, opts.URL)
+	case TabsActionSwitch:
+		return e.switchTab(ctx, browser, opts.Index)
+	case TabsActionClose:
+		return e.closeTab(ctx, browser, opts.Index)
+	default:
+		return nil, fmt.Errorf("unknown tabs action: %s", opts.Action)
+	}
+}
+
+// listTabs 列出所有标签页
+func (e *Executor) listTabs(ctx context.Context, browser *rod.Browser, currentPage *rod.Page) (*OperationResult, error) {
+	pages, err := browser.Pages()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to get tabs: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	tabs := make([]TabInfo, 0, len(pages))
+	for i, p := range pages {
+		info, err := p.Info()
+		if err != nil {
+			logger.Warn(ctx, "Failed to get tab info for index %d: %v", i, err)
+			continue
+		}
+
+		// 只列出 type="page" 的标签页，排除扩展、devtools 等
+		if info.Type != "page" {
+			continue
+		}
+
+		tab := TabInfo{
+			Index:  i,
+			Title:  info.Title,
+			URL:    info.URL,
+			Active: p == currentPage,
+			Type:   string(info.Type),
+		}
+		tabs = append(tabs, tab)
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Found %d tabs", len(tabs)),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"tabs":  tabs,
+			"count": len(tabs),
+		},
+	}, nil
+}
+
+// newTab 创建新标签页
+func (e *Executor) newTab(ctx context.Context, browser *rod.Browser, url string) (*OperationResult, error) {
+	logger.Info(ctx, "Creating new tab with URL: %s", url)
+
+	newPage, err := browser.Page(proto.TargetCreateTarget{URL: url})
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to create new tab: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	// 等待页面加载
+	if err := newPage.WaitLoad(); err != nil {
+		logger.Warn(ctx, "New tab loaded but with warning: %v", err)
+	}
+
+	// 获取新标签页的信息
+	info, err := newPage.Info()
+	if err != nil {
+		logger.Warn(ctx, "Failed to get new tab info: %v", err)
+	}
+
+	// 获取新标签页的索引
+	pages, _ := browser.Pages()
+	newIndex := -1
+	for i, p := range pages {
+		if p == newPage {
+			newIndex = i
+			break
+		}
+	}
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully created new tab at index %d", newIndex),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"index": newIndex,
+			"url":   url,
+			"title": info.Title,
+		},
+	}, nil
+}
+
+// switchTab 切换到指定标签页
+func (e *Executor) switchTab(ctx context.Context, browser *rod.Browser, index int) (*OperationResult, error) {
+	pages, err := browser.Pages()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to get tabs: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	// 过滤只保留 type="page" 的标签页
+	var pageTabs []*rod.Page
+	for _, p := range pages {
+		info, err := p.Info()
+		if err != nil {
+			continue
+		}
+		if info.Type == "page" {
+			pageTabs = append(pageTabs, p)
+		}
+	}
+
+	if index < 0 || index >= len(pageTabs) {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Tab index %d is out of range (0-%d)", index, len(pageTabs)-1),
+			Timestamp: time.Now(),
+		}, fmt.Errorf("invalid tab index: %d", index)
+	}
+
+	targetPage := pageTabs[index]
+
+	// 激活目标标签页
+	_, err = targetPage.Activate()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to activate tab: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	// 获取标签页信息
+	info, _ := targetPage.Info()
+
+	logger.Info(ctx, "Switched to tab %d: %s", index, info.URL)
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully switched to tab %d", index),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"index": index,
+			"url":   info.URL,
+			"title": info.Title,
+		},
+	}, nil
+}
+
+// closeTab 关闭指定标签页
+func (e *Executor) closeTab(ctx context.Context, browser *rod.Browser, index int) (*OperationResult, error) {
+	pages, err := browser.Pages()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to get tabs: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	// 过滤只保留 type="page" 的标签页
+	var pageTabs []*rod.Page
+	for _, p := range pages {
+		info, err := p.Info()
+		if err != nil {
+			continue
+		}
+		if info.Type == "page" {
+			pageTabs = append(pageTabs, p)
+		}
+	}
+
+	if index < 0 || index >= len(pageTabs) {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Tab index %d is out of range (0-%d)", index, len(pageTabs)-1),
+			Timestamp: time.Now(),
+		}, fmt.Errorf("invalid tab index: %d", index)
+	}
+
+	targetPage := pageTabs[index]
+	info, _ := targetPage.Info()
+
+	// 关闭标签页
+	err = targetPage.Close()
+	if err != nil {
+		return &OperationResult{
+			Success:   false,
+			Error:     fmt.Sprintf("Failed to close tab: %s", err.Error()),
+			Timestamp: time.Now(),
+		}, err
+	}
+
+	logger.Info(ctx, "Closed tab %d: %s", index, info.URL)
+
+	return &OperationResult{
+		Success:   true,
+		Message:   fmt.Sprintf("Successfully closed tab %d", index),
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"index": index,
+			"url":   info.URL,
+			"title": info.Title,
+		},
+	}, nil
+}
+
+// FormField 表单字段
+type FormField struct {
+	Name  string      `json:"name"`  // 字段名称（name, id, label, placeholder等）
+	Value interface{} `json:"value"` // 字段值（string, bool, []string等）
+	Type  string      `json:"type"`  // 字段类型（可选：text, email, password, select, checkbox, radio等）
+}
+
+// FillFormOptions 批量填写表单选项
+type FillFormOptions struct {
+	Fields []FormField   // 要填写的字段列表
+	Submit bool          // 是否自动提交表单
+	Timeout time.Duration // 超时时间
+}
+
+// FillForm 批量填写表单
+func (e *Executor) FillForm(ctx context.Context, opts *FillFormOptions) (*OperationResult, error) {
+	page := e.Browser.GetActivePage()
+	if page == nil {
+		return nil, fmt.Errorf("no active page")
+	}
+
+	if opts == nil || len(opts.Fields) == 0 {
+		return nil, fmt.Errorf("no fields provided")
+	}
+
+	if opts.Timeout == 0 {
+		opts.Timeout = 10 * time.Second
+	}
+
+	logger.Info(ctx, "Filling form with %d fields", len(opts.Fields))
+
+	filled := 0
+	var errors []string
+
+	for i, field := range opts.Fields {
+		logger.Info(ctx, "Processing field %d/%d: %s", i+1, len(opts.Fields), field.Name)
+
+		err := e.fillSingleField(ctx, page, field, opts.Timeout)
+		if err != nil {
+			errMsg := fmt.Sprintf("Field '%s': %s", field.Name, err.Error())
+			errors = append(errors, errMsg)
+			logger.Warn(ctx, "Failed to fill field '%s': %v", field.Name, err)
+		} else {
+			filled++
+			logger.Info(ctx, "✓ Successfully filled field: %s", field.Name)
+		}
+	}
+
+	// 如果需要提交表单
+	if opts.Submit {
+		logger.Info(ctx, "Submitting form...")
+		err := e.submitForm(ctx, page)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Submit failed: %s", err.Error()))
+		} else {
+			logger.Info(ctx, "✓ Form submitted successfully")
+		}
+	}
+
+	// 构建结果消息
+	message := fmt.Sprintf("Successfully filled %d/%d fields", filled, len(opts.Fields))
+	if opts.Submit {
+		if len(errors) == 0 || errors[len(errors)-1] != "Submit failed" {
+			message += " and submitted form"
+		}
+	}
+
+	return &OperationResult{
+		Success:   len(errors) == 0 || filled > 0,
+		Message:   message,
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"filled_count": filled,
+			"total_fields": len(opts.Fields),
+			"errors":       errors,
+			"submitted":    opts.Submit,
+		},
+	}, nil
+}
+
+// fillSingleField 填写单个表单字段
+func (e *Executor) fillSingleField(ctx context.Context, page *rod.Page, field FormField, timeout time.Duration) error {
+	// 尝试多种方式查找元素
+	selectors := []string{
+		fmt.Sprintf("input[name='%s']", field.Name),
+		fmt.Sprintf("input[id='%s']", field.Name),
+		fmt.Sprintf("textarea[name='%s']", field.Name),
+		fmt.Sprintf("textarea[id='%s']", field.Name),
+		fmt.Sprintf("select[name='%s']", field.Name),
+		fmt.Sprintf("select[id='%s']", field.Name),
+		fmt.Sprintf("input[placeholder='%s']", field.Name),
+		fmt.Sprintf("input[aria-label='%s']", field.Name),
+	}
+
+	var elem *rod.Element
+	var err error
+
+	// 尝试每个选择器
+	for _, selector := range selectors {
+		elem, err = page.Timeout(timeout).Element(selector)
+		if err == nil && elem != nil {
+			break
+		}
+	}
+
+	// 如果还是找不到，尝试通过 label 文本查找
+	if elem == nil {
+		elem, err = e.findElementByLabel(ctx, page, field.Name, timeout)
+	}
+
+	if elem == nil || err != nil {
+		return fmt.Errorf("element not found with name '%s'", field.Name)
+	}
+
+	// 根据元素类型填写值
+	tagName, _ := elem.Eval(`() => this.tagName.toLowerCase()`)
+	if tagName == nil {
+		return fmt.Errorf("failed to get element tag name")
+	}
+
+	tag := tagName.Value.String()
+	tag = strings.Trim(tag, "\"")
+
+	switch tag {
+	case "input":
+		return e.fillInputField(ctx, elem, field, timeout)
+	case "textarea":
+		return e.fillTextareaField(ctx, elem, field)
+	case "select":
+		return e.fillSelectField(ctx, elem, field)
+	default:
+		return fmt.Errorf("unsupported element type: %s", tag)
+	}
+}
+
+// fillInputField 填写 input 字段
+func (e *Executor) fillInputField(ctx context.Context, elem *rod.Element, field FormField, timeout time.Duration) error {
+	// 获取 input 类型
+	inputType, _ := elem.Attribute("type")
+	if inputType == nil {
+		defaultType := "text"
+		inputType = &defaultType
+	}
+
+	switch *inputType {
+	case "checkbox", "radio":
+		// 复选框和单选框
+		shouldCheck := false
+		switch v := field.Value.(type) {
+		case bool:
+			shouldCheck = v
+		case string:
+			shouldCheck = v == "true" || v == "1" || v == "yes" || v == "on"
+		}
+
+		isChecked, _ := elem.Property("checked")
+		currentlyChecked := false
+		if isChecked.Nil() == false {
+			currentlyChecked = isChecked.Bool()
+		}
+
+		if shouldCheck != currentlyChecked {
+			return elem.Click(proto.InputMouseButtonLeft, 1)
+		}
+		return nil
+
+	default:
+		// 文本输入框（text, email, password, url, tel, number 等）
+		valueStr := fmt.Sprintf("%v", field.Value)
+
+		// 滚动到元素
+		elem.ScrollIntoView()
+
+		// 聚焦元素
+		elem.Focus()
+
+		// 清空现有内容
+		elem.SelectAllText()
+		elem.Input("")
+
+		// 输入新值
+		return elem.Input(valueStr)
+	}
+}
+
+// fillTextareaField 填写 textarea 字段
+func (e *Executor) fillTextareaField(ctx context.Context, elem *rod.Element, field FormField) error {
+	valueStr := fmt.Sprintf("%v", field.Value)
+
+	elem.ScrollIntoView()
+	elem.Focus()
+	elem.SelectAllText()
+	elem.Input("")
+
+	return elem.Input(valueStr)
+}
+
+// fillSelectField 填写 select 下拉框
+func (e *Executor) fillSelectField(ctx context.Context, elem *rod.Element, field FormField) error {
+	valueStr := fmt.Sprintf("%v", field.Value)
+
+	// 先尝试按显示文本选择
+	err := elem.Select([]string{valueStr}, true, rod.SelectorTypeText)
+	if err == nil {
+		return nil
+	}
+
+	// 如果按文本选择失败，尝试使用 JavaScript 按 value 属性设置
+	_, err = elem.Eval(fmt.Sprintf(`(elem) => {
+		elem.value = '%s';
+		elem.dispatchEvent(new Event('change', { bubbles: true }));
+	}`, valueStr))
+
+	return err
+}
+
+// findElementByLabel 通过 label 文本查找输入元素
+func (e *Executor) findElementByLabel(ctx context.Context, page *rod.Page, labelText string, timeout time.Duration) (*rod.Element, error) {
+	// 尝试查找包含该文本的 label 元素
+	labels, err := page.Timeout(timeout).Elements("label")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, label := range labels {
+		text, err := label.Text()
+		if err != nil {
+			continue
+		}
+
+		if strings.Contains(strings.ToLower(text), strings.ToLower(labelText)) {
+			// 找到匹配的 label，获取其 for 属性
+			forAttr, _ := label.Attribute("for")
+			if forAttr != nil && *forAttr != "" {
+				// 通过 ID 查找输入元素
+				return page.Element(fmt.Sprintf("#%s", *forAttr))
+			}
+
+			// 如果没有 for 属性，查找 label 内部的输入元素
+			input, err := label.Element("input, textarea, select")
+			if err == nil {
+				return input, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no element found with label: %s", labelText)
+}
+
+// submitForm 提交表单
+func (e *Executor) submitForm(ctx context.Context, page *rod.Page) error {
+	// 尝试多种方式提交表单
+
+	// 1. 查找 submit 按钮
+	submitSelectors := []string{
+		"button[type='submit']",
+		"input[type='submit']",
+		"button:not([type])",  // button 默认 type 是 submit
+		"button",              // 最后尝试任何 button
+	}
+
+	for _, selector := range submitSelectors {
+		elem, err := page.Element(selector)
+		if err == nil && elem != nil {
+			// 检查按钮是否可见和可用
+			visible, _ := elem.Visible()
+			if !visible {
+				continue
+			}
+
+			// 点击提交按钮
+			return elem.Click(proto.InputMouseButtonLeft, 1)
+		}
+	}
+
+	// 2. 如果找不到提交按钮，尝试在任何输入框按 Enter
+	inputs, err := page.Elements("input[type='text'], input[type='email'], input[type='password']")
+	if err == nil && len(inputs) > 0 {
+		inputs[0].Focus()
+		return page.Keyboard.Press(input.Enter)
+	}
+
+	return fmt.Errorf("no submit button found")
 }

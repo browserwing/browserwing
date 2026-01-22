@@ -84,27 +84,27 @@ func ExampleSemanticTree() error {
 	// 导航到页面
 	executor.Navigate(ctx, "https://example.com", nil)
 
-	// 获取语义树
-	tree, err := executor.GetSemanticTree(ctx)
+	// 获取可访问性快照
+	snapshot, err := executor.GetAccessibilitySnapshot(ctx)
 	if err != nil {
 		return err
 	}
 
 	// 打印所有可点击元素
 	fmt.Println("Clickable Elements (use 'Clickable Element [N]' as identifier):")
-	clickable := tree.GetClickableElements()
+	clickable := snapshot.GetClickableElements()
 	for i, node := range clickable {
 		fmt.Printf("  [%d] %s (role: %s)\n", i+1, node.Label, node.Role)
 	}
 
 	// 打印所有输入元素
 	fmt.Println("\nInput Elements (use 'Input Element [N]' as identifier):")
-	inputs := tree.GetInputElements()
+	inputs := snapshot.GetInputElements()
 	for i, node := range inputs {
 		fmt.Printf("  [%d] %s (placeholder: %s)\n", i+1, node.Label, node.Placeholder)
 	}
 
-	// 推荐方式：使用语义树索引来点击元素
+	// 推荐方式：使用可访问性索引来点击元素
 	// 例如：点击第一个可点击元素
 	if len(clickable) > 0 {
 		executor.Click(ctx, "Clickable Element [1]", nil)

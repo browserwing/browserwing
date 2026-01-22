@@ -10,124 +10,124 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
-// ExtractSemanticTree 从页面提取语义树（基于 Accessibility Tree）
-func ExtractSemanticTree(ctx context.Context, page *rod.Page) (*SemanticTree, error) {
-	logger.Info(ctx, "[ExtractSemanticTree] Starting extraction")
+// GetAccessibilitySnapshot 获取页面的可访问性快照（基于 Accessibility Tree）
+func GetAccessibilitySnapshot(ctx context.Context, page *rod.Page) (*AccessibilitySnapshot, error) {
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Starting extraction")
 
 	// 检查 context 是否已经取消
 	select {
 	case <-ctx.Done():
-		logger.Info(ctx, "[ExtractSemanticTree] Context already done: %v", ctx.Err())
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Context already done: %v", ctx.Err())
 		return nil, ctx.Err()
 	default:
-		logger.Info(ctx, "[ExtractSemanticTree] Context is active")
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Context is active")
 	}
 
 	// 先禁用再启用，确保状态干净
-	logger.Info(ctx, "[ExtractSemanticTree] Disabling accessibility...")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Disabling accessibility...")
 	_ = proto.AccessibilityDisable{}.Call(page)
 
 	// 启用 Accessibility 域
-	logger.Info(ctx, "[ExtractSemanticTree] Enabling accessibility...")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Enabling accessibility...")
 	err := proto.AccessibilityEnable{}.Call(page)
 	if err != nil {
-		logger.Info(ctx, "[ExtractSemanticTree] Failed to enable accessibility: %v", err)
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Failed to enable accessibility: %v", err)
 		return nil, fmt.Errorf("failed to enable accessibility: %w", err)
 	}
-	logger.Info(ctx, "[ExtractSemanticTree] Accessibility enabled")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Accessibility enabled")
 
 	// 确保函数结束时禁用
 	defer func() {
-		logger.Info(ctx, "[ExtractSemanticTree] Cleaning up - disabling accessibility")
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Cleaning up - disabling accessibility")
 		_ = proto.AccessibilityDisable{}.Call(page)
 	}()
 
 	// 检查 context
 	select {
 	case <-ctx.Done():
-		logger.Info(ctx, "[ExtractSemanticTree] Context done before getting tree: %v", ctx.Err())
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Context done before getting tree: %v", ctx.Err())
 		return nil, ctx.Err()
 	default:
 	}
 
 	// 获取 Accessibility Tree，不限制深度（让它获取完整树）
 	// 但我们会在后续处理时过滤
-	logger.Info(ctx, "[ExtractSemanticTree] Getting full AX tree...")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Getting full AX tree...")
 	axTree, err := proto.AccessibilityGetFullAXTree{}.Call(page)
 	if err != nil {
-		logger.Info(ctx, "[ExtractSemanticTree] Failed to get AX tree: %v", err)
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Failed to get AX tree: %v", err)
 		return nil, fmt.Errorf("failed to get accessibility tree: %w", err)
 	}
-	logger.Info(ctx, "[ExtractSemanticTree] Got AX tree with %d nodes", len(axTree.Nodes))
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Got AX tree with %d nodes", len(axTree.Nodes))
 
 	if len(axTree.Nodes) == 0 {
-		logger.Info(ctx, "[ExtractSemanticTree] AX tree is empty")
+		logger.Info(ctx, "[GetAccessibilitySnapshot] AX tree is empty")
 		return nil, fmt.Errorf("accessibility tree is empty")
 	}
 
-	// 构建语义树
-	logger.Info(ctx, "[ExtractSemanticTree] Building semantic tree...")
-	tree := &SemanticTree{
-		Elements:     make(map[string]*SemanticNode),
+	// 构建可访问性快照
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Building accessibility snapshot...")
+	snapshot := &AccessibilitySnapshot{
+		Elements:     make(map[string]*AccessibilityNode),
 		AXNodeMap:    make(map[proto.AccessibilityAXNodeID]*proto.AccessibilityAXNode),
-		BackendIDMap: make(map[proto.DOMBackendNodeID]*SemanticNode),
+		BackendIDMap: make(map[proto.DOMBackendNodeID]*AccessibilityNode),
 	}
 
 	// 构建 AX Node 映射
-	logger.Info(ctx, "[ExtractSemanticTree] Building AX node map...")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Building AX node map...")
 	for _, axNode := range axTree.Nodes {
-		tree.AXNodeMap[axNode.NodeID] = axNode
+		snapshot.AXNodeMap[axNode.NodeID] = axNode
 	}
-	logger.Info(ctx, "[ExtractSemanticTree] AX node map built with %d nodes", len(tree.AXNodeMap))
+	logger.Info(ctx, "[GetAccessibilitySnapshot] AX node map built with %d nodes", len(snapshot.AXNodeMap))
 
-	// 转换为语义节点
+	// 转换为可访问性节点
 	// 注意：不要过度过滤，保留所有节点，在后续查询时再过滤
-	logger.Info(ctx, "[ExtractSemanticTree] Converting to semantic nodes...")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Converting to accessibility nodes...")
 	nodeCount := 0
 	for i, axNode := range axTree.Nodes {
 		// 检查 context
 		select {
 		case <-ctx.Done():
-			logger.Info(ctx, "[ExtractSemanticTree] Context cancelled during node conversion at node %d/%d", i, len(axTree.Nodes))
+			logger.Info(ctx, "[GetAccessibilitySnapshot] Context cancelled during node conversion at node %d/%d", i, len(axTree.Nodes))
 			return nil, ctx.Err()
 		default:
 		}
 
-		semanticNode := buildSemanticNodeFromAXNode(axNode, tree)
-		if semanticNode != nil {
-			tree.Elements[semanticNode.ID] = semanticNode
-			if semanticNode.BackendNodeID > 0 {
-				tree.BackendIDMap[semanticNode.BackendNodeID] = semanticNode
+		accessibilityNode := buildAccessibilityNodeFromAXNode(axNode)
+		if accessibilityNode != nil {
+			snapshot.Elements[accessibilityNode.ID] = accessibilityNode
+			if accessibilityNode.BackendNodeID > 0 {
+				snapshot.BackendIDMap[accessibilityNode.BackendNodeID] = accessibilityNode
 			}
 			nodeCount++
 		}
 
 		// 每100个节点输出一次进度
 		if (i+1)%100 == 0 {
-			logger.Info(ctx, "[ExtractSemanticTree] Processed %d/%d nodes, kept %d", i+1, len(axTree.Nodes), nodeCount)
+			logger.Info(ctx, "[GetAccessibilitySnapshot] Processed %d/%d nodes, kept %d", i+1, len(axTree.Nodes), nodeCount)
 		}
 	}
-	logger.Info(ctx, "[ExtractSemanticTree] Converted %d nodes to %d semantic nodes", len(axTree.Nodes), nodeCount)
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Converted %d nodes to %d accessibility nodes", len(axTree.Nodes), nodeCount)
 
 	// 检查 cursor: pointer 元素并标记为可点击
-	logger.Info(ctx, "[ExtractSemanticTree] Checking cursor:pointer elements...")
-	err = markCursorPointerElements(ctx, page, tree)
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Checking cursor:pointer elements...")
+	err = markCursorPointerElements(ctx, page, snapshot)
 	if err != nil {
-		logger.Warn(ctx, "[ExtractSemanticTree] Failed to mark cursor:pointer elements: %v", err)
+		logger.Warn(ctx, "[GetAccessibilitySnapshot] Failed to mark cursor:pointer elements: %v", err)
 		// 不返回错误，继续处理
 	}
 
 	// 构建根节点
 	if len(axTree.Nodes) > 0 {
-		tree.Root = tree.Elements[string(axTree.Nodes[0].NodeID)]
+		snapshot.Root = snapshot.Elements[string(axTree.Nodes[0].NodeID)]
 	}
 
-	logger.Info(ctx, "[ExtractSemanticTree] Semantic tree extraction completed successfully")
-	return tree, nil
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Accessibility snapshot extraction completed successfully")
+	return snapshot, nil
 }
 
-// buildSemanticNodeFromAXNode 从 Accessibility Node 构建语义节点
-func buildSemanticNodeFromAXNode(axNode *proto.AccessibilityAXNode, tree *SemanticTree) *SemanticNode {
+// buildAccessibilityNodeFromAXNode 从 Accessibility Node 构建可访问性节点
+func buildAccessibilityNodeFromAXNode(axNode *proto.AccessibilityAXNode) *AccessibilityNode {
 	// 获取 Role
 	var role string
 	if axNode.Role != nil {
@@ -135,14 +135,14 @@ func buildSemanticNodeFromAXNode(axNode *proto.AccessibilityAXNode, tree *Semant
 	}
 
 	// 创建节点（不在这里过滤，保留所有节点）
-	node := &SemanticNode{
+	node := &AccessibilityNode{
 		ID:         string(axNode.NodeID),
 		AXNodeID:   axNode.NodeID,
 		Role:       role,
 		Type:       role, // 保持兼容性
 		Attributes: make(map[string]string),
 		Metadata:   make(map[string]interface{}),
-		Children:   make([]*SemanticNode, 0),
+		Children:   make([]*AccessibilityNode, 0),
 	}
 
 	// 记录是否被忽略
@@ -258,7 +258,7 @@ func isInteractiveRole(role string) bool {
 }
 
 // FindElementByLabel 通过标签查找元素
-func (tree *SemanticTree) FindElementByLabel(label string) *SemanticNode {
+func (tree *AccessibilitySnapshot) FindElementByLabel(label string) *AccessibilityNode {
 	label = strings.ToLower(strings.TrimSpace(label))
 
 	for _, node := range tree.Elements {
@@ -277,8 +277,8 @@ func (tree *SemanticTree) FindElementByLabel(label string) *SemanticNode {
 }
 
 // FindElementByType 通过类型查找元素
-func (tree *SemanticTree) FindElementsByType(elemType string) []*SemanticNode {
-	result := make([]*SemanticNode, 0)
+func (tree *AccessibilitySnapshot) FindElementsByType(elemType string) []*AccessibilityNode {
+	result := make([]*AccessibilityNode, 0)
 
 	for _, node := range tree.Elements {
 		if node.Type == elemType {
@@ -290,13 +290,13 @@ func (tree *SemanticTree) FindElementsByType(elemType string) []*SemanticNode {
 }
 
 // FindElementByID 通过 ID 查找元素
-func (tree *SemanticTree) FindElementByID(id string) *SemanticNode {
+func (tree *AccessibilitySnapshot) FindElementByID(id string) *AccessibilityNode {
 	return tree.Elements[id]
 }
 
 // GetVisibleElements 获取所有可见元素
-func (tree *SemanticTree) GetVisibleElements() []*SemanticNode {
-	result := make([]*SemanticNode, 0)
+func (tree *AccessibilitySnapshot) GetVisibleElements() []*AccessibilityNode {
+	result := make([]*AccessibilityNode, 0)
 
 	for _, node := range tree.Elements {
 		if node.IsVisible {
@@ -308,7 +308,7 @@ func (tree *SemanticTree) GetVisibleElements() []*SemanticNode {
 }
 
 // markCursorPointerElements 标记所有 cursor:pointer 的元素为可点击
-func markCursorPointerElements(ctx context.Context, page *rod.Page, tree *SemanticTree) error {
+func markCursorPointerElements(ctx context.Context, page *rod.Page, tree *AccessibilitySnapshot) error {
 	// 执行 JavaScript 获取所有 cursor:pointer 元素的信息
 	script := `
 	() => {
@@ -394,8 +394,8 @@ func markCursorPointerElements(ctx context.Context, page *rod.Page, tree *Semant
 }
 
 // GetClickableElements 获取所有可点击元素（基于 Accessibility Role 和 cursor:pointer）
-func (tree *SemanticTree) GetClickableElements() []*SemanticNode {
-	result := make([]*SemanticNode, 0)
+func (tree *AccessibilitySnapshot) GetClickableElements() []*AccessibilityNode {
+	result := make([]*AccessibilityNode, 0)
 
 	clickableRoles := map[string]bool{
 		"button":           true,
@@ -448,8 +448,8 @@ func (tree *SemanticTree) GetClickableElements() []*SemanticNode {
 }
 
 // GetInputElements 获取所有输入元素（基于 Accessibility Role）
-func (tree *SemanticTree) GetInputElements() []*SemanticNode {
-	result := make([]*SemanticNode, 0)
+func (tree *AccessibilitySnapshot) GetInputElements() []*AccessibilityNode {
+	result := make([]*AccessibilityNode, 0)
 
 	inputRoles := map[string]bool{
 		"textbox":    true,
@@ -480,7 +480,7 @@ func (tree *SemanticTree) GetInputElements() []*SemanticNode {
 }
 
 // SerializeToSimpleText 将语义树序列化为简单文本（用于 LLM）
-func (tree *SemanticTree) SerializeToSimpleText() string {
+func (tree *AccessibilitySnapshot) SerializeToSimpleText() string {
 	var builder strings.Builder
 	builder.WriteString("Page Interactive Elements:\n")
 	builder.WriteString("(Use the exact identifier like 'Clickable Element [1]' or 'Input Element [1]' to interact with elements)\n\n")
@@ -646,7 +646,7 @@ type AccessibilityIssue struct {
 }
 
 // GetElementFromPage 从页面获取 Rod Element（基于 BackendNodeID）
-func GetElementFromPage(ctx context.Context, page *rod.Page, node *SemanticNode) (*rod.Element, error) {
+func GetElementFromPage(ctx context.Context, page *rod.Page, node *AccessibilityNode) (*rod.Element, error) {
 	if node.BackendNodeID == 0 {
 		return nil, fmt.Errorf("node has no backend node ID")
 	}
@@ -673,7 +673,7 @@ func GetElementFromPage(ctx context.Context, page *rod.Page, node *SemanticNode)
 }
 
 // GetElementByAXNodeID 通过 AX Node ID 获取 Rod Element
-func GetElementByAXNodeID(ctx context.Context, page *rod.Page, tree *SemanticTree, axNodeID proto.AccessibilityAXNodeID) (*rod.Element, error) {
+func GetElementByAXNodeID(ctx context.Context, page *rod.Page, tree *AccessibilitySnapshot, axNodeID proto.AccessibilityAXNodeID) (*rod.Element, error) {
 	// 从树中查找节点
 	node, ok := tree.Elements[string(axNodeID)]
 	if !ok {

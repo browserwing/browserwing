@@ -3555,13 +3555,13 @@ func (h *Handler) ExecutorHelp(c *gin.Context) {
 			"returns": "Input value",
 		},
 		{
-			"name":        "semantic-tree",
+			"name":        "snapshot",
 			"method":      "GET",
-			"endpoint":    "/api/v1/executor/semantic-tree",
-			"description": "Get the semantic tree of the current page (all interactive elements)",
+			"endpoint":    "/api/v1/executor/snapshot",
+			"description": "Get the accessibility snapshot of the current page (all interactive elements)",
 			"parameters":  map[string]interface{}{},
-			"returns":     "Semantic tree with all clickable and input elements",
-			"note":        "Use this first to understand page structure and get element indices",
+			"returns":     "Accessibility snapshot with all clickable and input elements",
+			"note":        "Use this first to understand page structure and get element indices. The accessibility tree is cleaner than raw DOM.",
 		},
 		{
 			"name":        "clickable-elements",
@@ -3693,19 +3693,19 @@ func (h *Handler) ExecutorHelp(c *gin.Context) {
 			"api_key": "X-BrowserWing-Key: <api-key>",
 		},
 		"workflow": []string{
-			"1. Call GET /semantic-tree to understand page structure",
+			"1. Call GET /snapshot to understand page structure",
 			"2. Use element indices ([1], [2]) or CSS selectors for operations",
 			"3. Call appropriate operation endpoints (navigate, click, type, etc.)",
 			"4. Extract data using /extract endpoint",
 			"5. Use /batch for multiple operations",
 		},
 		"element_identifiers": map[string]interface{}{
-			"css_selector":   "#id, .class, button[type='submit']",
-			"xpath":          "//button[@id='login']",
-			"text_content":   "Login, Sign Up (will find button/link with this text)",
-			"semantic_index": "[1], Clickable Element [1], Input Element [2]",
-			"aria_label":     "Searches for elements with aria-label attribute",
-			"recommendation": "Use semantic-tree first to get element indices",
+			"css_selector":         "#id, .class, button[type='submit']",
+			"xpath":                "//button[@id='login']",
+			"text_content":         "Login, Sign Up (will find button/link with this text)",
+			"accessibility_index": "[1], Clickable Element [1], Input Element [2]",
+			"aria_label":           "Searches for elements with aria-label attribute",
+			"recommendation":       "Use /snapshot first to get element indices",
 		},
 		"commands": commands,
 		"examples": map[string]interface{}{
@@ -3721,7 +3721,7 @@ func (h *Handler) ExecutorHelp(c *gin.Context) {
 					{
 						"step":     2,
 						"action":   "Get page structure",
-						"endpoint": "GET /semantic-tree",
+						"endpoint": "GET /snapshot",
 					},
 					{
 						"step":     3,
@@ -4298,22 +4298,22 @@ func (h *Handler) ExecutorGetPageText(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// ExecutorGetSemanticTree 获取语义树
-func (h *Handler) ExecutorGetSemanticTree(c *gin.Context) {
+// ExecutorGetAccessibilitySnapshot 获取可访问性快照
+func (h *Handler) ExecutorGetAccessibilitySnapshot(c *gin.Context) {
 	executor := h.executor.WithContext(c.Request.Context())
-	tree, err := executor.GetSemanticTree(c.Request.Context())
+	snapshot, err := executor.GetAccessibilitySnapshot(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":  "error.getSemanticTreeFailed",
+			"error":  "error.getAccessibilitySnapshotFailed",
 			"detail": err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success":   true,
-		"tree":      tree,
-		"tree_text": tree.SerializeToSimpleText(),
+		"success":       true,
+		"snapshot":      snapshot,
+		"snapshot_text": snapshot.SerializeToSimpleText(),
 	})
 }
 
@@ -4379,6 +4379,74 @@ func (h *Handler) ExecutorBatch(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ExecutorTabs 标签页管理
+func (h *Handler) ExecutorTabs(c *gin.Context) {
+	var req struct {
+		Action string `json:"action" binding:"required"` // list, new, switch, close
+		URL    string `json:"url"`                       // for new action
+		Index  int    `json:"index"`                     // for switch/close action
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.TabsOptions{
+		Action: executor2.TabsAction(req.Action),
+		URL:    req.URL,
+		Index:  req.Index,
+	}
+
+	result, err := executor.Tabs(c.Request.Context(), opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.tabsOperationFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ExecutorFillForm 批量填写表单
+func (h *Handler) ExecutorFillForm(c *gin.Context) {
+	var req struct {
+		Fields  []executor2.FormField `json:"fields" binding:"required"`
+		Submit  bool                  `json:"submit"`
+		Timeout int                   `json:"timeout"` // 秒
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidRequest"})
+		return
+	}
+
+	executor := h.executor.WithContext(c.Request.Context())
+
+	opts := &executor2.FillFormOptions{
+		Fields: req.Fields,
+		Submit: req.Submit,
+	}
+	if req.Timeout > 0 {
+		opts.Timeout = time.Duration(req.Timeout) * time.Second
+	}
+
+	result, err := executor.FillForm(c.Request.Context(), opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "error.fillFormFailed",
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 // ExportExecutorSkill 导出 Executor API 为 Claude Skills 的 SKILL.md 格式
 func (h *Handler) ExportExecutorSkill(c *gin.Context) {
 	// 获取服务端地址
@@ -4402,7 +4470,7 @@ func generateExecutorSkillMD(host string) string {
 	// YAML Frontmatter
 	sb.WriteString("---\n")
 	sb.WriteString("name: browserwing-executor\n")
-	sb.WriteString("description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, semantic tree analysis, screenshot, JavaScript execution, and batch operations.\n")
+	sb.WriteString("description: Control browser automation through HTTP API. Supports page navigation, element interaction (click, type, select), data extraction, accessibility snapshot analysis, screenshot, JavaScript execution, and batch operations.\n")
 	sb.WriteString("---\n\n")
 
 	// 主标题
@@ -4419,7 +4487,7 @@ func generateExecutorSkillMD(host string) string {
 	sb.WriteString("- **Page Navigation:** Navigate to URLs, go back/forward, reload\n")
 	sb.WriteString("- **Element Interaction:** Click, type, select, hover on page elements\n")
 	sb.WriteString("- **Data Extraction:** Extract text, attributes, values from elements\n")
-	sb.WriteString("- **Semantic Analysis:** Get semantic tree to understand page structure\n")
+	sb.WriteString("- **Accessibility Analysis:** Get accessibility snapshot to understand page structure\n")
 	sb.WriteString("- **Advanced Operations:** Screenshot, JavaScript execution, keyboard input\n")
 	sb.WriteString("- **Batch Processing:** Execute multiple operations in sequence\n\n")
 
@@ -4438,23 +4506,24 @@ func generateExecutorSkillMD(host string) string {
 	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/help?command=extract'\n", host))
 	sb.WriteString("```\n\n")
 
-	// 2. 获取页面语义树
-	sb.WriteString("### 2. Get Semantic Tree\n\n")
+	// 2. 获取可访问性快照
+	sb.WriteString("### 2. Get Accessibility Snapshot\n\n")
 	sb.WriteString("**CRITICAL:** Always call this after navigation to understand page structure and get element indices.\n\n")
 	sb.WriteString("```bash\n")
-	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/semantic-tree'\n", host))
+	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/snapshot'\n", host))
 	sb.WriteString("```\n\n")
 	sb.WriteString("**Response Example:**\n")
 	sb.WriteString("```json\n")
 	sb.WriteString("{\n")
 	sb.WriteString("  \"success\": true,\n")
-	sb.WriteString("  \"tree_text\": \"Clickable Element [1]: Login Button\\nInput Element [1]: Email\\nInput Element [2]: Password\"\n")
+	sb.WriteString("  \"snapshot_text\": \"Clickable Element [1]: Login Button\\nInput Element [1]: Email\\nInput Element [2]: Password\"\n")
 	sb.WriteString("}\n")
 	sb.WriteString("```\n\n")
 	sb.WriteString("**Use Cases:**\n")
 	sb.WriteString("- Understand what interactive elements are on the page\n")
 	sb.WriteString("- Get element indices for reliable identification\n")
-	sb.WriteString("- See element labels and roles\n\n")
+	sb.WriteString("- See element labels and roles\n")
+	sb.WriteString("- The accessibility tree is cleaner than raw DOM and better for LLMs\n\n")
 
 	// 3. 主要操作端点
 	sb.WriteString("### 3. Common Operations\n\n")
@@ -4523,7 +4592,7 @@ func generateExecutorSkillMD(host string) string {
 	sb.WriteString("**Step-by-step workflow:**\n\n")
 	sb.WriteString("1. **Discover commands:** Call `GET /help` to see all available operations and their parameters (do this first if unsure).\n\n")
 	sb.WriteString("2. **Navigate:** Use `POST /navigate` to open the target webpage.\n\n")
-	sb.WriteString("3. **Analyze page:** Call `GET /semantic-tree` to understand page structure and get element indices.\n\n")
+	sb.WriteString("3. **Analyze page:** Call `GET /snapshot` to understand page structure and get element indices.\n\n")
 	sb.WriteString("4. **Interact:** Use element indices (like `[1]`, `Input Element [1]`) or CSS selectors to:\n")
 	sb.WriteString("   - Click elements: `POST /click`\n")
 	sb.WriteString("   - Input text: `POST /type`\n")
@@ -4546,7 +4615,7 @@ func generateExecutorSkillMD(host string) string {
 
 	sb.WriteString("2. Get page structure to find search input:\n")
 	sb.WriteString("```bash\n")
-	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/semantic-tree'\n", host))
+	sb.WriteString(fmt.Sprintf("curl -X GET 'http://%s/api/v1/executor/snapshot'\n", host))
 	sb.WriteString("```\n")
 	sb.WriteString("Response shows: `Input Element [1]: Search Box`\n\n")
 
@@ -4620,7 +4689,7 @@ func generateExecutorSkillMD(host string) string {
 
 	// 页面分析类
 	sb.WriteString("### Page Analysis\n")
-	sb.WriteString("- `GET /semantic-tree` - Get semantic tree (⭐ **ALWAYS call after navigation**)\n")
+	sb.WriteString("- `GET /snapshot` - Get accessibility snapshot (⭐ **ALWAYS call after navigation**)\n")
 	sb.WriteString("- `GET /clickable-elements` - Get all clickable elements\n")
 	sb.WriteString("- `GET /input-elements` - Get all input elements\n\n")
 
@@ -4635,9 +4704,9 @@ func generateExecutorSkillMD(host string) string {
 	// 元素定位方式
 	sb.WriteString("## Element Identification\n\n")
 	sb.WriteString("You can identify elements using:\n\n")
-	sb.WriteString("1. **Semantic Index (Recommended):** `[1]`, `[2]`, `Clickable Element [1]`, `Input Element [2]`\n")
+	sb.WriteString("1. **Accessibility Index (Recommended):** `[1]`, `[2]`, `Clickable Element [1]`, `Input Element [2]`\n")
 	sb.WriteString("   - Most reliable method\n")
-	sb.WriteString("   - Get indices from `/semantic-tree` endpoint\n")
+	sb.WriteString("   - Get indices from `/snapshot` endpoint\n")
 	sb.WriteString("   - Example: `\"identifier\": \"[1]\"` or `\"identifier\": \"Input Element [1]\"`\n\n")
 	sb.WriteString("2. **CSS Selector:** `#id`, `.class`, `button[type=\"submit\"]`\n")
 	sb.WriteString("   - Standard CSS selectors\n")
@@ -4657,15 +4726,15 @@ func generateExecutorSkillMD(host string) string {
 	sb.WriteString("- Call `GET /help` if you're unsure about available commands or their parameters\n")
 	sb.WriteString("- Ensure browser is started (if not, it will auto-start on first operation)\n\n")
 	sb.WriteString("**During automation:**\n")
-	sb.WriteString("- **Always call `/semantic-tree` after navigation** to get page structure\n")
-	sb.WriteString("- **Prefer semantic indices** (like `[1]`) over CSS selectors for reliability\n")
+	sb.WriteString("- **Always call `/snapshot` after navigation** to get page structure\n")
+	sb.WriteString("- **Prefer accessibility indices** (like `[1]`) over CSS selectors for reliability\n")
 	sb.WriteString("- **Use `/wait`** for dynamic content that loads asynchronously\n")
 	sb.WriteString("- **Check element states** before interaction (visible, enabled)\n")
 	sb.WriteString("- **Use `/batch`** for multiple sequential operations to improve efficiency\n\n")
 	sb.WriteString("**Error handling:**\n")
 	sb.WriteString("- If operation fails, check element identifier and try different format\n")
 	sb.WriteString("- For timeout errors, increase timeout value\n")
-	sb.WriteString("- If element not found, call `/semantic-tree` again to refresh page structure\n")
+	sb.WriteString("- If element not found, call `/snapshot` again to refresh page structure\n")
 	sb.WriteString("- Explain errors clearly to user with suggested solutions\n\n")
 	sb.WriteString("**Data extraction:**\n")
 	sb.WriteString("- Use `fields` parameter to specify what to extract: `[\"text\", \"href\", \"src\"]`\n")
@@ -4688,7 +4757,7 @@ func generateExecutorSkillMD(host string) string {
 
 	sb.WriteString("**Step 2:** Get page structure\n")
 	sb.WriteString("```bash\n")
-	sb.WriteString(fmt.Sprintf("GET http://%s/api/v1/executor/semantic-tree\n", host))
+	sb.WriteString(fmt.Sprintf("GET http://%s/api/v1/executor/snapshot\n", host))
 	sb.WriteString("```\n")
 	sb.WriteString("Response:\n")
 	sb.WriteString("```\n")
@@ -4767,8 +4836,8 @@ func generateExecutorSkillMD(host string) string {
 	// 最佳实践
 	sb.WriteString("## Best Practices\n\n")
 	sb.WriteString("1. **Discovery first:** If unsure, call `/help` or `/help?command=<name>` to learn about commands\n")
-	sb.WriteString("2. **Structure first:** Always call `/semantic-tree` after navigation to understand the page\n")
-	sb.WriteString("3. **Use semantic indices:** They're more reliable than CSS selectors (elements might have dynamic classes)\n")
+	sb.WriteString("2. **Structure first:** Always call `/snapshot` after navigation to understand the page\n")
+	sb.WriteString("3. **Use accessibility indices:** They're more reliable than CSS selectors (elements might have dynamic classes)\n")
 	sb.WriteString("4. **Wait for dynamic content:** Use `/wait` before interacting with elements that load asynchronously\n")
 	sb.WriteString("5. **Batch when possible:** Use `/batch` for multiple sequential operations\n")
 	sb.WriteString("6. **Handle errors gracefully:** Provide clear explanations and suggestions when operations fail\n")
@@ -4779,7 +4848,7 @@ func generateExecutorSkillMD(host string) string {
 
 	sb.WriteString("### Form Filling\n")
 	sb.WriteString("1. Navigate to form page\n")
-	sb.WriteString("2. Get semantic tree to find input elements\n")
+	sb.WriteString("2. Get accessibility snapshot to find input elements\n")
 	sb.WriteString("3. Use `/type` for each field: `Input Element [1]`, `Input Element [2]`, etc.\n")
 	sb.WriteString("4. Use `/select` for dropdowns\n")
 	sb.WriteString("5. Click submit button\n\n")
@@ -4792,7 +4861,7 @@ func generateExecutorSkillMD(host string) string {
 
 	sb.WriteString("### Search Operations\n")
 	sb.WriteString("1. Navigate to search page\n")
-	sb.WriteString("2. Get semantic tree to locate search input\n")
+	sb.WriteString("2. Get accessibility snapshot to locate search input\n")
 	sb.WriteString("3. Type search query into input\n")
 	sb.WriteString("4. Press Enter or click search button\n")
 	sb.WriteString("5. Wait for results\n")
@@ -4800,7 +4869,7 @@ func generateExecutorSkillMD(host string) string {
 
 	sb.WriteString("### Login Automation\n")
 	sb.WriteString("1. Navigate to login page\n")
-	sb.WriteString("2. Get semantic tree\n")
+	sb.WriteString("2. Get accessibility snapshot\n")
 	sb.WriteString("3. Type username: `Input Element [1]`\n")
 	sb.WriteString("4. Type password: `Input Element [2]`\n")
 	sb.WriteString("5. Click login button: `Clickable Element [1]`\n")
@@ -4810,7 +4879,7 @@ func generateExecutorSkillMD(host string) string {
 	sb.WriteString("## Important Notes\n\n")
 	sb.WriteString("- Browser must be running (it will auto-start on first operation if needed)\n")
 	sb.WriteString("- Operations are executed on the **currently active browser tab**\n")
-	sb.WriteString("- Semantic tree updates after each navigation and click operation\n")
+	sb.WriteString("- Accessibility snapshot updates after each navigation and click operation\n")
 	sb.WriteString("- All timeouts are in seconds\n")
 	sb.WriteString("- Use `wait_visible: true` (default) for reliable element interaction\n")
 	sb.WriteString(fmt.Sprintf("- Replace `%s` with actual API host address\n", host))
@@ -4819,8 +4888,8 @@ func generateExecutorSkillMD(host string) string {
 	// 故障排除
 	sb.WriteString("## Troubleshooting\n\n")
 	sb.WriteString("**Element not found:**\n")
-	sb.WriteString("- Call `/semantic-tree` to see available elements\n")
-	sb.WriteString("- Try different identifier format (semantic index, CSS selector, text)\n")
+	sb.WriteString("- Call `/snapshot` to see available elements\n")
+	sb.WriteString("- Try different identifier format (accessibility index, CSS selector, text)\n")
 	sb.WriteString("- Check if page has finished loading\n\n")
 	sb.WriteString("**Timeout errors:**\n")
 	sb.WriteString("- Increase timeout value in request\n")
@@ -4839,7 +4908,7 @@ func generateExecutorSkillMD(host string) string {
 	sb.WriteString("# Navigate\n")
 	sb.WriteString(fmt.Sprintf("POST %s/api/v1/executor/navigate {\"url\": \"...\"}\n\n", host))
 	sb.WriteString("# Get page structure\n")
-	sb.WriteString(fmt.Sprintf("GET %s/api/v1/executor/semantic-tree\n\n", host))
+	sb.WriteString(fmt.Sprintf("GET %s/api/v1/executor/snapshot\n\n", host))
 	sb.WriteString("# Click element\n")
 	sb.WriteString(fmt.Sprintf("POST %s/api/v1/executor/click {\"identifier\": \"[1]\"}\n\n", host))
 	sb.WriteString("# Type text\n")

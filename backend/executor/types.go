@@ -9,23 +9,23 @@ import (
 
 // Page 表示一个浏览器页面及其上下文
 type Page struct {
-	RodPage    *rod.Page
-	URL        string
-	Title      string
-	SemanticTree *SemanticTree
-	LastUpdated time.Time
+	RodPage              *rod.Page
+	URL                  string
+	Title                string
+	AccessibilitySnapshot *AccessibilitySnapshot
+	LastUpdated          time.Time
 }
 
-// SemanticTree 表示页面的语义树结构（基于 Accessibility Tree）
-type SemanticTree struct {
-	Root         *SemanticNode                                           // 根节点
-	Elements     map[string]*SemanticNode                                // AXNodeID -> Node 映射
+// AccessibilitySnapshot 表示页面的可访问性快照（基于 Accessibility Tree）
+type AccessibilitySnapshot struct {
+	Root         *AccessibilityNode                                      // 根节点
+	Elements     map[string]*AccessibilityNode                           // AXNodeID -> Node 映射
 	AXNodeMap    map[proto.AccessibilityAXNodeID]*proto.AccessibilityAXNode // AXNodeID -> AXNode 映射
-	BackendIDMap map[proto.DOMBackendNodeID]*SemanticNode                // BackendNodeID -> Node 映射
+	BackendIDMap map[proto.DOMBackendNodeID]*AccessibilityNode           // BackendNodeID -> Node 映射
 }
 
-// SemanticNode 表示页面中的一个语义节点（基于 Accessibility Node）
-type SemanticNode struct {
+// AccessibilityNode 表示页面中的一个可访问性节点（基于 Accessibility Node）
+type AccessibilityNode struct {
 	ID            string                        // 节点 ID（字符串形式的 AXNodeID）
 	AXNodeID      proto.AccessibilityAXNodeID   // Accessibility 节点 ID
 	BackendNodeID proto.DOMBackendNodeID        // DOM Backend 节点 ID
@@ -38,7 +38,7 @@ type SemanticNode struct {
 	Attributes    map[string]string             // 所有属性
 	IsInteractive bool                          // 是否可交互
 	IsEnabled     bool                          // 是否启用（非 disabled）
-	Children      []*SemanticNode               // 子节点
+	Children      []*AccessibilityNode          // 子节点
 	Metadata      map[string]interface{}        // 其他元数据
 	
 	// 保留兼容性字段

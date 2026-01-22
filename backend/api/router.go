@@ -238,8 +238,9 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			executorAPI.GET("/page-content", handler.ExecutorGetPageContent) // 获取页面内容
 			executorAPI.GET("/page-text", handler.ExecutorGetPageText)       // 获取页面文本
 
-			// 语义树和元素查找
-			executorAPI.GET("/semantic-tree", handler.ExecutorGetSemanticTree)           // 获取语义树
+			// 可访问性快照和元素查找
+			executorAPI.GET("/snapshot", handler.ExecutorGetAccessibilitySnapshot)       // 获取可访问性快照
+			executorAPI.GET("/semantic-tree", handler.ExecutorGetAccessibilitySnapshot)  // 兼容旧路由
 			executorAPI.GET("/clickable-elements", handler.ExecutorGetClickableElements) // 获取可点击元素
 			executorAPI.GET("/input-elements", handler.ExecutorGetInputElements)         // 获取输入元素
 
@@ -247,6 +248,10 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			executorAPI.POST("/screenshot", handler.ExecutorScreenshot) // 截图
 			executorAPI.POST("/evaluate", handler.ExecutorEvaluate)     // 执行 JavaScript
 			executorAPI.POST("/batch", handler.ExecutorBatch)           // 批量执行操作
+
+			// 标签页管理和表单填写
+			executorAPI.POST("/tabs", handler.ExecutorTabs)           // 标签页管理（list, new, switch, close）
+			executorAPI.POST("/fill-form", handler.ExecutorFillForm) // 批量填写表单
 		}
 
 		// Agent 聊天相关

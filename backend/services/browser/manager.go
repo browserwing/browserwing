@@ -106,109 +106,132 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	logger.Info(ctx, fmt.Sprintf("Using default configuration: %s", defaultConfig.Name))
 
-	// 创建启动器
-	// 根据配置决定是否使用 headless 模式
-	headless := false // 默认不使用 headless
-	if defaultConfig.Headless != nil {
-		headless = *defaultConfig.Headless
-	}
-	logger.Info(ctx, fmt.Sprintf("Headless mode: %v", headless))
+	var url string
+	var browser *rod.Browser
 
-	l := launcher.New().
-		Headless(headless).
-		Devtools(false).
-		Leakless(false)
+	// 检查是否配置了远程 Chrome URL
+	if m.config.Browser != nil && m.config.Browser.ControlURL != "" {
+		// 使用远程 Chrome
+		url = m.config.Browser.ControlURL
+		logger.Info(ctx, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Info(ctx, "Using remote Chrome browser")
+		logger.Info(ctx, fmt.Sprintf("Control URL: %s", url))
+		logger.Info(ctx, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	if defaultConfig.Proxy != "" {
-		l = l.Proxy(defaultConfig.Proxy)
-		logger.Info(ctx, fmt.Sprintf("Using proxy: %s", defaultConfig.Proxy))
-	}
+		// 直接连接到远程浏览器
+		browser = rod.New().ControlURL(url)
+	} else {
+		// 启动本地浏览器
+		logger.Info(ctx, "Starting local Chrome browser...")
 
-	// 打印启动参数
-	logger.Info(ctx, fmt.Sprintf("Number of launch arguments: %d", len(defaultConfig.LaunchArgs)))
-	for i, arg := range defaultConfig.LaunchArgs {
-		logger.Info(ctx, fmt.Sprintf("  [%d] %s", i+1, arg))
-	}
-
-	// 应用默认配置的启动参数
-	for _, arg := range defaultConfig.LaunchArgs {
-		// 移除前导的--如果存在
-		arg = strings.TrimPrefix(arg, "--")
-
-		// 检查是否是key=value格式
-		if strings.Contains(arg, "=") {
-			parts := strings.SplitN(arg, "=", 2)
-			l = l.Set(flags.Flag(parts[0]), parts[1])
-		} else {
-			// 单个flag
-			l = l.Set(flags.Flag(arg))
+		// 创建启动器
+		// 根据配置决定是否使用 headless 模式
+		headless := false // 默认不使用 headless
+		if defaultConfig.Headless != nil {
+			headless = *defaultConfig.Headless
 		}
-	}
+		logger.Info(ctx, fmt.Sprintf("Headless mode: %v", headless))
 
-	// 设置浏览器路径
-	if m.config.Browser != nil && m.config.Browser.BinPath != "" {
-		l = l.Bin(m.config.Browser.BinPath)
-		logger.Info(ctx, fmt.Sprintf("Using browser path: %s", m.config.Browser.BinPath))
-	}
+		l := launcher.New().
+			Headless(headless).
+			Devtools(false).
+			Leakless(false)
 
-	// 设置用户数据目录 - 关键：这会保存登录状态
-	if m.config.Browser != nil && m.config.Browser.UserDataDir != "" {
-		userDataDir := m.config.Browser.UserDataDir
+		if defaultConfig.Proxy != "" {
+			l = l.Proxy(defaultConfig.Proxy)
+			logger.Info(ctx, fmt.Sprintf("Using proxy: %s", defaultConfig.Proxy))
+		}
 
-		// 确保目录存在
-		if err := os.MkdirAll(userDataDir, 0o755); err != nil {
-			logger.Warn(ctx, fmt.Sprintf("Failed to create user data directory: %v", err))
-			logger.Warn(ctx, "Will not use user data directory")
-		} else {
-			// 检查目录是否可写
-			testFile := userDataDir + "/.test"
-			if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
-				logger.Warn(ctx, fmt.Sprintf("User data directory is not writable: %v", err))
-				logger.Warn(ctx, "Will not use user data directory, may cause startup failure")
+		// 打印启动参数
+		logger.Info(ctx, fmt.Sprintf("Number of launch arguments: %d", len(defaultConfig.LaunchArgs)))
+		for i, arg := range defaultConfig.LaunchArgs {
+			logger.Info(ctx, fmt.Sprintf("  [%d] %s", i+1, arg))
+		}
+
+		// 应用默认配置的启动参数
+		for _, arg := range defaultConfig.LaunchArgs {
+			// 移除前导的--如果存在
+			arg = strings.TrimPrefix(arg, "--")
+
+			// 检查是否是key=value格式
+			if strings.Contains(arg, "=") {
+				parts := strings.SplitN(arg, "=", 2)
+				l = l.Set(flags.Flag(parts[0]), parts[1])
 			} else {
-				os.Remove(testFile)
-				l = l.UserDataDir(userDataDir)
-				logger.Info(ctx, fmt.Sprintf("✓ Using user data directory: %s", userDataDir))
+				// 单个flag
+				l = l.Set(flags.Flag(arg))
 			}
 		}
-	} else {
-		logger.Warn(ctx, "User data directory not configured, login state will not be saved")
-	}
 
-	logger.Info(ctx, "Starting browser process...")
-	// 启动浏览器
-	url, err := l.Launch()
-	if err != nil {
-		errMsg := err.Error()
-		logger.Error(ctx, "Failed to start browser, detailed error: %v", err)
-
-		// 检查是否是因为 Chrome 已经在运行
-		if strings.Contains(errMsg, "会话") || strings.Contains(errMsg, "session") || strings.Contains(errMsg, "already") {
-			logger.Error(ctx, "")
-			logger.Error(ctx, "❌ Error reason: Chrome browser is already running with the same user data directory")
-			logger.Error(ctx, "")
-			logger.Error(ctx, "Solution:")
-			logger.Error(ctx, "  1. Close all Chrome browser windows")
-			logger.Error(ctx, "  2. Open Task Manager and end all chrome.exe processes")
-			logger.Error(ctx, "  3. Then click the 'Start Browser' button again")
-			logger.Error(ctx, "")
-			logger.Error(ctx, "Or modify user_data_dir in config.toml to another directory")
-			logger.Error(ctx, "")
-			return fmt.Errorf("Chrome is already running with the same user data directory, please close all Chrome windows and try again")
+		// 设置浏览器路径
+		if m.config.Browser != nil && m.config.Browser.BinPath != "" {
+			l = l.Bin(m.config.Browser.BinPath)
+			logger.Info(ctx, fmt.Sprintf("Using browser path: %s", m.config.Browser.BinPath))
 		}
 
-		logger.Error(ctx, "Possible reasons:")
-		logger.Error(ctx, "  1. Incorrect Chrome path")
-		logger.Error(ctx, "  2. Insufficient permissions or invalid path for user data directory")
-		logger.Error(ctx, "  3. Chrome is being used by another process")
-		logger.Error(ctx, "  4. Blocked by system firewall or security software")
-		return fmt.Errorf("failed to start browser: %w", err)
+		// 设置用户数据目录 - 关键：这会保存登录状态
+		if m.config.Browser != nil && m.config.Browser.UserDataDir != "" {
+			userDataDir := m.config.Browser.UserDataDir
+
+			// 确保目录存在
+			if err := os.MkdirAll(userDataDir, 0o755); err != nil {
+				logger.Warn(ctx, fmt.Sprintf("Failed to create user data directory: %v", err))
+				logger.Warn(ctx, "Will not use user data directory")
+			} else {
+				// 检查目录是否可写
+				testFile := userDataDir + "/.test"
+				if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
+					logger.Warn(ctx, fmt.Sprintf("User data directory is not writable: %v", err))
+					logger.Warn(ctx, "Will not use user data directory, may cause startup failure")
+				} else {
+					os.Remove(testFile)
+					l = l.UserDataDir(userDataDir)
+					logger.Info(ctx, fmt.Sprintf("✓ Using user data directory: %s", userDataDir))
+				}
+			}
+		} else {
+			logger.Warn(ctx, "User data directory not configured, login state will not be saved")
+		}
+
+		logger.Info(ctx, "Starting browser process...")
+		// 启动浏览器
+		var err error
+		url, err = l.Launch()
+		if err != nil {
+			errMsg := err.Error()
+			logger.Error(ctx, "Failed to start browser, detailed error: %v", err)
+
+			// 检查是否是因为 Chrome 已经在运行
+			if strings.Contains(errMsg, "会话") || strings.Contains(errMsg, "session") || strings.Contains(errMsg, "already") {
+				logger.Error(ctx, "")
+				logger.Error(ctx, "❌ Error reason: Chrome browser is already running with the same user data directory")
+				logger.Error(ctx, "")
+				logger.Error(ctx, "Solution:")
+				logger.Error(ctx, "  1. Close all Chrome browser windows")
+				logger.Error(ctx, "  2. Open Task Manager and end all chrome.exe processes")
+				logger.Error(ctx, "  3. Then click the 'Start Browser' button again")
+				logger.Error(ctx, "")
+				logger.Error(ctx, "Or modify user_data_dir in config.toml to another directory")
+				logger.Error(ctx, "")
+				return fmt.Errorf("Chrome is already running with the same user data directory, please close all Chrome windows and try again")
+			}
+
+			logger.Error(ctx, "Possible reasons:")
+			logger.Error(ctx, "  1. Incorrect Chrome path")
+			logger.Error(ctx, "  2. Insufficient permissions or invalid path for user data directory")
+			logger.Error(ctx, "  3. Chrome is being used by another process")
+			logger.Error(ctx, "  4. Blocked by system firewall or security software")
+			return fmt.Errorf("failed to start browser: %w", err)
+		}
+
+		logger.Info(ctx, fmt.Sprintf("Browser control URL: %s", url))
+
+		// 连接到浏览器
+		browser = rod.New().ControlURL(url)
+
+		// 保存 launcher 实例用于后续清理
+		m.launcher = l
 	}
-
-	logger.Info(ctx, fmt.Sprintf("Browser control URL: %s", url))
-
-	// 连接到浏览器
-	browser := rod.New().ControlURL(url)
 	if err := browser.Connect(); err != nil {
 		return fmt.Errorf("failed to connect browser: %w", err)
 	}
@@ -301,7 +324,6 @@ func (m *Manager) Start(ctx context.Context) error {
 		logger.Info(ctx, "✓ Clipboard permissions granted (read/write)")
 	}
 
-	m.launcher = l
 	m.browser = browser
 	m.isRunning = true
 	m.startTime = time.Now()
@@ -320,20 +342,31 @@ func (m *Manager) Stop() error {
 	}
 
 	ctx := context.Background()
-	logger.Info(ctx, "Closing browser...")
+	
+	// 检查是否是远程模式
+	isRemoteMode := m.config.Browser != nil && m.config.Browser.ControlURL != ""
+	
+	if isRemoteMode {
+		logger.Info(ctx, "Disconnecting from remote browser...")
+	} else {
+		logger.Info(ctx, "Closing browser...")
+	}
 
 	// 1. 先关闭所有页面，让浏览器有机会保存数据
 	if m.browser != nil {
-		pages, err := m.browser.Pages()
-		if err == nil {
-			for _, page := range pages {
-				_ = page.Close()
+		if !isRemoteMode {
+			// 仅在本地模式下关闭页面
+			pages, err := m.browser.Pages()
+			if err == nil {
+				for _, page := range pages {
+					_ = page.Close()
+				}
+				logger.Info(ctx, fmt.Sprintf("Closed %d pages", len(pages)))
 			}
-			logger.Info(ctx, fmt.Sprintf("Closed %d pages", len(pages)))
-		}
 
-		// 2. 等待一下，让浏览器保存数据
-		time.Sleep(1 * time.Second)
+			// 2. 等待一下，让浏览器保存数据
+			time.Sleep(1 * time.Second)
+		}
 
 		// 3. 优雅关闭浏览器连接
 		if err := m.browser.Close(); err != nil {
@@ -341,23 +374,30 @@ func (m *Manager) Stop() error {
 		}
 	}
 
-	// 4. 再等待一下，确保数据完全写入磁盘
-	time.Sleep(1 * time.Second)
+	// 4. 仅在本地模式下关闭浏览器进程
+	if !isRemoteMode {
+		// 再等待一下，确保数据完全写入磁盘
+		time.Sleep(1 * time.Second)
 
-	// 5. ⚠️ 重要：不调用 launcher.Cleanup()，因为它会删除用户数据目录！
-	// 浏览器进程会在连接关闭后自动退出
-	// 如果需要强制杀死进程，可以调用 launcher.Kill() 而不是 Cleanup()
-	if m.launcher != nil {
-		// 只杀死进程，不清理目录
-		m.launcher.Kill()
-		logger.Info(ctx, "Browser process terminated")
+		// 5. ⚠️ 重要：不调用 launcher.Cleanup()，因为它会删除用户数据目录！
+		// 浏览器进程会在连接关闭后自动退出
+		// 如果需要强制杀死进程，可以调用 launcher.Kill() 而不是 Cleanup()
+		if m.launcher != nil {
+			// 只杀死进程，不清理目录
+			m.launcher.Kill()
+			logger.Info(ctx, "Browser process terminated")
+		}
 	}
 
 	m.browser = nil
 	m.launcher = nil
 	m.isRunning = false
 
-	logger.Info(ctx, "Browser fully closed, user data saved")
+	if isRemoteMode {
+		logger.Info(ctx, "Disconnected from remote browser successfully")
+	} else {
+		logger.Info(ctx, "Browser fully closed, user data saved")
+	}
 	return nil
 }
 

@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Chromium 服务（轻量级）
+  chrome-alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: browserpilot-chrome-alpine
+    ports:
+      - "9222:9222"
+    # 共享内存大小（避免崩溃）
+    shm_size: 2gb
+    # 环境变量
+    environment:
+      - DISPLAY=:99
+    # 重启策略
+    restart: unless-stopped
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Google Chrome 服务（完整版）
+  chrome-full:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+    container_name: browserpilot-chrome-full
+    ports:
+      - "9223:9222"  # 使用不同端口避免冲突
+    shm_size: 2gb
+    environment:
+      - DISPLAY=:99
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    # 挂载卷以持久化用户数据（可选）
+    volumes:
+      - chrome-data:/home/chrome/.config/google-chrome
+
+  # 使用官方镜像（推荐，最简单）
+  chrome-zenika:
+    image: zenika/alpine-chrome:latest
+    container_name: browserpilot-chrome-zenika
+    ports:
+      - "9224:9222"
+    shm_size: 2gb
+    command:
+      - --no-sandbox
+      - --disable-dev-shm-usage
+      - --remote-debugging-address=0.0.0.0
+      - --remote-debugging-port=9222
+      - --no-first-run
+    restart: unless-stopped
+
+volumes:
+  chrome-data:
+    driver: local
+

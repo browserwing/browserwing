@@ -54,7 +54,7 @@ func (r *MCPToolRegistry) RegisterAllTools() error {
 	}
 
 	// 注册语义树工具
-	if err := r.registerGetSemanticTreeTool(); err != nil {
+	if err := r.registerAccessibilitySnapshotTool(); err != nil {
 		return fmt.Errorf("failed to register semantic tree tool: %w", err)
 	}
 
@@ -123,6 +123,16 @@ func (r *MCPToolRegistry) RegisterAllTools() error {
 		return fmt.Errorf("failed to register network requests tool: %w", err)
 	}
 
+	// 注册标签页管理工具
+	if err := r.registerTabsTool(); err != nil {
+		return fmt.Errorf("failed to register tabs tool: %w", err)
+	}
+
+	// 注册表单填写工具
+	if err := r.registerFillFormTool(); err != nil {
+		return fmt.Errorf("failed to register fill form tool: %w", err)
+	}
+
 	return nil
 }
 
@@ -168,13 +178,13 @@ func (r *MCPToolRegistry) registerNavigateTool() error {
 		}
 		logger.Info(ctx, "[MCP Handler] Navigate succeeded")
 
-		// 构建返回文本，包含消息和语义树
+		// 构建返回文本，包含消息和可访问性快照
 		var responseText string
 		responseText = result.Message
 
-		// 如果有语义树数据，添加到响应中
-		if semanticTree, ok := result.Data["semantic_tree"].(string); ok && semanticTree != "" {
-			responseText += "\n\nSemantic Tree:\n" + semanticTree
+		// 如果有可访问性快照数据，添加到响应中
+		if accessibilitySnapshot, ok := result.Data["accessibility_snapshot"].(string); ok && accessibilitySnapshot != "" {
+			responseText += "\n\nAccessibility Snapshot:\n" + accessibilitySnapshot
 		}
 
 		return mcpgo.NewToolResultText(responseText), nil
@@ -213,13 +223,13 @@ func (r *MCPToolRegistry) registerClickTool() error {
 			return mcpgo.NewToolResultError(err.Error()), nil
 		}
 
-		// 构建返回文本，包含消息和语义树
+		// 构建返回文本，包含消息和可访问性快照
 		var responseText string
 		responseText = result.Message
 
-		// 如果有语义树数据，添加到响应中
-		if semanticTree, ok := result.Data["semantic_tree"].(string); ok && semanticTree != "" {
-			responseText += "\n\nSemantic Tree:\n" + semanticTree
+		// 如果有可访问性快照数据，添加到响应中
+		if accessibilitySnapshot, ok := result.Data["accessibility_snapshot"].(string); ok && accessibilitySnapshot != "" {
+			responseText += "\n\nAccessibility Snapshot:\n" + accessibilitySnapshot
 		}
 
 		return mcpgo.NewToolResultText(responseText), nil
@@ -338,12 +348,13 @@ func (r *MCPToolRegistry) registerExtractTool() error {
 	return nil
 }
 
-// registerGetSemanticTreeTool 注册语义树工具
-func (r *MCPToolRegistry) registerGetSemanticTreeTool() error {
+// registerAccessibilitySnapshotTool 注册可访问性快照工具
+func (r *MCPToolRegistry) registerAccessibilitySnapshotTool() error {
 	tool := mcpgo.NewTool(
-		"browser_get_semantic_tree",
-		mcpgo.WithDescription("Get the semantic tree of interactive elements on the page"),
+		"browser_snapshot",
+		mcpgo.WithDescription("Get the accessibility snapshot of the current page. Returns a tree structure representing the page's accessibility tree, which is cleaner than raw DOM and better for LLMs to understand."),
 		mcpgo.WithBoolean("simple", mcpgo.Description("Return simplified text format suitable for LLMs (default: true)")),
+		mcpgo.WithNumber("max_depth", mcpgo.Description("Maximum depth of the tree (default: unlimited)")),
 	)
 
 	handler := func(ctx context.Context, request mcpgo.CallToolRequest) (*mcpgo.CallToolResult, error) {
@@ -354,19 +365,19 @@ func (r *MCPToolRegistry) registerGetSemanticTreeTool() error {
 			simple = simpleArg
 		}
 
-		tree, err := r.executor.GetSemanticTree(ctx)
+		snapshot, err := r.executor.GetAccessibilitySnapshot(ctx)
 		if err != nil {
 			return mcpgo.NewToolResultError(err.Error()), nil
 		}
 
 		if simple {
 			// 返回简化的文本格式
-			text := tree.SerializeToSimpleText()
+			text := snapshot.SerializeToSimpleText()
 			return mcpgo.NewToolResultText(text), nil
 		}
 
 		// 返回完整的 JSON 格式
-		data, _ := json.Marshal(tree)
+		data, _ := json.Marshal(snapshot)
 		return mcpgo.NewToolResultText(string(data)), nil
 	}
 
@@ -852,11 +863,11 @@ func GetExecutorToolsMetadata() []ToolMetadata {
 			},
 		},
 		{
-			Name:        "browser_get_semantic_tree",
-			Description: "Get semantic tree of interactive elements",
+			Name:        "browser_snapshot",
+			Description: "Get the accessibility snapshot of the current page. Returns a tree structure representing the page's accessibility tree, which is cleaner than raw DOM and better for LLMs to understand.",
 			Category:    "Analysis",
 			Parameters: []ToolParameter{
-				{Name: "simple", Type: "boolean", Required: false, Description: "Return simplified format"},
+				{Name: "max_depth", Type: "number", Required: false, Description: "Maximum depth of the tree (default: unlimited)"},
 			},
 		},
 		{
@@ -966,6 +977,26 @@ func GetExecutorToolsMetadata() []ToolMetadata {
 			Category:    "Debug",
 			Parameters:  []ToolParameter{},
 		},
+		{
+			Name:        "browser_tabs",
+			Description: "Manage browser tabs (list, create, switch, close)",
+			Category:    "Window",
+			Parameters: []ToolParameter{
+				{Name: "action", Type: "string", Required: true, Description: "Action: 'list', 'new', 'switch', or 'close'"},
+				{Name: "url", Type: "string", Required: false, Description: "URL for new tab (when action='new')"},
+				{Name: "index", Type: "number", Required: false, Description: "Tab index for switch/close (0-based)"},
+			},
+		},
+		{
+			Name:        "browser_fill_form",
+			Description: "Intelligently fill out web forms with multiple fields",
+			Category:    "Interaction",
+			Parameters: []ToolParameter{
+				{Name: "fields", Type: "array", Required: true, Description: "Array of form fields (each with name and value)"},
+				{Name: "submit", Type: "boolean", Required: false, Description: "Auto-submit form after filling (default: false)"},
+				{Name: "timeout", Type: "number", Required: false, Description: "Timeout per field in seconds (default: 10)"},
+			},
+		},
 	}
 }
 
@@ -995,4 +1026,158 @@ func safeScrollToTop(ctx context.Context, page *rod.Page) (err error) {
 
 	_, err = page.Eval(`() => window.scrollTo(0, 0)`)
 	return err
+}
+
+// registerTabsTool 注册标签页管理工具
+func (r *MCPToolRegistry) registerTabsTool() error {
+	tool := mcpgo.NewTool(
+		"browser_tabs",
+		mcpgo.WithDescription("Manage browser tabs. Supports listing, creating, switching, and closing tabs."),
+		mcpgo.WithString("action", mcpgo.Required(), mcpgo.Description("Tab action: 'list', 'new', 'switch', or 'close'")),
+		mcpgo.WithString("url", mcpgo.Description("URL for new tab (required when action='new')")),
+		mcpgo.WithNumber("index", mcpgo.Description("Tab index for switch/close (0-based, required when action='switch' or 'close')")),
+	)
+
+	handler := func(ctx context.Context, request mcpgo.CallToolRequest) (*mcpgo.CallToolResult, error) {
+		args := request.Params.Arguments.(map[string]interface{})
+		action, _ := args["action"].(string)
+
+		opts := &TabsOptions{
+			Action: TabsAction(action),
+		}
+
+		// 处理 URL 参数（仅 action=new 时需要）
+		if url, ok := args["url"].(string); ok {
+			opts.URL = url
+		}
+
+		// 处理 index 参数（action=switch 或 close 时需要）
+		if indexFloat, ok := args["index"].(float64); ok {
+			opts.Index = int(indexFloat)
+		}
+
+		result, err := r.executor.Tabs(ctx, opts)
+		if err != nil {
+			return mcpgo.NewToolResultError(err.Error()), nil
+		}
+
+		// 根据操作类型返回不同的响应
+		switch opts.Action {
+		case TabsActionList:
+			// 列出所有标签页
+			if tabs, ok := result.Data["tabs"].([]TabInfo); ok {
+				var tabsText string
+				for _, tab := range tabs {
+					activeIndicator := ""
+					if tab.Active {
+						activeIndicator = " (active)"
+					}
+					tabsText += fmt.Sprintf("\n[%d] %s - %s%s", tab.Index, tab.Title, tab.URL, activeIndicator)
+				}
+				return mcpgo.NewToolResultText(fmt.Sprintf("%s\n\nTabs:%s", result.Message, tabsText)), nil
+			}
+		case TabsActionNew:
+			// 创建新标签页
+			index := result.Data["index"]
+			url := result.Data["url"]
+			return mcpgo.NewToolResultText(fmt.Sprintf("%s\n\nTab Index: %v\nURL: %v", result.Message, index, url)), nil
+		case TabsActionSwitch:
+			// 切换标签页
+			index := result.Data["index"]
+			url := result.Data["url"]
+			return mcpgo.NewToolResultText(fmt.Sprintf("%s\n\nTab Index: %v\nURL: %v", result.Message, index, url)), nil
+		case TabsActionClose:
+			// 关闭标签页
+			return mcpgo.NewToolResultText(result.Message), nil
+		}
+
+		return mcpgo.NewToolResultText(result.Message), nil
+	}
+
+	r.mcpServer.AddTool(tool, handler)
+	return nil
+}
+
+// registerFillFormTool 注册表单填写工具
+func (r *MCPToolRegistry) registerFillFormTool() error {
+	tool := mcpgo.NewTool(
+		"browser_fill_form",
+		mcpgo.WithDescription("Intelligently fill out web forms with multiple fields. Supports text, email, password, checkbox, radio, select, and textarea inputs."),
+		mcpgo.WithObject("fields", mcpgo.Required(), mcpgo.Description("Array of form fields to fill. Each field should have 'name' and 'value' properties.")),
+		mcpgo.WithBoolean("submit", mcpgo.Description("Whether to automatically submit the form after filling (default: false)")),
+		mcpgo.WithNumber("timeout", mcpgo.Description("Timeout in seconds for each field (default: 10)")),
+	)
+
+	handler := func(ctx context.Context, request mcpgo.CallToolRequest) (*mcpgo.CallToolResult, error) {
+		args := request.Params.Arguments.(map[string]interface{})
+
+		opts := &FillFormOptions{
+			Submit:  false,
+			Timeout: 10 * time.Second,
+		}
+
+		// 处理 fields 参数
+		if fieldsData, ok := args["fields"].([]interface{}); ok {
+			for _, fieldData := range fieldsData {
+				if fieldMap, ok := fieldData.(map[string]interface{}); ok {
+					field := FormField{}
+					
+					if name, ok := fieldMap["name"].(string); ok {
+						field.Name = name
+					}
+					
+					if value, ok := fieldMap["value"]; ok {
+						field.Value = value
+					}
+					
+					if fieldType, ok := fieldMap["type"].(string); ok {
+						field.Type = fieldType
+					}
+					
+					opts.Fields = append(opts.Fields, field)
+				}
+			}
+		}
+
+		// 处理 submit 参数
+		if submit, ok := args["submit"].(bool); ok {
+			opts.Submit = submit
+		}
+
+		// 处理 timeout 参数
+		if timeoutFloat, ok := args["timeout"].(float64); ok {
+			opts.Timeout = time.Duration(timeoutFloat) * time.Second
+		}
+
+		result, err := r.executor.FillForm(ctx, opts)
+		if err != nil {
+			return mcpgo.NewToolResultError(err.Error()), nil
+		}
+
+		// 构建详细的响应消息
+		filledCount := result.Data["filled_count"]
+		totalFields := result.Data["total_fields"]
+		errors := result.Data["errors"].([]string)
+		submitted := result.Data["submitted"].(bool)
+
+		var responseText string
+		responseText = result.Message
+
+		if len(errors) > 0 {
+			responseText += "\n\nErrors:"
+			for _, errMsg := range errors {
+				responseText += fmt.Sprintf("\n- %s", errMsg)
+			}
+		}
+
+		responseText += fmt.Sprintf("\n\nSummary: %d/%d fields filled", filledCount, totalFields)
+		if submitted {
+			responseText += ", form submitted"
+		}
+
+		return mcpgo.NewToolResultText(responseText), nil
+	}
+
+	r.mcpServer.AddTool(tool, handler)
+	return nil
 }
