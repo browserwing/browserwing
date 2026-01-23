@@ -37,6 +37,8 @@ type Player struct {
 	downloadPath     string                          // 下载目录路径
 	downloadCtx      context.Context                 // 下载监听上下文
 	downloadCancel   context.CancelFunc              // 取消下载监听
+	currentScriptName string                         // 当前执行的脚本名称
+	currentLang      string                         // 当前语言设置
 }
 
 // highlightElement 高亮显示元素
@@ -80,6 +82,412 @@ func (p *Player) unhighlightElement(ctx context.Context, element *rod.Element) {
 	}
 }
 
+// showAIControlIndicator 显示 AI 控制指示器
+func (p *Player) showAIControlIndicator(ctx context.Context, page *rod.Page, scriptName, currentLang string) {
+	if page == nil {
+		return
+	}
+
+	// 获取国际化文本
+	titleText := getI18nText("ai.control.title", currentLang)
+	scriptLabelText := getI18nText("ai.control.script", currentLang)
+	readyText := getI18nText("ai.control.ready", currentLang)
+
+	_, err := page.Eval(`(scriptName, titleText, scriptLabelText, readyText) => {
+		// 如果已经存在且有保护，直接返回
+		if (window.__browserwingAIIndicatorProtected__) {
+			return true;
+		}
+
+		// 创建或重新创建指示器的函数
+		function createAIIndicator() {
+			// 清理旧的闪烁定时器（如果有）
+			if (window.__browserwingBlinkInterval__) {
+				clearInterval(window.__browserwingBlinkInterval__);
+				window.__browserwingBlinkInterval__ = null;
+			}
+			
+			// 移除已存在的指示器（如果有）
+			const existingIndicator = document.getElementById('browserwing-ai-indicator');
+			if (existingIndicator) {
+				existingIndicator.remove();
+			}
+
+			// 创建容器
+			const container = document.createElement('div');
+			container.id = 'browserwing-ai-indicator';
+			container.className = '__browserwing-protected__';
+			container.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; pointer-events: none !important; z-index: 2147483647 !important; opacity: 1 !important; visibility: visible !important;';
+			
+			// 添加页面边框 - 亮蓝色主题，加粗边框，使用JS控制闪烁效果
+			const border = document.createElement('div');
+			border.id = 'browserwing-ai-border';
+			border.className = '__browserwing-protected__';
+			border.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; border: 8px solid #4FC3F7 !important; box-shadow: 0 0 15px #4FC3F7 !important, 0 0 30px rgba(79, 195, 247, 0.6) !important, inset 0 0 30px rgba(79, 195, 247, 0.4) !important; pointer-events: none !important; transition: opacity 0.1s ease !important;';
+			
+			// 添加控制面板 - 放在右边
+			const panel = document.createElement('div');
+			panel.id = 'browserwing-ai-panel';
+			panel.className = '__browserwing-protected__';
+			panel.style.cssText = 'position: absolute !important; top: 20px !important; right: 20px !important; width: 320px !important; max-width: 320px !important; min-width: 280px !important; background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important; border-radius: 16px !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important, 0 2px 8px rgba(0, 0, 0, 0.08) !important; border: 1px solid rgba(0, 0, 0, 0.08) !important; overflow: hidden !important; pointer-events: auto !important; backdrop-filter: blur(10px) !important; animation: browserwing-ai-slide-in 0.5s ease-out !important; opacity: 1 !important; visibility: visible !important; cursor: default !important; box-sizing: border-box !important;';
+			
+			// 头部区域（可拖动）
+			const header = document.createElement('div');
+			header.className = '__browserwing-protected__';
+			header.style.cssText = 'padding: 20px 24px 16px !important; background: transparent !important; display: flex !important; align-items: center !important; justify-content: center !important; border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important; gap: 10px !important; opacity: 1 !important; visibility: visible !important; cursor: move !important; user-select: none !important;';
+			
+			// 标题
+			const title = document.createElement('div');
+			title.className = '__browserwing-protected__';
+			title.style.cssText = 'color: #0f172a !important; font-size: 15px !important; font-weight: 600 !important; letter-spacing: -0.01em !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Helvetica, Arial, sans-serif !important; opacity: 1 !important; visibility: visible !important;';
+			title.textContent = titleText;
+			
+			header.appendChild(title);
+			
+			// 脚本信息区域 - 淡红色背景
+			const infoArea = document.createElement('div');
+			infoArea.className = '__browserwing-protected__';
+			infoArea.style.cssText = 'padding: 16px 24px !important; background: rgba(239, 68, 68, 0.03) !important; border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important; opacity: 1 !important; visibility: visible !important;';
+			
+			const scriptInfo = document.createElement('div');
+			scriptInfo.className = '__browserwing-protected__';
+			scriptInfo.style.cssText = 'display: flex !important; align-items: center !important; gap: 8px !important; color: #64748b !important; font-size: 13px !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Helvetica, Arial, sans-serif !important; opacity: 1 !important; visibility: visible !important;';
+			
+			const scriptLabel = document.createElement('span');
+			scriptLabel.className = '__browserwing-protected__';
+			scriptLabel.style.cssText = 'color: #94a3b8 !important; opacity: 1 !important; visibility: visible !important;';
+			scriptLabel.textContent = scriptLabelText;
+			
+			const scriptNameSpan = document.createElement('span');
+			scriptNameSpan.className = '__browserwing-protected__';
+			scriptNameSpan.style.cssText = 'color: #475569 !important; font-weight: 500 !important; opacity: 1 !important; visibility: visible !important;';
+			scriptNameSpan.textContent = scriptName || 'Untitled';
+			
+			scriptInfo.appendChild(scriptLabel);
+			scriptInfo.appendChild(scriptNameSpan);
+			infoArea.appendChild(scriptInfo);
+			
+			// 状态显示区域
+			const statusArea = document.createElement('div');
+			statusArea.className = '__browserwing-protected__';
+			statusArea.style.cssText = 'padding: 20px 24px 24px !important; background: transparent !important; opacity: 1 !important; visibility: visible !important; box-sizing: border-box !important; width: 100% !important; max-width: 100% !important; overflow: hidden !important;';
+			
+			// 状态卡片 - 红色主题，防止文本溢出
+			const statusCard = document.createElement('div');
+			statusCard.id = 'browserwing-ai-status-card';
+			statusCard.className = '__browserwing-protected__';
+			statusCard.style.cssText = 'width: 100% !important; max-width: 100% !important; padding: 14px 20px !important; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; color: white !important; border-radius: 12px !important; font-size: 14px !important; font-weight: 600 !important; letter-spacing: -0.01em !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Helvetica, Arial, sans-serif !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 10px !important; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important, 0 2px 4px rgba(0, 0, 0, 0.1) !important; opacity: 1 !important; visibility: visible !important; box-sizing: border-box !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;';
+			
+			// 脉动指示器
+			const indicator = document.createElement('div');
+			indicator.className = '__browserwing-protected__';
+			indicator.style.cssText = 'width: 10px !important; height: 10px !important; min-width: 10px !important; min-height: 10px !important; border-radius: 50% !important; background: white !important; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6) !important; animation: browserwing-ai-blink 1.5s ease-in-out infinite !important; opacity: 1 !important; visibility: visible !important; flex-shrink: 0 !important;';
+			
+			const statusText = document.createElement('span');
+			statusText.id = 'browserwing-ai-status-text';
+			statusText.className = '__browserwing-protected__';
+			statusText.style.cssText = 'opacity: 1 !important; visibility: visible !important; color: white !important; font-size: 14px !important; font-weight: 600 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Helvetica, Arial, sans-serif !important; letter-spacing: -0.01em !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; max-width: 100% !important; flex: 1 !important; text-align: center !important;';
+			statusText.textContent = readyText;
+			
+			statusCard.appendChild(indicator);
+			statusCard.appendChild(statusText);
+			statusArea.appendChild(statusCard);
+			
+			// 组装面板
+			panel.appendChild(header);
+			panel.appendChild(infoArea);
+			panel.appendChild(statusArea);
+			
+			// 添加拖动功能
+			let isDragging = false;
+			let currentX = 0;
+			let currentY = 0;
+			let initialX = 0;
+			let initialY = 0;
+			let xOffset = 0;
+			let yOffset = 0;
+			
+			header.addEventListener('mousedown', function(e) {
+				initialX = e.clientX - xOffset;
+				initialY = e.clientY - yOffset;
+				isDragging = true;
+				panel.__isDragging = false;
+				e.preventDefault();
+			});
+			
+			document.addEventListener('mousemove', function(e) {
+				if (isDragging) {
+					e.preventDefault();
+					currentX = e.clientX - initialX;
+					currentY = e.clientY - initialY;
+					xOffset = currentX;
+					yOffset = currentY;
+					
+					if (Math.abs(currentX) > 5 || Math.abs(currentY) > 5) {
+						panel.__isDragging = true;
+					}
+					
+					panel.style.transform = 'translate(' + currentX + 'px, ' + currentY + 'px)';
+				}
+			});
+			
+			document.addEventListener('mouseup', function() {
+				if (isDragging) {
+					setTimeout(function() {
+						panel.__isDragging = false;
+					}, 100);
+				}
+				isDragging = false;
+			});
+			
+			// 添加 CSS 动画（只保留必要的动画）
+			const style = document.createElement('style');
+			style.id = 'browserwing-ai-styles';
+			style.textContent = ` + "`" + `
+				@keyframes browserwing-ai-slide-in {
+					from { opacity: 0 !important; transform: translateX(20px) !important; }
+					to { opacity: 1 !important; transform: translateX(0) !important; }
+				}
+				@keyframes browserwing-ai-blink {
+					0%, 100% { opacity: 1 !important; transform: scale(1) !important; }
+					50% { opacity: 0.4 !important; transform: scale(0.85) !important; }
+				}
+			` + "`" + `;
+			
+			// 使用 JavaScript 定时器控制边框闪烁
+			let borderVisible = true;
+			const blinkInterval = setInterval(() => {
+				if (border && border.parentNode) {
+					borderVisible = !borderVisible;
+					border.style.opacity = borderVisible ? '1' : '0';
+				}
+			}, 750); // 每750毫秒切换一次（显示0.75秒，隐藏0.75秒）
+			
+			// 保存定时器以便后续清理
+			window.__browserwingBlinkInterval__ = blinkInterval;
+			
+			// 组装容器
+			container.appendChild(border);
+			container.appendChild(panel);
+			document.head.appendChild(style);
+			
+			// 确保 body 存在
+			if (!document.body) {
+				return null;
+			}
+			
+			document.body.appendChild(container);
+			
+			return container;
+		}
+		
+		// 创建指示器
+		const container = createAIIndicator();
+		
+		if (!container) {
+			return false;
+		}
+		
+		// 使用 MutationObserver 保护指示器不被删除
+		const observer = new MutationObserver((mutations) => {
+			mutations.forEach((mutation) => {
+				// 检查是否有受保护的节点被删除
+				mutation.removedNodes.forEach((node) => {
+					if (node.id === 'browserwing-ai-indicator' || 
+					    node.className === '__browserwing-protected__' ||
+					    (node.querySelector && node.querySelector('.__browserwing-protected__'))) {
+						// 重新创建
+						setTimeout(() => {
+							if (!document.getElementById('browserwing-ai-indicator')) {
+								createAIIndicator();
+							}
+						}, 100);
+					}
+				});
+			});
+		});
+		
+		// 监控整个 body 的变化
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true
+		});
+		
+		// 保存 observer 以便后续清理
+		window.__browserwingAIObserver__ = observer;
+		window.__browserwingAIIndicatorProtected__ = true;
+		
+		return true;
+	}`, scriptName, titleText, scriptLabelText, readyText)
+
+	if err != nil {
+		logger.Warn(ctx, "Failed to show AI control indicator: %v", err)
+		logger.Warn(ctx, "Error details: %v", err)
+	} else {
+		logger.Info(ctx, "✓ AI control indicator displayed")
+	}
+}
+
+// ensureAIControlIndicator 确保 AI 控制指示器存在（在页面导航后重新注入）
+func (p *Player) ensureAIControlIndicator(ctx context.Context, page *rod.Page) {
+	if page == nil {
+		return
+	}
+
+	// 检查指示器是否存在
+	exists, err := page.Eval(`() => {
+		// 清理旧的闪烁定时器（如果有）
+		if (window.__browserwingBlinkInterval__) {
+			clearInterval(window.__browserwingBlinkInterval__);
+			window.__browserwingBlinkInterval__ = null;
+		}
+		return document.getElementById('browserwing-ai-indicator') !== null;
+	}`)
+
+	if err != nil {
+		logger.Warn(ctx, "Failed to check AI control indicator: %v", err)
+		return
+	}
+
+	// 如果不存在，重新注入
+	if exists != nil && !exists.Value.Bool() {
+		logger.Info(ctx, "AI control indicator lost after navigation, re-injecting...")
+		currentLang := p.currentLang
+		if currentLang == "" {
+			currentLang = "zh-CN"
+		}
+		p.showAIControlIndicator(ctx, page, p.currentScriptName, currentLang)
+	}
+}
+
+// updateAIControlStatus 更新 AI 控制状态显示
+func (p *Player) updateAIControlStatus(ctx context.Context, page *rod.Page, current, total int, actionType string) {
+	if page == nil {
+		return
+	}
+
+	// 获取国际化文本
+	stepText := getI18nText("ai.control.step", p.currentLang)
+	actionText := getActionDisplayText(actionType, p.currentLang)
+	
+	_, err := page.Eval(`(current, total, stepText, actionText) => {
+		const statusText = document.getElementById('browserwing-ai-status-text');
+		if (statusText) {
+			statusText.textContent = stepText + ' ' + current + '/' + total + ': ' + actionText;
+		}
+		return true;
+	}`, current, total, stepText, actionText)
+
+	if err != nil {
+		logger.Warn(ctx, "Failed to update AI control status: %v", err)
+	}
+}
+
+// getI18nText 获取国际化文本
+func getI18nText(key, lang string) string {
+	// 翻译映射表
+	translations := map[string]map[string]string{
+		"zh-CN": {
+			// AI 控制指示器
+			"ai.control.title":    "Browserwing AI 控制中",
+			"ai.control.script":   "执行脚本:",
+			"ai.control.ready":    "准备执行脚本...",
+			"ai.control.step":     "步骤",
+			"ai.control.completed": "✓ 完成",
+			"ai.control.success":  "成功",
+			"ai.control.failed":   "失败",
+			// 操作类型
+			"action.click":              "点击元素",
+			"action.input":              "输入文本",
+			"action.select":             "选择选项",
+			"action.navigate":           "页面导航",
+			"action.wait":               "等待加载",
+			"action.sleep":              "延迟等待",
+			"action.extract_text":       "提取文本",
+			"action.extract_html":       "提取HTML",
+			"action.extract_attribute":  "提取属性",
+			"action.execute_js":         "执行JS",
+			"action.upload_file":        "上传文件",
+			"action.scroll":             "滚动页面",
+			"action.keyboard":           "键盘事件",
+			"action.open_tab":           "打开新标签页",
+			"action.switch_tab":         "切换标签页",
+			"action.switch_active_tab":  "切换到活跃标签页",
+		},
+		"zh-TW": {
+			// AI 控制指示器
+			"ai.control.title":    "Browserwing AI 控制中",
+			"ai.control.script":   "執行腳本:",
+			"ai.control.ready":    "準備執行腳本...",
+			"ai.control.step":     "步驟",
+			"ai.control.completed": "✓ 完成",
+			"ai.control.success":  "成功",
+			"ai.control.failed":   "失敗",
+			// 操作類型
+			"action.click":              "點擊元素",
+			"action.input":              "輸入文字",
+			"action.select":             "選擇選項",
+			"action.navigate":           "頁面導航",
+			"action.wait":               "等待載入",
+			"action.sleep":              "延遲等待",
+			"action.extract_text":       "提取文字",
+			"action.extract_html":       "提取HTML",
+			"action.extract_attribute":  "提取屬性",
+			"action.execute_js":         "執行JS",
+			"action.upload_file":        "上傳檔案",
+			"action.scroll":             "滾動頁面",
+			"action.keyboard":           "鍵盤事件",
+			"action.open_tab":           "打開新標籤頁",
+			"action.switch_tab":         "切換標籤頁",
+			"action.switch_active_tab":  "切換到活躍標籤頁",
+		},
+		"en": {
+			// AI Control Indicator
+			"ai.control.title":    "Browserwing AI Control",
+			"ai.control.script":   "Executing Script:",
+			"ai.control.ready":    "Preparing to execute script...",
+			"ai.control.step":     "Step",
+			"ai.control.completed": "✓ Completed",
+			"ai.control.success":  "Success",
+			"ai.control.failed":   "Failed",
+			// Action Types
+			"action.click":              "Click Element",
+			"action.input":              "Input Text",
+			"action.select":             "Select Option",
+			"action.navigate":           "Navigate Page",
+			"action.wait":               "Wait for Load",
+			"action.sleep":              "Sleep",
+			"action.extract_text":       "Extract Text",
+			"action.extract_html":       "Extract HTML",
+			"action.extract_attribute":  "Extract Attribute",
+			"action.execute_js":         "Execute JS",
+			"action.upload_file":        "Upload File",
+			"action.scroll":             "Scroll Page",
+			"action.keyboard":           "Keyboard Event",
+			"action.open_tab":           "Open New Tab",
+			"action.switch_tab":         "Switch Tab",
+			"action.switch_active_tab":  "Switch to Active Tab",
+		},
+	}
+
+	// 如果语言不存在，默认使用英文
+	langMap, exists := translations[lang]
+	if !exists {
+		langMap = translations["en"]
+	}
+
+	// 返回翻译文本，如果不存在则返回 key
+	if text, exists := langMap[key]; exists {
+		return text
+	}
+	return key
+}
+
+// getActionDisplayText 获取操作的显示文本（支持国际化）
+func getActionDisplayText(actionType, lang string) string {
+	return getI18nText("action."+actionType, lang)
+}
+
 // min 返回两个整数中的较小值
 func min(a, b int) int {
 	if a < b {
@@ -95,7 +503,7 @@ type elementContext struct {
 }
 
 // NewPlayer 创建回放器
-func NewPlayer() *Player {
+func NewPlayer(currentLang string) *Player {
 	return &Player{
 		extractedData:   make(map[string]interface{}),
 		successCount:    0,
@@ -103,6 +511,7 @@ func NewPlayer() *Player {
 		pages:           make(map[int]*rod.Page),
 		tabCounter:      0,
 		downloadedFiles: make([]string, 0),
+		currentLang:     currentLang,
 	}
 }
 
@@ -552,10 +961,19 @@ func (p *Player) convertFramesToGIF(ctx context.Context, outputPath string, fram
 }
 
 // PlayScript 回放脚本
-func (p *Player) PlayScript(ctx context.Context, page *rod.Page, script *models.Script) error {
+func (p *Player) PlayScript(ctx context.Context, page *rod.Page, script *models.Script, currentLang string) error {
 	logger.Info(ctx, "Start playing script: %s", script.Name)
 	logger.Info(ctx, "Target URL: %s", script.URL)
 	logger.Info(ctx, "Total %d operation steps", len(script.Actions))
+
+	// 确保语言设置有默认值
+	if currentLang == "" {
+		currentLang = "zh-CN"
+	}
+	logger.Info(ctx, "Using language: %s", currentLang)
+
+	// AI 控制指示器将常驻显示，不再自动隐藏
+	// defer p.hideAIControlIndicator(ctx, page)  // 注释掉自动隐藏
 
 	// 重置统计和抓取数据
 	p.ResetStats()
@@ -586,11 +1004,24 @@ func (p *Player) PlayScript(ctx context.Context, page *rod.Page, script *models.
 		}
 		// 等待页面稳定
 		time.Sleep(2 * time.Second)
+		
+		// 页面加载完成后，等待额外时间让 JavaScript 框架初始化完成
+		logger.Info(ctx, "Waiting for page JavaScript to stabilize...")
+		time.Sleep(1 * time.Second)
 	}
+
+	// 保存脚本名称，用于后续重新注入时使用
+	p.currentScriptName = script.Name
+	
+	// 在页面完全稳定后显示 AI 控制指示器
+	p.showAIControlIndicator(ctx, page, script.Name, currentLang)
 
 	// 执行每个操作
 	for i, action := range script.Actions {
 		logger.Info(ctx, "[%d/%d] Execute action: %s", i+1, len(script.Actions), action.Type)
+
+		// 更新 AI 控制状态显示
+		p.updateAIControlStatus(ctx, page, i+1, len(script.Actions), action.Type)
 
 		// 检查条件执行
 		if action.Condition != nil && action.Condition.Enabled {
@@ -628,6 +1059,13 @@ func (p *Player) PlayScript(ctx context.Context, page *rod.Page, script *models.
 	if len(p.extractedData) > 0 {
 		logger.Info(ctx, "Extracted %d data items", len(p.extractedData))
 	}
+
+	// 显示执行完成状态（指示器将保持常驻）
+	completedText := getI18nText("ai.control.completed", currentLang)
+	successText := getI18nText("ai.control.success", currentLang)
+	failedText := getI18nText("ai.control.failed", currentLang)
+	statusMessage := fmt.Sprintf("%s (%s:%d, %s:%d)", completedText, successText, p.successCount, failedText, p.failCount)
+	p.updateAIControlStatus(ctx, page, len(script.Actions), len(script.Actions), statusMessage)
 
 	// 如果所有操作都失败了，返回错误
 	if p.failCount > 0 && p.successCount == 0 {
@@ -1222,6 +1660,8 @@ func (p *Player) executeNavigate(ctx context.Context, page *rod.Page, action mod
 	if err := page.WaitLoad(); err != nil {
 		return fmt.Errorf("failed to wait for page to load: %w", err)
 	}
+
+	p.ensureAIControlIndicator(ctx, page)
 
 	return nil
 }

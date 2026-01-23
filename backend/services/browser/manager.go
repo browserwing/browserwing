@@ -838,7 +838,12 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 		}
 	}
 
-	player := NewPlayer()
+	// 创建播放器，传入当前语言设置
+	currentLang := m.currentLanguage
+	if currentLang == "" {
+		currentLang = "zh-CN" // 默认简体中文
+	}
+	player := NewPlayer(currentLang)
 
 	// 设置下载路径并启动下载监听
 	if m.downloadPath != "" {
@@ -883,7 +888,7 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script) (*model
 	}
 
 	// 执行回放
-	playErr := player.PlayScript(ctx, page, script)
+	playErr := player.PlayScript(ctx, page, script, m.currentLanguage)
 
 	// 停止下载监听
 	if m.downloadPath != "" {
