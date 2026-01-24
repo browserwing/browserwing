@@ -37,12 +37,12 @@ func cleanToolName(name string) string {
 	// 将不允许的字符替换为下划线
 	re := regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 	cleaned := re.ReplaceAllString(name, "_")
-	
+
 	// 确保不以数字或特殊字符开头
 	if len(cleaned) > 0 && !regexp.MustCompile(`^[a-zA-Z]`).MatchString(cleaned) {
 		cleaned = "tool_" + cleaned
 	}
-	
+
 	return cleaned
 }
 
@@ -52,7 +52,7 @@ func (d *DeepSeekWrapper) wrapToolsForDeepSeek(tools []interfaces.Tool) []interf
 	for i, tool := range tools {
 		originalName := tool.Name()
 		cleanedName := cleanToolName(originalName)
-		
+
 		// 如果名称需要清理，则使用包装器
 		if cleanedName != originalName {
 			wrappedTools[i] = &DeepSeekToolWrapper{
@@ -272,7 +272,7 @@ func createDeepSeekClient(config *models.LLMConfigModel) (interfaces.LLM, error)
 	opts = append(opts, openai.WithBaseURL(baseURL))
 
 	client := openai.NewClient(config.APIKey, opts...)
-	
+
 	// 使用包装器处理 DeepSeek 的特殊参数要求
 	return &DeepSeekWrapper{client: client}, nil
 }
@@ -292,7 +292,13 @@ func createOpenAICompatibleClient(config *models.LLMConfigModel) (interfaces.LLM
 		opts = append(opts, openai.WithBaseURL(baseURL))
 	}
 
-	client := openai.NewClient(config.APIKey, opts...)
+	// Ollama 本地运行时不需要真实的 API Key，提供默认值
+	apiKey := config.APIKey
+	if provider == "ollama" && apiKey == "" {
+		apiKey = "ollama" // Ollama 本地不验证 API Key，提供占位符即可
+	}
+
+	client := openai.NewClient(apiKey, opts...)
 	return client, nil
 }
 
@@ -364,7 +370,9 @@ func ValidateLLMConfig(config *models.LLMConfigModel) error {
 		return fmt.Errorf("provider cannot be empty")
 	}
 
-	if config.APIKey == "" {
+	// Ollama 本地运行时不需要 API Key
+	provider := strings.ToLower(config.Provider)
+	if provider != "ollama" && config.APIKey == "" {
 		return fmt.Errorf("api_key cannot be empty")
 	}
 
@@ -521,6 +529,18 @@ func SupportsToolCalling(provider, model string) bool {
 			"qwen2.5", "qwen/qwen", "deepseek-v3", "deepseek-ai/deepseek",
 			"llama-3.3", "llama-3.1", "meta-llama/llama",
 			"yi-lightning", "01-ai/yi",
+		},
+		"ollama": {
+			// Ollama 支持工具调用的模型（需要较新的模型）
+			"qwen2.5", "qwen2", "qwen",
+			"llama3.3", "llama3.2", "llama3.1", "llama3",
+			"llama-3.3", "llama-3.2", "llama-3.1", "llama-3",
+			"mistral", "mixtral",
+			"deepseek-r1", "deepseek-v3", "deepseek-coder",
+			"yi-coder", "yi-lightning",
+			"phi3", "phi4",
+			"gemma2", "gemma",
+			"command-r", "command-r-plus",
 		},
 	}
 
