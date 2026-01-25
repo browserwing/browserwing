@@ -778,6 +778,27 @@ func (am *AgentManager) createAgentInstance(llmClient interfaces.LLM, maxIter in
 	return ag, nil
 }
 
+// createEvalAgent 创建评估 Agent（不带任何工具）
+func (am *AgentManager) createEvalAgent(llmClient interfaces.LLM) (*agent.Agent, error) {
+	mem := memory.NewConversationBuffer()
+
+	// ⚠️ 评估 Agent 不需要任何工具，只用于评估任务复杂度
+	ag, err := agent.NewAgent(
+		agent.WithLLM(llmClient),
+		agent.WithMemory(mem),
+		// ✅ 不传入任何工具
+		agent.WithSystemPrompt("You are a task evaluation assistant. Your ONLY job is to analyze user requests and classify them. DO NOT call any tools, DO NOT perform any actions, ONLY return the evaluation JSON."),
+		agent.WithRequirePlanApproval(false),
+		agent.WithMaxIterations(1), // 评估只需要1次
+		agent.WithLogger(NewAgentLogger()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return ag, nil
+}
+
 // createAgentInstances 为会话创建所有类型的 Agent 实例（使用指定的 LLM client）
 func (am *AgentManager) createAgentInstances(llmClient interfaces.LLM) (*AgentInstances, error) {
 	// 创建简单任务 Agent
@@ -798,8 +819,8 @@ func (am *AgentManager) createAgentInstances(llmClient interfaces.LLM) (*AgentIn
 		return nil, fmt.Errorf("failed to create complex agent: %w", err)
 	}
 
-	// 创建任务评估 Agent
-	evalAgent, err := am.createAgentInstance(llmClient, maxIterationsEval)
+	// 创建任务评估 Agent（不带工具）
+	evalAgent, err := am.createEvalAgent(llmClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create eval agent: %w", err)
 	}
@@ -1000,48 +1021,86 @@ If need_tools is false, set complex_mode to "none".`, userMessage)
 	// 使用评估 Agent
 	response, err := agentInstances.EvalAgent.Run(evalCtx, evalPrompt)
 	if err != nil {
-		logger.Warn(ctx, "[TaskEval] Failed to evaluate task complexity: %v, defaulting to simple", err)
+		logger.Warn(ctx, "[TaskEval] Failed to evaluate task complexity: %v, defaulting to no tools", err)
 		return &TaskComplexity{
-			ComplexMode: ComplexModeSimple,
-			Reasoning:   "Evaluation failed, defaulting to simple task",
+			NeedTools:   false, // ✅ 评估失败时默认不使用工具
+			ComplexMode: "none",
+			Reasoning:   "Evaluation failed, defaulting to direct response",
 			Confidence:  "low",
-			Explanation: "无法评估任务复杂度，使用简单模式",
+			Explanation: "评估失败，直接回复",
 		}, nil
 	}
 
 	logger.Info(ctx, "[TaskEval] Raw response: %s", response)
+	
+	// 🔍 调试：输出原始响应的前 200 个字符
+	if len(response) > 200 {
+		logger.Info(ctx, "[TaskEval] Raw response preview (first 200 chars): %s...", response[:200])
+	}
 
 	response = strings.TrimSpace(response)
 	// 移除 ```json 和 ``` 标签
 	response = strings.ReplaceAll(response, "```json", "")
 	response = strings.ReplaceAll(response, "```", "")
 	response = strings.TrimSpace(response)
+	
+	// 🔍 调试：输出清理后的响应
+	logger.Info(ctx, "[TaskEval] Cleaned response: %s", response)
 	if response == "" {
-		logger.Warn(ctx, "[TaskEval] Empty response, defaulting to simple")
+		logger.Warn(ctx, "[TaskEval] Empty response, defaulting to no tools")
 		return &TaskComplexity{
-			ComplexMode: ComplexModeSimple,
-			Reasoning:   "Empty response, defaulting to simple",
+			NeedTools:   false, // ✅ 空响应时默认不使用工具
+			ComplexMode: "none",
+			Reasoning:   "Empty response, defaulting to direct response",
 			Confidence:  "low",
-			Explanation: "评估结果为空，使用简单模式",
+			Explanation: "评估结果为空，直接回复",
 		}, nil
 	}
 
 	// 解析 JSON 响应
 	var complexity TaskComplexity
 	if err := json.Unmarshal([]byte(response), &complexity); err != nil {
-		logger.Warn(ctx, "[TaskEval] Failed to parse JSON response: %v, defaulting to simple", err)
+		logger.Warn(ctx, "[TaskEval] Failed to parse JSON response: %v", err)
+		logger.Warn(ctx, "[TaskEval] Response content: %s", response)
+		logger.Warn(ctx, "[TaskEval] Defaulting to no tools")
 		return &TaskComplexity{
-			ComplexMode: ComplexModeSimple,
+			NeedTools:   false, // ✅ 解析失败时默认不使用工具
+			ComplexMode: "none",
 			Reasoning:   "Failed to parse evaluation result",
 			Confidence:  "low",
-			Explanation: "评估结果解析失败，使用简单模式",
+			Explanation: "评估结果解析失败，直接回复",
 		}, nil
 	}
+	
+	// 🔍 调试：检查解析后的值
+	logger.Info(ctx, "[TaskEval] Parsed result: NeedTools=%v, ComplexMode='%s', Reasoning='%s'",
+		complexity.NeedTools,
+		complexity.ComplexMode,
+		complexity.Reasoning)
 
+	// 🔍 验证：检查必需字段是否为空
+	if complexity.ComplexMode == "" && complexity.Reasoning == "" {
+		logger.Warn(ctx, "[TaskEval] ⚠️ Warning: All fields are empty after parsing! Using default.")
+		logger.Warn(ctx, "[TaskEval] This usually means LLM returned wrong format.")
+		return &TaskComplexity{
+			NeedTools:   false,
+			ComplexMode: "none",
+			Reasoning:   "LLM returned invalid format",
+			Confidence:  "low",
+			Explanation: "评估返回格式错误，直接回复",
+		}, nil
+	}
+	
 	logger.Info(ctx, "[TaskEval] Task evaluated as %s (confidence: %s): %s",
 		complexity.ComplexMode,
 		complexity.Confidence,
 		complexity.Reasoning)
+	
+	// 🔍 调试日志：输出完整的评估结果
+	logger.Info(ctx, "[TaskEval] ✓ Evaluation result: NeedTools=%v, ComplexMode=%s, Confidence=%s",
+		complexity.NeedTools,
+		complexity.ComplexMode,
+		complexity.Confidence)
 
 	return &complexity, nil
 }
@@ -1123,18 +1182,25 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 	// 评估任务复杂度（在后台进行）
 	complexity, err := am.evaluateTaskComplexity(ctx, sessionID, userMessage)
 	if err != nil {
-		logger.Warn(ctx, "Failed to evaluate task complexity: %v, using simple agent", err)
+		logger.Warn(ctx, "Failed to evaluate task complexity: %v, using direct response", err)
 		complexity = &TaskComplexity{
-			NeedTools:   true,
-			ComplexMode: ComplexModeSimple,
-			Reasoning:   "Evaluation error, defaulting to simple",
+			NeedTools:   false, // ✅ 评估错误时默认不使用工具
+			ComplexMode: "none",
+			Reasoning:   "Evaluation error, defaulting to direct response",
 			Confidence:  "low",
-			Explanation: "评估失败，使用简单模式",
+			Explanation: "评估失败，直接回复",
 		}
 	}
+	
+	// 🔍 调试日志：输出评估结果和判断逻辑
+	logger.Info(ctx, "[SendMessage] Complexity evaluation: NeedTools=%v, ComplexMode=%s, Message='%s'",
+		complexity.NeedTools,
+		complexity.ComplexMode,
+		userMessage)
 
 	// 如果不需要工具，直接用 LLM 生成回复
 	if !complexity.NeedTools {
+		logger.Info(ctx, "[SendMessage] ✓ Taking direct response path (no tools needed)")
 		logger.Info(ctx, "[DirectLLM] Task doesn't need tools, using direct LLM response: %s", complexity.Reasoning)
 		
 		// 使用 SimpleAgent 但不调用工具（直接回复）
@@ -1202,6 +1268,8 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 	}
 
 	// 需要工具，根据评估结果选择合适的 Agent
+	logger.Info(ctx, "[SendMessage] ✓ Taking agent path (tools needed)")
+	
 	var ag *agent.Agent
 	switch complexity.ComplexMode {
 	case ComplexModeComplex:
