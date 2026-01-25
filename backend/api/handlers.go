@@ -2901,10 +2901,17 @@ func generateSkillMD(scripts []*models.Script, host string, isExportAll bool, sc
 		if i >= 10 {
 			break
 		}
+		description := script.Description
+		if description == "" && script.Name != "" {
+			description = script.Name
+		}
+		if description == "" && script.MCPCommandDescription != "" {
+			description = script.MCPCommandDescription
+		}
 		if i == len(scripts)-1 || i == 9 {
-			skillDescription += script.Description
+			skillDescription += description
 		} else {
-			skillDescription += script.Description + ","
+			skillDescription += description + ","
 		}
 	}
 
