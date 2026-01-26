@@ -9,6 +9,8 @@ import (
 	"image/draw"
 	"image/gif"
 	"image/jpeg"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -124,7 +126,6 @@ func (p *Player) ensureAIControlIndicator(ctx context.Context, page *rod.Page) {
 		}
 		return document.getElementById('browserwing-ai-indicator') !== null;
 	}`)
-
 	if err != nil {
 		logger.Warn(ctx, "Failed to check AI control indicator: %v", err)
 		return
@@ -138,17 +139,17 @@ func (p *Player) ensureAIControlIndicator(ctx context.Context, page *rod.Page) {
 			currentLang = "zh-CN"
 		}
 		p.showAIControlIndicator(ctx, page, p.currentScriptName, currentLang)
-		
+
 		// 如果有当前执行的脚本动作，重新初始化步骤列表
 		if len(p.currentActions) > 0 {
 			p.initAIControlSteps(ctx, page, p.currentActions)
-			
+
 			// 恢复之前步骤的状态
 			for i := 0; i < p.currentStepIndex && i < len(p.currentActions); i++ {
 				// 标记已完成的步骤为成功（简化处理）
 				p.markStepCompleted(ctx, page, i+1, true)
 			}
-			
+
 			// 如果当前正在执行某个步骤，也更新其状态
 			if p.currentStepIndex > 0 && p.currentStepIndex <= len(p.currentActions) {
 				p.updateAIControlStatus(ctx, page, p.currentStepIndex, len(p.currentActions), p.currentActions[p.currentStepIndex-1].Type)
@@ -165,13 +166,13 @@ func (p *Player) initAIControlSteps(ctx context.Context, page *rod.Page, actions
 
 	// 获取国际化文本
 	stepText := getI18nText("ai.control.step", p.currentLang)
-	
+
 	// 构建步骤数据
 	type stepData struct {
 		Index  int    `json:"index"`
 		Action string `json:"action"`
 	}
-	
+
 	steps := make([]stepData, len(actions))
 	for i, action := range actions {
 		steps[i] = stepData{
@@ -220,7 +221,6 @@ func (p *Player) initAIControlSteps(ctx context.Context, page *rod.Page, actions
 		
 		return true;
 	}`, stepText, steps)
-
 	if err != nil {
 		logger.Warn(ctx, "Failed to initialize AI control steps: %v", err)
 	}
@@ -261,7 +261,6 @@ func (p *Player) updateAIControlStatus(ctx context.Context, page *rod.Page, curr
 		
 		return true;
 	}`, current)
-
 	if err != nil {
 		logger.Warn(ctx, "Failed to update AI control status: %v", err)
 	}
@@ -316,7 +315,6 @@ func (p *Player) markStepCompleted(ctx context.Context, page *rod.Page, stepInde
 		
 		return true;
 	}`, stepIndex, success)
-
 	if err != nil {
 		logger.Warn(ctx, "Failed to mark step completion: %v", err)
 	}
@@ -328,84 +326,84 @@ func getI18nText(key, lang string) string {
 	translations := map[string]map[string]string{
 		"zh-CN": {
 			// AI 控制指示器
-			"ai.control.title":    "Browserwing AI 控制中",
-			"ai.control.script":   "执行脚本:",
-			"ai.control.ready":    "准备执行脚本...",
-			"ai.control.step":     "步骤",
+			"ai.control.title":     "Browserwing AI 控制中",
+			"ai.control.script":    "执行脚本:",
+			"ai.control.ready":     "准备执行脚本...",
+			"ai.control.step":      "步骤",
 			"ai.control.completed": "✓ 完成",
-			"ai.control.success":  "成功",
-			"ai.control.failed":   "失败",
+			"ai.control.success":   "成功",
+			"ai.control.failed":    "失败",
 			// 操作类型
-			"action.click":              "点击元素",
-			"action.input":              "输入文本",
-			"action.select":             "选择选项",
-			"action.navigate":           "页面导航",
-			"action.wait":               "等待加载",
-			"action.sleep":              "延迟等待",
-			"action.extract_text":       "提取文本",
-			"action.extract_html":       "提取HTML",
-			"action.extract_attribute":  "提取属性",
-			"action.execute_js":         "执行JS",
-			"action.upload_file":        "上传文件",
-			"action.scroll":             "滚动页面",
-			"action.keyboard":           "键盘事件",
-			"action.open_tab":           "打开新标签页",
-			"action.switch_tab":         "切换标签页",
-			"action.switch_active_tab":  "切换到活跃标签页",
+			"action.click":             "点击元素",
+			"action.input":             "输入文本",
+			"action.select":            "选择选项",
+			"action.navigate":          "页面导航",
+			"action.wait":              "等待加载",
+			"action.sleep":             "延迟等待",
+			"action.extract_text":      "提取文本",
+			"action.extract_html":      "提取HTML",
+			"action.extract_attribute": "提取属性",
+			"action.execute_js":        "执行JS",
+			"action.upload_file":       "上传文件",
+			"action.scroll":            "滚动页面",
+			"action.keyboard":          "键盘事件",
+			"action.open_tab":          "打开新标签页",
+			"action.switch_tab":        "切换标签页",
+			"action.switch_active_tab": "切换到活跃标签页",
 		},
 		"zh-TW": {
 			// AI 控制指示器
-			"ai.control.title":    "Browserwing AI 控制中",
-			"ai.control.script":   "執行腳本:",
-			"ai.control.ready":    "準備執行腳本...",
-			"ai.control.step":     "步驟",
+			"ai.control.title":     "Browserwing AI 控制中",
+			"ai.control.script":    "執行腳本:",
+			"ai.control.ready":     "準備執行腳本...",
+			"ai.control.step":      "步驟",
 			"ai.control.completed": "✓ 完成",
-			"ai.control.success":  "成功",
-			"ai.control.failed":   "失敗",
+			"ai.control.success":   "成功",
+			"ai.control.failed":    "失敗",
 			// 操作類型
-			"action.click":              "點擊元素",
-			"action.input":              "輸入文字",
-			"action.select":             "選擇選項",
-			"action.navigate":           "頁面導航",
-			"action.wait":               "等待載入",
-			"action.sleep":              "延遲等待",
-			"action.extract_text":       "提取文字",
-			"action.extract_html":       "提取HTML",
-			"action.extract_attribute":  "提取屬性",
-			"action.execute_js":         "執行JS",
-			"action.upload_file":        "上傳檔案",
-			"action.scroll":             "滾動頁面",
-			"action.keyboard":           "鍵盤事件",
-			"action.open_tab":           "打開新標籤頁",
-			"action.switch_tab":         "切換標籤頁",
-			"action.switch_active_tab":  "切換到活躍標籤頁",
+			"action.click":             "點擊元素",
+			"action.input":             "輸入文字",
+			"action.select":            "選擇選項",
+			"action.navigate":          "頁面導航",
+			"action.wait":              "等待載入",
+			"action.sleep":             "延遲等待",
+			"action.extract_text":      "提取文字",
+			"action.extract_html":      "提取HTML",
+			"action.extract_attribute": "提取屬性",
+			"action.execute_js":        "執行JS",
+			"action.upload_file":       "上傳檔案",
+			"action.scroll":            "滾動頁面",
+			"action.keyboard":          "鍵盤事件",
+			"action.open_tab":          "打開新標籤頁",
+			"action.switch_tab":        "切換標籤頁",
+			"action.switch_active_tab": "切換到活躍標籤頁",
 		},
 		"en": {
 			// AI Control Indicator
-			"ai.control.title":    "Browserwing AI Control",
-			"ai.control.script":   "Executing Script:",
-			"ai.control.ready":    "Preparing to execute script...",
-			"ai.control.step":     "Step",
+			"ai.control.title":     "Browserwing AI Control",
+			"ai.control.script":    "Executing Script:",
+			"ai.control.ready":     "Preparing to execute script...",
+			"ai.control.step":      "Step",
 			"ai.control.completed": "✓ Completed",
-			"ai.control.success":  "Success",
-			"ai.control.failed":   "Failed",
+			"ai.control.success":   "Success",
+			"ai.control.failed":    "Failed",
 			// Action Types
-			"action.click":              "Click Element",
-			"action.input":              "Input Text",
-			"action.select":             "Select Option",
-			"action.navigate":           "Navigate Page",
-			"action.wait":               "Wait for Load",
-			"action.sleep":              "Sleep",
-			"action.extract_text":       "Extract Text",
-			"action.extract_html":       "Extract HTML",
-			"action.extract_attribute":  "Extract Attribute",
-			"action.execute_js":         "Execute JS",
-			"action.upload_file":        "Upload File",
-			"action.scroll":             "Scroll Page",
-			"action.keyboard":           "Keyboard Event",
-			"action.open_tab":           "Open New Tab",
-			"action.switch_tab":         "Switch Tab",
-			"action.switch_active_tab":  "Switch to Active Tab",
+			"action.click":             "Click Element",
+			"action.input":             "Input Text",
+			"action.select":            "Select Option",
+			"action.navigate":          "Navigate Page",
+			"action.wait":              "Wait for Load",
+			"action.sleep":             "Sleep",
+			"action.extract_text":      "Extract Text",
+			"action.extract_html":      "Extract HTML",
+			"action.extract_attribute": "Extract Attribute",
+			"action.execute_js":        "Execute JS",
+			"action.upload_file":       "Upload File",
+			"action.scroll":            "Scroll Page",
+			"action.keyboard":          "Keyboard Event",
+			"action.open_tab":          "Open New Tab",
+			"action.switch_tab":        "Switch Tab",
+			"action.switch_active_tab": "Switch to Active Tab",
 		},
 	}
 
@@ -493,7 +491,7 @@ func (p *Player) StartDownloadListener(ctx context.Context, browser *rod.Browser
 
 			// 构建完整路径
 			fullPath := filepath.Join(p.downloadPath, fileName)
-			
+
 			// 检查文件是否实际存在（可能浏览器自动重命名了）
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 				// 文件不存在，可能被重命名了（如 file.pdf -> file (1).pdf）
@@ -516,7 +514,7 @@ func (p *Player) StartDownloadListener(ctx context.Context, browser *rod.Browser
 
 			if !alreadyRecorded {
 				p.downloadedFiles = append(p.downloadedFiles, fullPath)
-				logger.Info(ctx, "✓ Download completed: %s (%.2f MB, GUID: %s)", 
+				logger.Info(ctx, "✓ Download completed: %s (%.2f MB, GUID: %s)",
 					fullPath, float64(e.TotalBytes)/(1024*1024), e.GUID)
 			}
 
@@ -552,10 +550,10 @@ func (p *Player) findSimilarFile(originalName string) string {
 		// 检查是否匹配 "原名 (数字).扩展名" 的模式
 		if strings.HasPrefix(name, nameWithoutExt) && strings.HasSuffix(name, ext) {
 			// 精确匹配或带数字后缀
-			if name == originalName || 
-			   (len(name) > len(nameWithoutExt)+len(ext) && 
-			    name[len(nameWithoutExt)] == ' ' && 
-			    name[len(nameWithoutExt)+1] == '(') {
+			if name == originalName ||
+				(len(name) > len(nameWithoutExt)+len(ext) &&
+					name[len(nameWithoutExt)] == ' ' &&
+					name[len(nameWithoutExt)+1] == '(') {
 				return name
 			}
 		}
@@ -570,7 +568,7 @@ func (p *Player) StopDownloadListener(ctx context.Context) {
 		p.downloadCancel()
 		logger.Info(ctx, "Download event listener stopped")
 	}
-	
+
 	// 记录最终下载的文件
 	if len(p.downloadedFiles) > 0 {
 		logger.Info(ctx, "✓ Total downloaded files: %d", len(p.downloadedFiles))
@@ -943,7 +941,7 @@ func (p *Player) PlayScript(ctx context.Context, page *rod.Page, script *models.
 		}
 		// 等待页面稳定
 		time.Sleep(2 * time.Second)
-		
+
 		// 页面加载完成后，等待额外时间让 JavaScript 框架初始化完成
 		logger.Info(ctx, "Waiting for page JavaScript to stabilize...")
 		time.Sleep(1 * time.Second)
@@ -953,10 +951,10 @@ func (p *Player) PlayScript(ctx context.Context, page *rod.Page, script *models.
 	p.currentScriptName = script.Name
 	p.currentActions = script.Actions
 	p.currentStepIndex = 0
-	
+
 	// 在页面完全稳定后显示 AI 控制指示器
 	p.showAIControlIndicator(ctx, page, script.Name, currentLang)
-	
+
 	// 初始化步骤列表
 	p.initAIControlSteps(ctx, page, script.Actions)
 
@@ -1962,6 +1960,74 @@ func (p *Player) executeScroll(ctx context.Context, page *rod.Page, action model
 	return nil
 }
 
+// downloadFileFromURL 从 HTTP(S) URL 下载文件到临时目录
+func (p *Player) downloadFileFromURL(ctx context.Context, url string) (string, error) {
+	logger.Info(ctx, "Downloading file from URL: %s", url)
+
+	// 创建 HTTP 请求
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// 执行请求
+	client := &http.Client{
+		Timeout: 5 * time.Minute, // 5分钟超时
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 检查响应状态
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
+	}
+
+	// 从 URL 中提取文件名
+	urlPath := strings.TrimRight(url, "/")
+	fileName := filepath.Base(urlPath)
+	if fileName == "." || fileName == "/" || fileName == "" {
+		fileName = "downloaded_file"
+	}
+
+	// 如果文件名没有扩展名，尝试从 Content-Type 推断
+	if filepath.Ext(fileName) == "" {
+		contentType := resp.Header.Get("Content-Type")
+		if strings.Contains(contentType, "image/jpeg") || strings.Contains(contentType, "image/jpg") {
+			fileName += ".jpg"
+		} else if strings.Contains(contentType, "image/png") {
+			fileName += ".png"
+		} else if strings.Contains(contentType, "image/gif") {
+			fileName += ".gif"
+		} else if strings.Contains(contentType, "application/pdf") {
+			fileName += ".pdf"
+		}
+	}
+
+	// 创建临时文件
+	tempDir := os.TempDir()
+	tempFile := filepath.Join(tempDir, fileName)
+
+	// 创建目标文件
+	out, err := os.Create(tempFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer out.Close()
+
+	// 复制内容到文件
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		os.Remove(tempFile) // 清理失败的文件
+		return "", fmt.Errorf("failed to save file: %w", err)
+	}
+
+	logger.Info(ctx, "✓ File downloaded successfully to: %s", tempFile)
+	return tempFile, nil
+}
+
 // executeUploadFile 执行文件上传操作
 func (p *Player) executeUploadFile(ctx context.Context, page *rod.Page, action models.ScriptAction) error {
 	selector := action.Selector
@@ -1982,6 +2048,44 @@ func (p *Player) executeUploadFile(ctx context.Context, page *rod.Page, action m
 	}
 
 	logger.Info(ctx, "Preparing to upload %d files: %v", len(action.FilePaths), action.FilePaths)
+
+	// 处理 HTTP(S) 链接，先下载到本地
+	localFilePaths := make([]string, 0, len(action.FilePaths))
+	downloadedFiles := make([]string, 0) // 记录需要清理的临时文件
+
+	for _, filePath := range action.FilePaths {
+		// 检查是否是 HTTP(S) 链接
+		if strings.HasPrefix(strings.ToLower(filePath), "http://") ||
+			strings.HasPrefix(strings.ToLower(filePath), "https://") {
+			// 下载文件到本地
+			localPath, err := p.downloadFileFromURL(ctx, filePath)
+			if err != nil {
+				// 清理已下载的临时文件
+				for _, tmpFile := range downloadedFiles {
+					os.Remove(tmpFile)
+				}
+				return fmt.Errorf("failed to download file from %s: %w", filePath, err)
+			}
+			localFilePaths = append(localFilePaths, localPath)
+			downloadedFiles = append(downloadedFiles, localPath)
+		} else {
+			// 本地文件路径，直接使用
+			localFilePaths = append(localFilePaths, filePath)
+		}
+	}
+
+	// 延迟清理下载的临时文件
+	defer func() {
+		for _, tmpFile := range downloadedFiles {
+			if err := os.Remove(tmpFile); err != nil {
+				logger.Warn(ctx, "Failed to cleanup temp file %s: %v", tmpFile, err)
+			} else {
+				logger.Info(ctx, "Cleaned up temp file: %s", tmpFile)
+			}
+		}
+	}()
+
+	logger.Info(ctx, "Local file paths ready: %v", localFilePaths)
 
 	// 重试机制：最多尝试3次
 	maxRetries := 3
@@ -2028,8 +2132,8 @@ func (p *Player) executeUploadFile(ctx context.Context, page *rod.Page, action m
 		// 高亮显示元素（即使是隐藏的也可以高亮其父元素）
 		p.highlightElement(ctx, element)
 
-		// 使用 SetFiles 设置文件
-		err = element.SetFiles(action.FilePaths)
+		// 使用 SetFiles 设置文件（使用处理后的本地文件路径）
+		err = element.SetFiles(localFilePaths)
 		if err == nil {
 			logger.Info(ctx, "✓ File upload successful")
 
