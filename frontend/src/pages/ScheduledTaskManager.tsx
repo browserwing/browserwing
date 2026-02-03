@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, Plus, Edit2, Trash2, Power, PowerOff, History, Calendar, Timer, Code, ChevronDown, ChevronUp } from 'lucide-react'
+import { Clock, Plus, Edit2, Trash2, Power, PowerOff, History, Calendar, Timer, Code, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { useLanguage } from '../i18n'
 import * as api from '../api/client'
 import type { ScheduledTask, TaskExecution, Script, LLMConfig } from '../api/client'
@@ -414,15 +414,29 @@ export default function ScheduledTaskManager() {
 
       {/* Tasks Tab */}
       {activeTab === 'tasks' && (
-        <div className="space-y-4">
-          {/* Search - 缩小尺寸 */}
-          <input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full max-w-md px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
-          />
+        <div className="space-y-4" style={{ marginTop: '19px' }}>
+          {/* Search */}
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={t('common.search')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-3 pr-8 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 w-64 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Task List */}
           {loading ? (
@@ -548,25 +562,52 @@ export default function ScheduledTaskManager() {
 
       {/* Executions Tab */}
       {activeTab === 'executions' && (
-        <div className="space-y-4">
-          {/* Filters - 缩小尺寸 */}
-          <div className="flex space-x-3">
-            <input
-              type="text"
-              placeholder={t('common.search')}
-              value={executionSearchQuery}
-              onChange={(e) => setExecutionSearchQuery(e.target.value)}
-              className="flex-1 max-w-md px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 placeholder-gray-500 focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
-            />
-            <select
-              value={successFilter}
-              onChange={(e) => setSuccessFilter(e.target.value as 'all' | 'success' | 'failed')}
-              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
-            >
-              <option value="all">{t('common.all')}</option>
-              <option value="success">{t('task.status.success')}</option>
-              <option value="failed">{t('task.status.failed')}</option>
-            </select>
+        <div className="space-y-4" style={{ marginTop: '19px' }}>
+          {/* Filters */}
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={t('common.search')}
+                  value={executionSearchQuery}
+                  onChange={(e) => setExecutionSearchQuery(e.target.value)}
+                  className="pl-3 pr-8 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 w-64 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                />
+                {executionSearchQuery && (
+                  <button
+                    onClick={() => setExecutionSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <select
+                  value={successFilter}
+                  onChange={(e) => setSuccessFilter(e.target.value as 'all' | 'success' | 'failed')}
+                  className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="all">{t('common.all')}</option>
+                  <option value="success">{t('task.status.success')}</option>
+                  <option value="failed">{t('task.status.failed')}</option>
+                </select>
+              </div>
+
+              {(executionSearchQuery || successFilter !== 'all') && (
+                <button
+                  onClick={() => { 
+                    setExecutionSearchQuery(''); 
+                    setSuccessFilter('all');
+                  }}
+                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+                >
+                  {t('script.filter.clear')}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Execution List */}

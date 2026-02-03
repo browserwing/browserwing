@@ -1339,23 +1339,13 @@ export default function ScriptManager() {
       {/* 悬浮工具栏 */}
       {showFloatingToolbar && editingScript && (
         <div className="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-lg z-50 animate-slide-down">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto px-6 lg:px-10 xl:px-12 py-3 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('script.editor.editing')}: {editingScript.name}
               </span>
             </div>
             <div className="flex items-center space-x-3">
-              {editingActions.some(action => action.type === 'sleep') && (
-                <button
-                  onClick={handleRemoveAllSleepActions}
-                  className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition-colors shadow-sm"
-                  title={t('script.editor.removeAllSleep')}
-                >
-                  <Clock className="w-4 h-4" />
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
               <div className="relative">
                 <button
                   onClick={() => setShowFloatingAddActionMenu(!showFloatingAddActionMenu)}
@@ -1373,35 +1363,35 @@ export default function ScriptManager() {
                       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.basic')}</div>
                         <div className="grid grid-cols-2 gap-1.5">
-                          <button onClick={() => { handleAddAction('click'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Click</button>
-                          <button onClick={() => { handleAddAction('input'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Input</button>
-                          <button onClick={() => { handleAddAction('select'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Select</button>
-                          <button onClick={() => { handleAddAction('navigate'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Navigate</button>
+                          <button onClick={() => { handleAddAction('click'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('click')}</button>
+                          <button onClick={() => { handleAddAction('input'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('input')}</button>
+                          <button onClick={() => { handleAddAction('select'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('select')}</button>
+                          <button onClick={() => { handleAddAction('navigate'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('navigate')}</button>
                         </div>
                       </div>
                       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.waitScroll')}</div>
                         <div className="grid grid-cols-2 gap-1.5">
-                          <button onClick={() => { handleAddAction('wait'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Wait</button>
-                          <button onClick={() => { handleAddAction('sleep'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Sleep</button>
-                          <button onClick={() => { handleAddAction('scroll'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Scroll</button>
+                          <button onClick={() => { handleAddAction('wait'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('wait')}</button>
+                          <button onClick={() => { handleAddAction('sleep'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('sleep')}</button>
+                          <button onClick={() => { handleAddAction('scroll'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('scroll')}</button>
                         </div>
                       </div>
                       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.extract')}</div>
                         <div className="grid grid-cols-2 gap-1.5">
-                          <button onClick={() => { handleAddAction('extract_text'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Extract Text</button>
-                          <button onClick={() => { handleAddAction('extract_html'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Extract HTML</button>
-                          <button onClick={() => { handleAddAction('extract_attribute'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors col-span-2">Extract Attribute</button>
+                          <button onClick={() => { handleAddAction('extract_text'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('extract_text')}</button>
+                          <button onClick={() => { handleAddAction('extract_html'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('extract_html')}</button>
+                          <button onClick={() => { handleAddAction('extract_attribute'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors col-span-2">{t('extract_attribute')}</button>
                         </div>
                       </div>
                       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('script.action.category.advanced')}</div>
                         <div className="grid grid-cols-2 gap-1.5">
-                          <button onClick={() => { handleAddAction('execute_js'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Execute JS</button>
-                          <button onClick={() => { handleAddAction('upload_file'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Upload File</button>
-                          <button onClick={() => { handleAddAction('keyboard'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Keyboard</button>
-                          <button onClick={() => { handleAddAction('screenshot'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">Screenshot</button>
+                          <button onClick={() => { handleAddAction('execute_js'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('execute_js')}</button>
+                          <button onClick={() => { handleAddAction('upload_file'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('upload_file')}</button>
+                          <button onClick={() => { handleAddAction('keyboard'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('keyboard')}</button>
+                          <button onClick={() => { handleAddAction('screenshot'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('screenshot')}</button>
                         </div>
                       </div>
                       <div className="px-3 py-2">
@@ -1419,7 +1409,7 @@ export default function ScriptManager() {
               <button
                 onClick={handleSaveEditedScript}
                 disabled={loading}
-                className="flex items-center space-x-1 px-4 py-1.5 bg-gray-900 dark:bg-gray-100 hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors shadow-sm"
               >
                 <Check className="w-4 h-4" />
                 <span>{t('script.card.saveEdit')}</span>
@@ -1430,7 +1420,7 @@ export default function ScriptManager() {
                   setEditingActions([])
                 }}
                 disabled={loading}
-                className="flex items-center space-x-1 px-4 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors shadow-sm"
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors shadow-sm"
               >
                 <X className="w-4 h-4" />
                 <span>{t('script.card.cancelEdit')}</span>
@@ -2372,7 +2362,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Click
+                                                {t('click')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2381,7 +2371,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Input
+                                                {t('input')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2390,7 +2380,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Select
+                                                {t('select')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2399,7 +2389,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Navigate
+                                                {t('navigate')}
                                               </button>
                                             </div>
                                           </div>
@@ -2415,7 +2405,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded transition-colors"
                                               >
-                                                Wait
+                                                {t('wait')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2424,7 +2414,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded transition-colors"
                                               >
-                                                Sleep
+                                                {t('sleep')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2433,7 +2423,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded transition-colors"
                                               >
-                                                Scroll
+                                                {t('scroll')}
                                               </button>
                                             </div>
                                           </div>
@@ -2449,7 +2439,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded transition-colors"
                                               >
-                                                Extract Text
+                                                {t('extract_text')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2458,7 +2448,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded transition-colors"
                                               >
-                                                Extract HTML
+                                                {t('extract_html')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2467,7 +2457,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded transition-colors col-span-2"
                                               >
-                                                Extract Attribute
+                                                {t('extract_attribute')}
                                               </button>
                                             </div>
                                           </div>
@@ -2483,7 +2473,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Execute JS
+                                                {t('execute_js')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2492,7 +2482,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Upload File
+                                                {t('upload_file')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2501,7 +2491,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Keyboard
+                                                {t('keyboard')}
                                               </button>
                                               <button
                                                 onClick={() => {
@@ -2510,7 +2500,7 @@ export default function ScriptManager() {
                                                 }}
                                                 className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                               >
-                                                Screenshot
+                                                {t('screenshot')}
                                               </button>
                                             </div>
                                           </div>
