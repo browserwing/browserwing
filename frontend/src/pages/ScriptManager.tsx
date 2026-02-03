@@ -156,7 +156,7 @@ export default function ScriptManager() {
     } else if (activeTab === 'executions') {
       loadExecutions()
     }
-  }, [activeTab, currentPage, filterGroup, filterTag, searchQuery, successFilter])
+  }, [activeTab, currentPage, filterGroup, filterTag, searchQuery, successFilter, executionSearchQuery])
 
   // 点击外部区域关闭导入下拉菜单
   useEffect(() => {
@@ -1250,10 +1250,6 @@ export default function ScriptManager() {
     }
   }
 
-  const handleSearchExecutions = () => {
-    setCurrentPage(1)
-    loadExecutions()
-  }
 
   const handleDeleteExecution = async () => {
     if (!executionDeleteConfirm.executionId) return
@@ -1713,6 +1709,84 @@ export default function ScriptManager() {
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>{t('common.delete')}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 搜索和过滤 & 批量操作 */}
+        {activeTab === 'executions' && (
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-4">
+              {/* 搜索框 */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={t('execution.search.placeholder')}
+                  value={executionSearchQuery}
+                  onChange={(e) => {
+                    setExecutionSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-3 pr-8 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 w-64 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                />
+                {executionSearchQuery && (
+                  <button
+                    onClick={() => {
+                      setExecutionSearchQuery('');
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* 状态过滤 */}
+              <div className="flex items-center space-x-2">
+                <select
+                  value={successFilter}
+                  onChange={(e) => {
+                    setSuccessFilter(e.target.value as any);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="all">{t('execution.filter.allStatus')}</option>
+                  <option value="success">{t('execution.filter.success')}</option>
+                  <option value="failed">{t('execution.filter.failed')}</option>
+                </select>
+              </div>
+
+              {(executionSearchQuery || successFilter !== 'all') && (
+                <button
+                  onClick={() => { 
+                    setExecutionSearchQuery(''); 
+                    setSuccessFilter('all'); 
+                    setCurrentPage(1); 
+                  }}
+                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+                >
+                  {t('script.filter.clear')}
+                </button>
+              )}
+            </div>
+
+            {/* 批量操作 */}
+            {selectedExecutions.size > 0 && (
+              <div className="flex items-center space-x-3">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {t('execution.selected', { count: selectedExecutions.size.toString() })}
+                </span>
+                <button
+                  onClick={handleBatchDeleteExecutions}
+                  className="btn-secondary text-sm flex items-center space-x-1.5"
+                  disabled={loading}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{t('execution.batchDelete')}</span>
                 </button>
               </div>
             )}
@@ -2573,54 +2647,7 @@ export default function ScriptManager() {
 
       {/* Execution History List */}
       {activeTab === 'executions' && (
-        <>
-          {/* 搜索和过滤 */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder={t('execution.search.placeholder')}
-                  value={executionSearchQuery}
-                  onChange={(e) => setExecutionSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearchExecutions()}
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 focus:border-gray-900 dark:focus:border-gray-100 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={successFilter}
-                  onChange={(e) => setSuccessFilter(e.target.value as any)}
-                  className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 focus:border-gray-900 dark:focus:border-gray-100 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="all">{t('execution.filter.allStatus')}</option>
-                  <option value="success">{t('execution.filter.success')}</option>
-                  <option value="failed">{t('execution.filter.failed')}</option>
-                </select>
-                <button
-                  onClick={handleSearchExecutions}
-                  className="px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  {t('common.search')}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 批量操作 */}
-          {selectedExecutions.size > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex items-center justify-between">
-              <span className="text-gray-900 dark:text-gray-100">
-                {t('execution.selected', { count: selectedExecutions.size.toString() })}
-              </span>
-              <button
-                onClick={handleBatchDeleteExecutions}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                {t('execution.batchDelete')}
-              </button>
-            </div>
-          )}
+        <div className="space-y-6">
 
           {/* 执行记录列表 */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -2634,12 +2661,17 @@ export default function ScriptManager() {
                   <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left">
-                        <input
-                          type="checkbox"
-                          checked={selectedExecutions.size === executions.length && executions.length > 0}
-                          onChange={toggleSelectAllExecutions}
-                          className="w-4 h-4 text-gray-900 rounded focus:ring-gray-900"
-                        />
+                        <button
+                          onClick={toggleSelectAllExecutions}
+                          className="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                          title={selectedExecutions.size === executions.length && executions.length > 0 ? t('script.card.deselectAll') : t('script.card.selectAll')}
+                        >
+                          {selectedExecutions.size === executions.length && executions.length > 0 ? (
+                            <CheckSquare className="w-5 h-5 text-gray-900 dark:text-gray-100" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('execution.table.scriptName')}</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('execution.table.startTime')}</th>
@@ -2654,12 +2686,17 @@ export default function ScriptManager() {
                       <>
                         <tr key={execution.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
                           <td className="px-6 py-4">
-                            <input
-                              type="checkbox"
-                              checked={selectedExecutions.has(execution.id)}
-                              onChange={() => toggleExecutionSelection(execution.id)}
-                              className="w-4 h-4 text-gray-900 dark:text-gray-100 rounded focus:ring-gray-900 dark:focus:ring-gray-100"
-                            />
+                            <button
+                              onClick={() => toggleExecutionSelection(execution.id)}
+                              className="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                              title={selectedExecutions.has(execution.id) ? t('script.card.deselect') : t('script.card.select')}
+                            >
+                              {selectedExecutions.has(execution.id) ? (
+                                <CheckSquare className="w-5 h-5 text-gray-900 dark:text-gray-100" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
                           </td>
                           <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
                             {execution.script_name}
@@ -2672,10 +2709,10 @@ export default function ScriptManager() {
                           </td>
                           <td className="px-6 py-4 text-sm">
                             <div className="flex items-center gap-2">
-                              <span className="text-green-600">{t('execution.steps.success', { count: execution.success_steps.toString() })}</span>
-                              <span className="text-gray-400">/</span>
-                              <span className="text-red-600">{t('execution.steps.failed', { count: execution.failed_steps.toString() })}</span>
-                              <span className="text-gray-400">/</span>
+                              <span className="text-gray-600 dark:text-gray-400">{t('execution.steps.success', { count: execution.success_steps.toString() })}</span>
+                              <span className="text-gray-600 dark:text-gray-400">/</span>
+                              <span className="text-gray-600 dark:text-gray-400">{t('execution.steps.failed', { count: execution.failed_steps.toString() })}</span>
+                              <span className="text-gray-600 dark:text-gray-400">/</span>
                               <span className="text-gray-600 dark:text-gray-400">{t('execution.steps.total', { count: execution.total_steps.toString() })}</span>
                             </div>
                           </td>
@@ -2804,7 +2841,7 @@ export default function ScriptManager() {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Delete Confirmation Dialog */}
