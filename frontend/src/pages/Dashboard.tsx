@@ -11,6 +11,7 @@ export default function Dashboard() {
   const mcpConfig = `{
   "mcpServers": {
     "browserwing": {
+      "type": "http",
       "url": "http://${window.location.host}/api/v1/mcp/message"
     }
   }

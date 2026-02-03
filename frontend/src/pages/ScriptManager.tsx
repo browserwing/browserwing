@@ -3344,6 +3344,7 @@ export default function ScriptManager() {
                               {`{
   "mcpServers": {
     "browserwing": {
+      "type": "http",
       "url": "http://${window.location.host}/api/v1/mcp/message"
     }
   }

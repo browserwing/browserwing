@@ -127,6 +127,7 @@ make package
 {
   "mcpServers": {
     "browserwing": {
+      "type": "http",
       "url": "http://localhost:8080/api/v1/mcp/message"
     }
   }
