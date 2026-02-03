@@ -941,6 +941,116 @@ export const deleteApiKey = async (id: string): Promise<void> => {
   await client.delete(`/api-keys/${id}`)
 }
 
+// 定时任务相关类型定义
+export type ScheduleType = 'at' | 'every' | 'cron'
+export type ExecutionType = 'script' | 'agent'
+
+export interface ScheduledTask {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  created_at: string
+  updated_at: string
+  schedule_type: ScheduleType
+  schedule_config: string
+  execution_type: ExecutionType
+  script_id?: string
+  script_name?: string
+  script_variables?: Record<string, string>
+  browser_instance_id?: string
+  agent_prompt?: string
+  agent_llm_id?: string
+  agent_llm_name?: string
+  agent_session_id?: string
+  last_execution_time?: string
+  next_execution_time?: string
+  last_execution_status?: 'success' | 'failed'
+  execution_count: number
+  success_count: number
+  failed_count: number
+}
+
+export interface TaskExecution {
+  id: string
+  task_id: string
+  task_name: string
+  start_time: string
+  end_time: string
+  duration: number
+  success: boolean
+  message: string
+  error_msg: string
+  result_data?: Record<string, any>
+  execution_type: ExecutionType
+  script_id?: string
+  agent_session_id?: string
+  created_at: string
+}
+
+// 定时任务 API
+export const listScheduledTasks = async (
+  page = 1,
+  pageSize = 20,
+  search = ''
+): Promise<{ tasks: ScheduledTask[]; total: number; page: number; page_size: number }> => {
+  const response = await client.get('/scheduled-tasks', {
+    params: { page, page_size: pageSize, search },
+  })
+  return response.data
+}
+
+export const getScheduledTask = async (id: string): Promise<ScheduledTask> => {
+  const response = await client.get(`/scheduled-tasks/${id}`)
+  return response.data.task
+}
+
+export const createScheduledTask = async (task: Partial<ScheduledTask>): Promise<ScheduledTask> => {
+  const response = await client.post('/scheduled-tasks', task)
+  return response.data.task
+}
+
+export const updateScheduledTask = async (id: string, task: Partial<ScheduledTask>): Promise<ScheduledTask> => {
+  const response = await client.put(`/scheduled-tasks/${id}`, task)
+  return response.data.task
+}
+
+export const deleteScheduledTask = async (id: string): Promise<void> => {
+  await client.delete(`/scheduled-tasks/${id}`)
+}
+
+export const toggleScheduledTask = async (id: string): Promise<ScheduledTask> => {
+  const response = await client.post(`/scheduled-tasks/${id}/toggle`)
+  return response.data.task
+}
+
+// 任务执行记录 API
+export const listTaskExecutions = async (
+  page = 1,
+  pageSize = 20,
+  taskId = '',
+  search = '',
+  successFilter = 'all'
+): Promise<{ executions: TaskExecution[]; total: number; page: number; page_size: number }> => {
+  const response = await client.get('/task-executions', {
+    params: { page, page_size: pageSize, task_id: taskId, search, success: successFilter },
+  })
+  return response.data
+}
+
+export const getTaskExecution = async (id: string): Promise<TaskExecution> => {
+  const response = await client.get(`/task-executions/${id}`)
+  return response.data.execution
+}
+
+export const deleteTaskExecution = async (id: string): Promise<void> => {
+  await client.delete(`/task-executions/${id}`)
+}
+
+export const batchDeleteTaskExecutions = async (ids: string[]): Promise<void> => {
+  await client.post('/task-executions/batch/delete', { ids })
+}
+
 
 
 

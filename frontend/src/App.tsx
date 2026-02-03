@@ -13,6 +13,7 @@ import AgentChat from './pages/AgentChat'
 import ToolManager from './pages/ToolManager'
 import Login from './pages/Login'
 import Settings from './pages/Settings'
+import ScheduledTaskManager from './pages/ScheduledTaskManager'
 import { checkAuth } from './api/client'
 
 // 受保护的路由组件
@@ -76,6 +77,7 @@ function App() {
           <Route path="browser/instances" element={<BrowserInstanceManager />} />
           <Route path="cookies" element={<CookieManager />} />
           <Route path="scripts" element={<ScriptManager />} />
+          <Route path="scheduled-tasks" element={<ScheduledTaskManager />} />
           <Route path="llm" element={<LLMManager />} />
           <Route path="prompts" element={<PromptManage />} />
           <Route path="agent" element={<AgentChat />} />

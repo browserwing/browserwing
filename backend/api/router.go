@@ -156,6 +156,26 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			mcp.GET("/commands_all", handler.ListMCPCommandsAll) // 列出所有 MCP 命令
 		}
 
+		// 定时任务相关
+		scheduledTasks := api.Group("/scheduled-tasks")
+		{
+			scheduledTasks.GET("", handler.ListScheduledTasks)           // 列出定时任务
+			scheduledTasks.GET("/:id", handler.GetScheduledTask)         // 获取单个定时任务
+			scheduledTasks.POST("", handler.CreateScheduledTask)         // 创建定时任务
+			scheduledTasks.PUT("/:id", handler.UpdateScheduledTask)      // 更新定时任务
+			scheduledTasks.DELETE("/:id", handler.DeleteScheduledTask)   // 删除定时任务
+			scheduledTasks.POST("/:id/toggle", handler.ToggleScheduledTask) // 启用/禁用定时任务
+		}
+
+		// 任务执行记录相关
+		taskExecutions := api.Group("/task-executions")
+		{
+			taskExecutions.GET("", handler.ListTaskExecutions)                      // 列出执行记录
+			taskExecutions.GET("/:id", handler.GetTaskExecution)                    // 获取单个执行记录
+			taskExecutions.DELETE("/:id", handler.DeleteTaskExecution)              // 删除执行记录
+			taskExecutions.POST("/batch/delete", handler.BatchDeleteTaskExecutions) // 批量删除执行记录
+		}
+
 		// MCP SSE端点（使用ApiKey认证，供外部MCP客户端调用）
 		mcpSSE := r.Group("/api/v1/mcp")
 		mcpSSE.Use(ApiKeyAuthenticationMiddleware(handler.config, handler.db))

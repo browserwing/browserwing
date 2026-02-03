@@ -44,6 +44,7 @@ type Handler struct {
 	llmManager     *llm.Manager
 	mcpServer      MCPHTTPHandler // MCP 服务器（使用 interface{} 避免循环依赖）
 	agentManager   interface{}    // Agent 管理器（用于 LLM 配置更新后的热加载）
+	scheduler      interface{}    // 定时任务调度器
 }
 
 func NewHandler(
@@ -5591,4 +5592,377 @@ func (h *Handler) GetCurrentBrowserInstance(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"instance": instance,
 	})
+}
+
+// SetScheduler 设置调度器
+func (h *Handler) SetScheduler(scheduler interface{}) {
+	h.scheduler = scheduler
+}
+
+// ================== Scheduled Tasks API ==================
+
+// CreateScheduledTask 创建定时任务
+func (h *Handler) CreateScheduledTask(c *gin.Context) {
+	var task models.ScheduledTask
+	if err := c.ShouldBindJSON(&task); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidParams", "details": err.Error()})
+		return
+	}
+
+	// 设置ID和时间戳
+	task.ID = uuid.New().String()
+	task.CreatedAt = time.Now()
+	task.UpdatedAt = time.Now()
+	task.ExecutionCount = 0
+	task.SuccessCount = 0
+	task.FailedCount = 0
+
+	// 验证必填字段
+	if task.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.taskNameRequired"})
+		return
+	}
+	if task.ScheduleType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.scheduleTypeRequired"})
+		return
+	}
+	if task.ScheduleConfig == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.scheduleConfigRequired"})
+		return
+	}
+	if task.ExecutionType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.executionTypeRequired"})
+		return
+	}
+
+	// 根据执行类型验证配置
+	if task.ExecutionType == models.ExecutionTypeScript && task.ScriptID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.scriptIdRequired"})
+		return
+	}
+	if task.ExecutionType == models.ExecutionTypeAgent && task.AgentPrompt == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.agentPromptRequired"})
+		return
+	}
+
+	// 如果有脚本ID，加载脚本名称
+	if task.ScriptID != "" {
+		script, err := h.db.GetScript(task.ScriptID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error.scriptNotFound"})
+			return
+		}
+		task.ScriptName = script.Name
+	}
+
+	// 如果有LLM ID，加载LLM名称
+	if task.AgentLLMID != "" {
+		llmConfig, err := h.db.GetLLMConfig(task.AgentLLMID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error.llmConfigNotFound"})
+			return
+		}
+		task.AgentLLMName = llmConfig.Name
+	}
+
+	// 保存到数据库
+	if err := h.db.CreateScheduledTask(&task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.createTaskFailed", "details": err.Error()})
+		return
+	}
+
+	// 如果任务启用，添加到调度器
+	if task.Enabled && h.scheduler != nil {
+		type Scheduler interface {
+			AddTask(*models.ScheduledTask) error
+		}
+		if scheduler, ok := h.scheduler.(Scheduler); ok {
+			if err := scheduler.AddTask(&task); err != nil {
+				logger.Warn(context.Background(), "Failed to add task to scheduler: %v", err)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "success.taskCreated",
+		"task":    task,
+	})
+}
+
+// ListScheduledTasks 列出定时任务
+func (h *Handler) ListScheduledTasks(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	searchQuery := c.Query("search")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	tasks, total, err := h.db.ListScheduledTasksWithPagination(page, pageSize, searchQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.getTaskListFailed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"tasks": tasks,
+		"total": total,
+		"page":  page,
+		"page_size": pageSize,
+	})
+}
+
+// GetScheduledTask 获取单个定时任务
+func (h *Handler) GetScheduledTask(c *gin.Context) {
+	id := c.Param("id")
+	task, err := h.db.GetScheduledTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.taskNotFound"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"task": task})
+}
+
+// UpdateScheduledTask 更新定时任务
+func (h *Handler) UpdateScheduledTask(c *gin.Context) {
+	id := c.Param("id")
+	
+	// 检查任务是否存在
+	existingTask, err := h.db.GetScheduledTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.taskNotFound"})
+		return
+	}
+
+	var task models.ScheduledTask
+	if err := c.ShouldBindJSON(&task); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidParams", "details": err.Error()})
+		return
+	}
+
+	// 保持ID和创建时间
+	task.ID = id
+	task.CreatedAt = existingTask.CreatedAt
+	task.UpdatedAt = time.Now()
+	
+	// 保持统计数据
+	task.ExecutionCount = existingTask.ExecutionCount
+	task.SuccessCount = existingTask.SuccessCount
+	task.FailedCount = existingTask.FailedCount
+	task.LastExecutionTime = existingTask.LastExecutionTime
+	task.LastExecutionStatus = existingTask.LastExecutionStatus
+
+	// 验证必填字段
+	if task.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.taskNameRequired"})
+		return
+	}
+	if task.ScheduleType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.scheduleTypeRequired"})
+		return
+	}
+	if task.ScheduleConfig == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.scheduleConfigRequired"})
+		return
+	}
+	if task.ExecutionType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.executionTypeRequired"})
+		return
+	}
+
+	// 根据执行类型验证配置
+	if task.ExecutionType == models.ExecutionTypeScript && task.ScriptID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.scriptIdRequired"})
+		return
+	}
+	if task.ExecutionType == models.ExecutionTypeAgent && task.AgentPrompt == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.agentPromptRequired"})
+		return
+	}
+
+	// 如果有脚本ID，加载脚本名称
+	if task.ScriptID != "" {
+		script, err := h.db.GetScript(task.ScriptID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error.scriptNotFound"})
+			return
+		}
+		task.ScriptName = script.Name
+	}
+
+	// 如果有LLM ID，加载LLM名称
+	if task.AgentLLMID != "" {
+		llmConfig, err := h.db.GetLLMConfig(task.AgentLLMID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error.llmConfigNotFound"})
+			return
+		}
+		task.AgentLLMName = llmConfig.Name
+	}
+
+	// 更新数据库
+	if err := h.db.UpdateScheduledTask(&task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.updateTaskFailed", "details": err.Error()})
+		return
+	}
+
+	// 重新加载调度器中的任务
+	if h.scheduler != nil {
+		type Scheduler interface {
+			ReloadTask(string) error
+		}
+		if scheduler, ok := h.scheduler.(Scheduler); ok {
+			if err := scheduler.ReloadTask(id); err != nil {
+				logger.Warn(context.Background(), "Failed to reload task in scheduler: %v", err)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "success.taskUpdated",
+		"task":    task,
+	})
+}
+
+// DeleteScheduledTask 删除定时任务
+func (h *Handler) DeleteScheduledTask(c *gin.Context) {
+	id := c.Param("id")
+
+	// 从调度器移除任务
+	if h.scheduler != nil {
+		type Scheduler interface {
+			RemoveTask(string)
+		}
+		if scheduler, ok := h.scheduler.(Scheduler); ok {
+			scheduler.RemoveTask(id)
+		}
+	}
+
+	// 从数据库删除
+	if err := h.db.DeleteScheduledTask(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.deleteTaskFailed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "success.taskDeleted"})
+}
+
+// ToggleScheduledTask 启用/禁用定时任务
+func (h *Handler) ToggleScheduledTask(c *gin.Context) {
+	id := c.Param("id")
+	
+	task, err := h.db.GetScheduledTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.taskNotFound"})
+		return
+	}
+
+	// 切换启用状态
+	task.Enabled = !task.Enabled
+	task.UpdatedAt = time.Now()
+
+	if err := h.db.UpdateScheduledTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.updateTaskFailed", "details": err.Error()})
+		return
+	}
+
+	// 更新调度器
+	if h.scheduler != nil {
+		type Scheduler interface {
+			ReloadTask(string) error
+		}
+		if scheduler, ok := h.scheduler.(Scheduler); ok {
+			if err := scheduler.ReloadTask(id); err != nil {
+				logger.Warn(context.Background(), "Failed to reload task in scheduler: %v", err)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "success.taskToggled",
+		"task":    task,
+	})
+}
+
+// ================== Task Executions API ==================
+
+// ListTaskExecutions 列出任务执行记录
+func (h *Handler) ListTaskExecutions(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	taskID := c.Query("task_id")
+	searchQuery := c.Query("search")
+	successFilter := c.DefaultQuery("success", "all")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	executions, total, err := h.db.ListTaskExecutionsWithPagination(page, pageSize, taskID, searchQuery, successFilter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.getExecutionsFailed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"executions": executions,
+		"total":      total,
+		"page":       page,
+		"page_size":  pageSize,
+	})
+}
+
+// GetTaskExecution 获取单个执行记录
+func (h *Handler) GetTaskExecution(c *gin.Context) {
+	id := c.Param("id")
+	execution, err := h.db.GetTaskExecution(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.executionNotFound"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"execution": execution})
+}
+
+// DeleteTaskExecution 删除执行记录
+func (h *Handler) DeleteTaskExecution(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.db.DeleteTaskExecution(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.deleteExecutionFailed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "success.executionDeleted"})
+}
+
+// BatchDeleteTaskExecutions 批量删除执行记录
+func (h *Handler) BatchDeleteTaskExecutions(c *gin.Context) {
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.invalidParams"})
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.noExecutionsSelected"})
+		return
+	}
+
+	if err := h.db.BatchDeleteTaskExecutions(req.IDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.batchDeleteFailed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "success.executionsDeleted", "count": len(req.IDs)})
 }

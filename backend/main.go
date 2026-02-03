@@ -20,6 +20,7 @@ import (
 	"github.com/browserwing/browserwing/mcp"
 	"github.com/browserwing/browserwing/models"
 	"github.com/browserwing/browserwing/pkg/logger"
+	"github.com/browserwing/browserwing/scheduler"
 	"github.com/browserwing/browserwing/services/browser"
 	"github.com/browserwing/browserwing/storage"
 	"github.com/google/uuid"
@@ -161,6 +162,23 @@ func main() {
 	// 将 Agent 管理器注入到 Handler (用于 LLM 配置更新后的热加载)
 	handler.SetAgentManager(agentManager)
 
+	// 初始化定时任务执行器（使用真实的浏览器管理器和 Agent 管理器）
+	scriptPlayer := scheduler.NewRealScriptPlayer(db, browserManager)
+	agentExecutor := scheduler.NewRealAgentExecutor(agentManager)
+	taskExecutor := scheduler.NewDefaultTaskExecutor(db, scriptPlayer, agentExecutor)
+
+	// 初始化定时任务调度器
+	taskScheduler := scheduler.NewScheduler(db, taskExecutor)
+	err = taskScheduler.Start()
+	if err != nil {
+		log.Printf("Warning: Failed to start scheduler: %v", err)
+	} else {
+		log.Println("✓ Task scheduler initialized successfully")
+	}
+
+	// 将调度器注入到 Handler
+	handler.SetScheduler(taskScheduler)
+
 	// 创建 Agent HTTP 处理器
 	agentHandler := agent.NewHandler(agentManager)
 
@@ -174,7 +192,7 @@ func main() {
 	router := api.SetupRouter(handler, agentHandler, frontendFS, embedMode, cfg.Debug)
 
 	// 设置优雅退出
-	setupGracefulShutdown(browserManager, db, mcpServer, agentManager)
+	setupGracefulShutdown(browserManager, db, mcpServer, agentManager, taskScheduler)
 
 	// 启动服务器
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
@@ -196,7 +214,7 @@ func main() {
 }
 
 // setupGracefulShutdown 设置优雅退出，自动关闭浏览器
-func setupGracefulShutdown(browserManager *browser.Manager, db *storage.BoltDB, mcpServer mcp.IMCPServer, agentManager *agent.AgentManager) {
+func setupGracefulShutdown(browserManager *browser.Manager, db *storage.BoltDB, mcpServer mcp.IMCPServer, agentManager *agent.AgentManager, taskScheduler interface{}) {
 	sigChan := make(chan os.Signal, 1)
 	// 监听 SIGINT (Ctrl+C) 和 SIGTERM
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -209,6 +227,18 @@ func setupGracefulShutdown(browserManager *browser.Manager, db *storage.BoltDB, 
 		// 创建超时上下文，最多等待 10 秒
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
+		// 停止定时任务调度器
+		if taskScheduler != nil {
+			log.Println("Stopping task scheduler...")
+			type Scheduler interface {
+				Stop()
+			}
+			if s, ok := taskScheduler.(Scheduler); ok {
+				s.Stop()
+				log.Println("✓ Task scheduler stopped")
+			}
+		}
 
 		// 停止 Agent 管理器
 		if agentManager != nil {

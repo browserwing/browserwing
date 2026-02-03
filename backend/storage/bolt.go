@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/browserwing/browserwing/models"
@@ -27,6 +28,8 @@ var (
 	mcpServicesBucket       = []byte("mcp_services")
 	usersBucket             = []byte("users")
 	apiKeysBucket           = []byte("api_keys")
+	scheduledTasksBucket    = []byte("scheduled_tasks")
+	taskExecutionsBucket    = []byte("task_executions")
 )
 
 type BoltDB struct {
@@ -99,6 +102,14 @@ func NewBoltDB(dbPath string) (*BoltDB, error) {
 			return err
 		}
 		_, err = tx.CreateBucketIfNotExists(apiKeysBucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(scheduledTasksBucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(taskExecutionsBucket)
 		return err
 	})
 	if err != nil {
@@ -1497,5 +1508,237 @@ func (b *BoltDB) DeleteBrowserInstance(id string) error {
 		}
 		
 		return bucket.Delete([]byte(id))
+	})
+}
+
+// ================== Scheduled Tasks ==================
+
+// CreateScheduledTask 创建定时任务
+func (db *BoltDB) CreateScheduledTask(task *models.ScheduledTask) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(scheduledTasksBucket)
+		data, err := json.Marshal(task)
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(task.ID), data)
+	})
+}
+
+// GetScheduledTask 获取定时任务
+func (db *BoltDB) GetScheduledTask(id string) (*models.ScheduledTask, error) {
+	var task models.ScheduledTask
+	err := db.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(scheduledTasksBucket)
+		data := bucket.Get([]byte(id))
+		if data == nil {
+			return fmt.Errorf("scheduled task not found")
+		}
+		return json.Unmarshal(data, &task)
+	})
+	return &task, err
+}
+
+// UpdateScheduledTask 更新定时任务
+func (db *BoltDB) UpdateScheduledTask(task *models.ScheduledTask) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(scheduledTasksBucket)
+		// 检查任务是否存在
+		if bucket.Get([]byte(task.ID)) == nil {
+			return fmt.Errorf("scheduled task not found")
+		}
+		data, err := json.Marshal(task)
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(task.ID), data)
+	})
+}
+
+// DeleteScheduledTask 删除定时任务
+func (db *BoltDB) DeleteScheduledTask(id string) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(scheduledTasksBucket)
+		return bucket.Delete([]byte(id))
+	})
+}
+
+// ListScheduledTasks 列出所有定时任务
+func (db *BoltDB) ListScheduledTasks() ([]models.ScheduledTask, error) {
+	var tasks []models.ScheduledTask
+	err := db.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(scheduledTasksBucket)
+		return bucket.ForEach(func(k, v []byte) error {
+			var task models.ScheduledTask
+			if err := json.Unmarshal(v, &task); err != nil {
+				return err
+			}
+			tasks = append(tasks, task)
+			return nil
+		})
+	})
+	
+	// 按创建时间降序排序
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].CreatedAt.After(tasks[j].CreatedAt)
+	})
+	
+	return tasks, err
+}
+
+// ListScheduledTasksWithPagination 分页列出定时任务
+func (db *BoltDB) ListScheduledTasksWithPagination(page, pageSize int, searchQuery string) ([]models.ScheduledTask, int, error) {
+	allTasks, err := db.ListScheduledTasks()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 过滤
+	var filteredTasks []models.ScheduledTask
+	for _, task := range allTasks {
+		if searchQuery == "" {
+			filteredTasks = append(filteredTasks, task)
+			continue
+		}
+		// 简单的名称和描述搜索
+		if strings.Contains(strings.ToLower(task.Name), strings.ToLower(searchQuery)) || 
+		   strings.Contains(strings.ToLower(task.Description), strings.ToLower(searchQuery)) {
+			filteredTasks = append(filteredTasks, task)
+		}
+	}
+
+	total := len(filteredTasks)
+
+	// 分页
+	start := (page - 1) * pageSize
+	end := start + pageSize
+	if start >= total {
+		return []models.ScheduledTask{}, total, nil
+	}
+	if end > total {
+		end = total
+	}
+
+	return filteredTasks[start:end], total, nil
+}
+
+// ================== Task Executions ==================
+
+// CreateTaskExecution 创建任务执行记录
+func (db *BoltDB) CreateTaskExecution(execution *models.TaskExecution) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(taskExecutionsBucket)
+		data, err := json.Marshal(execution)
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(execution.ID), data)
+	})
+}
+
+// GetTaskExecution 获取任务执行记录
+func (db *BoltDB) GetTaskExecution(id string) (*models.TaskExecution, error) {
+	var execution models.TaskExecution
+	err := db.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(taskExecutionsBucket)
+		data := bucket.Get([]byte(id))
+		if data == nil {
+			return fmt.Errorf("task execution not found")
+		}
+		return json.Unmarshal(data, &execution)
+	})
+	return &execution, err
+}
+
+// DeleteTaskExecution 删除任务执行记录
+func (db *BoltDB) DeleteTaskExecution(id string) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(taskExecutionsBucket)
+		return bucket.Delete([]byte(id))
+	})
+}
+
+// ListTaskExecutions 列出所有任务执行记录
+func (db *BoltDB) ListTaskExecutions() ([]models.TaskExecution, error) {
+	var executions []models.TaskExecution
+	err := db.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(taskExecutionsBucket)
+		return bucket.ForEach(func(k, v []byte) error {
+			var execution models.TaskExecution
+			if err := json.Unmarshal(v, &execution); err != nil {
+				return err
+			}
+			executions = append(executions, execution)
+			return nil
+		})
+	})
+	
+	// 按开始时间降序排序
+	sort.Slice(executions, func(i, j int) bool {
+		return executions[i].StartTime.After(executions[j].StartTime)
+	})
+	
+	return executions, err
+}
+
+// ListTaskExecutionsWithPagination 分页列出任务执行记录
+func (db *BoltDB) ListTaskExecutionsWithPagination(page, pageSize int, taskID, searchQuery string, successFilter string) ([]models.TaskExecution, int, error) {
+	allExecutions, err := db.ListTaskExecutions()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 过滤
+	var filteredExecutions []models.TaskExecution
+	for _, execution := range allExecutions {
+		// 按任务 ID 过滤
+		if taskID != "" && execution.TaskID != taskID {
+			continue
+		}
+		
+		// 按搜索关键字过滤
+		if searchQuery != "" {
+			if !strings.Contains(strings.ToLower(execution.TaskName), strings.ToLower(searchQuery)) && 
+			   !strings.Contains(strings.ToLower(execution.Message), strings.ToLower(searchQuery)) {
+				continue
+			}
+		}
+		
+		// 按成功状态过滤
+		if successFilter == "success" && !execution.Success {
+			continue
+		}
+		if successFilter == "failed" && execution.Success {
+			continue
+		}
+		
+		filteredExecutions = append(filteredExecutions, execution)
+	}
+
+	total := len(filteredExecutions)
+
+	// 分页
+	start := (page - 1) * pageSize
+	end := start + pageSize
+	if start >= total {
+		return []models.TaskExecution{}, total, nil
+	}
+	if end > total {
+		end = total
+	}
+
+	return filteredExecutions[start:end], total, nil
+}
+
+// BatchDeleteTaskExecutions 批量删除任务执行记录
+func (db *BoltDB) BatchDeleteTaskExecutions(ids []string) error {
+	return db.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(taskExecutionsBucket)
+		for _, id := range ids {
+			if err := bucket.Delete([]byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
