@@ -652,7 +652,7 @@ export default function ScheduledTaskManager() {
                       {execution.message && (
                         <div className="mt-2 text-sm">
                           <span className="font-medium text-gray-700 dark:text-gray-300">{t('task.message')}: </span>
-                          <span className="text-gray-600 dark:text-gray-400">{execution.message}</span>
+                          <span className="text-gray-600 dark:text-gray-400">{t(execution.message)}</span>
                         </div>
                       )}
 
