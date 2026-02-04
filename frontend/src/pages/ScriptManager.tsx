@@ -36,6 +36,7 @@ export default function ScriptManager() {
   const [expandedScriptId, setExpandedScriptId] = useState<string | null>(null)
   const [editingScript, setEditingScript] = useState<Script | null>(null)
   const [editingActions, setEditingActions] = useState<ScriptAction[]>([])
+  const [isDraggingAction, setIsDraggingAction] = useState(false)
   const [extractedData, setExtractedData] = useState<Record<string, any> | null>(null)
   const [showExtractedData, setShowExtractedData] = useState(false)
   const [showToast, setShowToast] = useState(false)
@@ -682,8 +683,13 @@ export default function ScriptManager() {
     )
   }
 
+  const handleDragStart = () => {
+    setIsDraggingAction(true)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
+    setIsDraggingAction(false)
 
     if (over && active.id !== over.id) {
       setEditingActions((items) => {
@@ -2560,6 +2566,7 @@ export default function ScriptManager() {
                                 <DndContext
                                   sensors={sensors}
                                   collisionDetection={closestCenter}
+                                  onDragStart={handleDragStart}
                                   onDragEnd={handleDragEnd}
                                 >
                                   <SortableContext
@@ -2590,6 +2597,7 @@ export default function ScriptManager() {
                                             onPaste={handlePasteAction}
                                             hasCopiedAction={!!copiedAction}
                                             availableVariables={Array.from(availableVars)}
+                                            isAnyDragging={isDraggingAction}
                                           />
                                         )
                                       })}
@@ -3637,9 +3645,10 @@ interface SortableActionItemProps {
   onPaste: (index: number) => void
   hasCopiedAction: boolean
   availableVariables?: string[]  // 可用的变量列表
+  isAnyDragging: boolean  // 是否有任何项正在拖动
 }
 
-function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate, onCopyToClipboard, onPaste, hasCopiedAction, availableVariables }: SortableActionItemProps) {
+function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate, onCopyToClipboard, onPaste, hasCopiedAction, availableVariables, isAnyDragging }: SortableActionItemProps) {
   const { t } = useLanguage()
   const [isSemanticExpanded, setIsSemanticExpanded] = useState(false)
   const {
@@ -3654,7 +3663,48 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.8 : 1,
+    zIndex: isDragging ? 9999 : 'auto',
+    position: isDragging ? 'relative' as const : undefined,
+  }
+
+  // 任何项拖动时都显示简化版本
+  if (isAnyDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`rounded-lg p-3 text-base ${
+          isDragging 
+            ? 'bg-white dark:bg-gray-800 border-2 border-blue-400 dark:border-blue-500 shadow-lg relative'
+            : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <button
+            className={isDragging ? "cursor-grabbing p-1.5" : "cursor-grab p-1.5"}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className={`w-5 h-5 ${
+              isDragging 
+                ? 'text-blue-500 dark:text-blue-400'
+                : 'text-gray-400 dark:text-gray-500'
+            }`} />
+          </button>
+          <div className="flex items-center space-x-2">
+            <span className={`font-mono text-sm px-2.5 py-1 rounded font-medium ${
+              isDragging
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+            }`}>
+              #{index + 1}
+            </span>
+            <span className="font-semibold text-base text-gray-900 dark:text-gray-100">{t(action.type)}</span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
