@@ -264,6 +264,11 @@ export interface ScriptAction {
   status?: number
   xhr_id?: string
 
+  // 截图相关字段（用于 screenshot 类型）
+  screenshot_mode?: string  // viewport, fullpage, region
+  screenshot_width?: number
+  screenshot_height?: number
+
   // 语义信息字段（用于自愈）
   intent?: {
     verb?: string

@@ -98,6 +98,12 @@ var RecorderI18n = map[string]map[string]string{
 		"SIZE":                     "大小",
 		"SELECT_THIS_REQUEST":      "选择此请求",
 		"XHR_CAPTURED":             "已捕获XHR",
+		// 截图相关
+		"SCREENSHOT":               "截图",
+		"SCREENSHOT_VIEWPORT":      "当前视口",
+		"SCREENSHOT_FULLPAGE":      "完整页面",
+		"SCREENSHOT_REGION":        "自由截图",
+		"SCREENSHOT_REGION_HINT":   "拖动鼠标选择截图区域，按 ESC 取消",
 	},
 	"zh-TW": {
 		"RECORDING_STATUS":         "腳本錄製中",
@@ -193,6 +199,12 @@ var RecorderI18n = map[string]map[string]string{
 		"SIZE":                     "大小",
 		"SELECT_THIS_REQUEST":      "選擇此請求",
 		"XHR_CAPTURED":             "已捕獲XHR",
+		// 截圖相關
+		"SCREENSHOT":               "截圖",
+		"SCREENSHOT_VIEWPORT":      "當前視口",
+		"SCREENSHOT_FULLPAGE":      "完整頁面",
+		"SCREENSHOT_REGION":        "自由截圖",
+		"SCREENSHOT_REGION_HINT":   "拖動鼠標選擇截圖區域，按 ESC 取消",
 	},
 	"en": {
 		"RECORDING_STATUS":         "Recording",
@@ -288,6 +300,12 @@ var RecorderI18n = map[string]map[string]string{
 		"SIZE":                     "Size",
 		"SELECT_THIS_REQUEST":      "Select This Request",
 		"XHR_CAPTURED":             "XHR Captured",
+		// Screenshot
+		"SCREENSHOT":               "Screenshot",
+		"SCREENSHOT_VIEWPORT":      "Current Viewport",
+		"SCREENSHOT_FULLPAGE":      "Full Page",
+		"SCREENSHOT_REGION":        "Free Region",
+		"SCREENSHOT_REGION_HINT":   "Drag to select screenshot area, press ESC to cancel",
 	},
 	"es": {
 		"RECORDING_STATUS":         "Grabando",
@@ -383,6 +401,12 @@ var RecorderI18n = map[string]map[string]string{
 		"SIZE":                     "Tamaño",
 		"SELECT_THIS_REQUEST":      "Seleccionar esta solicitud",
 		"XHR_CAPTURED":             "XHR capturado",
+		// Captura de pantalla
+		"SCREENSHOT":               "Captura",
+		"SCREENSHOT_VIEWPORT":      "Vista Actual",
+		"SCREENSHOT_FULLPAGE":      "Página Completa",
+		"SCREENSHOT_REGION":        "Región Libre",
+		"SCREENSHOT_REGION_HINT":   "Arrastra para seleccionar el área de captura, presiona ESC para cancelar",
 	},
 	"ja": {
 		"RECORDING_STATUS":         "記録中",
@@ -478,6 +502,12 @@ var RecorderI18n = map[string]map[string]string{
 		"SIZE":                     "サイズ",
 		"SELECT_THIS_REQUEST":      "このリクエストを選択",
 		"XHR_CAPTURED":             "XHRキャプチャ済み",
+		// スクリーンショット
+		"SCREENSHOT":               "スクショ",
+		"SCREENSHOT_VIEWPORT":      "現在のビュー",
+		"SCREENSHOT_FULLPAGE":      "フルページ",
+		"SCREENSHOT_REGION":        "自由領域",
+		"SCREENSHOT_REGION_HINT":   "ドラッグして範囲を選択、ESCでキャンセル",
 	},
 }
 

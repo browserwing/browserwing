@@ -347,12 +347,12 @@ func getI18nText(key, lang string) string {
 			"action.execute_js":        "执行JS",
 			"action.upload_file":       "上传文件",
 			"action.scroll":            "滚动页面",
-		"action.keyboard":          "键盘事件",
-		"action.screenshot":        "截图",
-		"action.open_tab":          "打开新标签页",
-		"action.switch_tab":        "切换标签页",
-		"action.switch_active_tab": "切换到活跃标签页",
-		"action.capture_xhr":       "捕获XHR请求",
+			"action.keyboard":          "键盘事件",
+			"action.screenshot":        "截图",
+			"action.open_tab":          "打开新标签页",
+			"action.switch_tab":        "切换标签页",
+			"action.switch_active_tab": "切换到活跃标签页",
+			"action.capture_xhr":       "捕获XHR请求",
 		},
 		"zh-TW": {
 			// AI 控制指示器
@@ -376,12 +376,12 @@ func getI18nText(key, lang string) string {
 			"action.execute_js":        "執行JS",
 			"action.upload_file":       "上傳檔案",
 			"action.scroll":            "滾動頁面",
-		"action.keyboard":          "鍵盤事件",
-		"action.screenshot":        "截圖",
-		"action.open_tab":          "打開新標籤頁",
-		"action.switch_tab":        "切換標籤頁",
-		"action.switch_active_tab": "切換到活躍標籤頁",
-		"action.capture_xhr":       "捕獲XHR請求",
+			"action.keyboard":          "鍵盤事件",
+			"action.screenshot":        "截圖",
+			"action.open_tab":          "打開新標籤頁",
+			"action.switch_tab":        "切換標籤頁",
+			"action.switch_active_tab": "切換到活躍標籤頁",
+			"action.capture_xhr":       "捕獲XHR請求",
 		},
 		"en": {
 			// AI Control Indicator
@@ -405,12 +405,12 @@ func getI18nText(key, lang string) string {
 			"action.execute_js":        "Execute JS",
 			"action.upload_file":       "Upload File",
 			"action.scroll":            "Scroll Page",
-		"action.keyboard":          "Keyboard Event",
-		"action.screenshot":        "Screenshot",
-		"action.open_tab":          "Open New Tab",
-		"action.switch_tab":        "Switch Tab",
-		"action.switch_active_tab": "Switch to Active Tab",
-		"action.capture_xhr":       "Capture XHR Request",
+			"action.keyboard":          "Keyboard Event",
+			"action.screenshot":        "Screenshot",
+			"action.open_tab":          "Open New Tab",
+			"action.switch_tab":        "Switch Tab",
+			"action.switch_active_tab": "Switch to Active Tab",
+			"action.capture_xhr":       "Capture XHR Request",
 		},
 	}
 
@@ -2611,15 +2611,60 @@ func (p *Player) executeKeyboard(ctx context.Context, page *rod.Page, action mod
 
 // executeScreenshot 执行截图操作
 func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action models.ScriptAction) error {
-	logger.Info(ctx, "Taking screenshot of current page")
+	mode := action.ScreenshotMode
+	if mode == "" {
+		mode = "viewport" // 默认视口截图
+	}
+	
+	logger.Info(ctx, "Taking screenshot: mode=%s", mode)
 
 	// 等待页面稳定
 	time.Sleep(500 * time.Millisecond)
 
-	// 获取截图（PNG格式）
-	screenshot, err := page.Screenshot(true, nil)
-	if err != nil {
-		return fmt.Errorf("failed to take screenshot: %w", err)
+	var screenshot []byte
+	var err error
+
+	switch mode {
+	case "viewport":
+		// 当前视口截图
+		screenshot, err = page.Screenshot(false, nil)
+		if err != nil {
+			return fmt.Errorf("failed to take viewport screenshot: %w", err)
+		}
+		logger.Info(ctx, "Viewport screenshot captured")
+
+	case "fullpage":
+		// 完整页面截图
+		screenshot, err = page.Screenshot(true, nil)
+		if err != nil {
+			return fmt.Errorf("failed to take full page screenshot: %w", err)
+		}
+		logger.Info(ctx, "Full page screenshot captured")
+
+	case "region":
+		// 区域截图
+		if action.ScreenshotWidth <= 0 || action.ScreenshotHeight <= 0 {
+			return fmt.Errorf("invalid region dimensions: width=%d, height=%d", action.ScreenshotWidth, action.ScreenshotHeight)
+		}
+
+		// 使用 proto 设置截图区域
+		screenshot, err = page.Screenshot(false, &proto.PageCaptureScreenshot{
+			Clip: &proto.PageViewport{
+				X:      float64(action.X),
+				Y:      float64(action.Y),
+				Width:  float64(action.ScreenshotWidth),
+				Height: float64(action.ScreenshotHeight),
+				Scale:  1,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to take region screenshot: %w", err)
+		}
+		logger.Info(ctx, "Region screenshot captured: x=%d, y=%d, w=%d, h=%d", 
+			action.X, action.Y, action.ScreenshotWidth, action.ScreenshotHeight)
+
+	default:
+		return fmt.Errorf("unsupported screenshot mode: %s", mode)
 	}
 
 	// 确保下载目录存在
@@ -2628,14 +2673,14 @@ func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action m
 	}
 
 	// 创建下载目录（如果不存在）
-	if err := os.MkdirAll(p.downloadPath, 0755); err != nil {
+	if err := os.MkdirAll(p.downloadPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create download directory: %w", err)
 	}
 
 	// 生成唯一的文件名
 	timestamp := time.Now().Format("20060102_150405")
-	fileName := fmt.Sprintf("browserwing_screenshot_%s.png", timestamp)
-	
+	fileName := fmt.Sprintf("browserwing_screenshot_%s_%s.png", mode, timestamp)
+
 	// 如果有自定义变量名，使用它作为文件名前缀
 	if action.VariableName != "" {
 		// 清理变量名，移除非法字符
@@ -2645,14 +2690,14 @@ func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action m
 			}
 			return '_'
 		}, action.VariableName)
-		fileName = fmt.Sprintf("%s_%s.png", cleanName, timestamp)
+		fileName = fmt.Sprintf("%s_%s_%s.png", cleanName, mode, timestamp)
 	}
 
 	// 构建完整路径
 	fullPath := filepath.Join(p.downloadPath, fileName)
 
 	// 保存截图到文件
-	if err := os.WriteFile(fullPath, screenshot, 0644); err != nil {
+	if err := os.WriteFile(fullPath, screenshot, 0o644); err != nil {
 		return fmt.Errorf("failed to save screenshot to file: %w", err)
 	}
 
@@ -3035,7 +3080,6 @@ func (p *Player) injectXHRInterceptorForScript(ctx context.Context, page *rod.Pa
 		console.log('[BrowserWing Player] XHR capture script installed, monitoring', targetKeys.size, 'targets');
 		return true;
 	}`, string(targetsJSON))
-
 	if err != nil {
 		return fmt.Errorf("failed to inject XHR interceptor: %w", err)
 	}

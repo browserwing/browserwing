@@ -1176,36 +1176,66 @@ func (m *Manager) checkInPageRecordingRequests(ctx context.Context, page *rod.Pa
 				if (window.__startRecordingRequest__) {
 					var req = window.__startRecordingRequest__;
 					delete window.__startRecordingRequest__;
-					return req;
+					return { type: 'start_recording', data: req };
+				}
+				if (window.__screenshotRequest__) {
+					var req = window.__screenshotRequest__;
+					delete window.__screenshotRequest__;
+					return { type: 'screenshot', data: req };
 				}
 				return null;
 			}`)
 
 			if err == nil && result != nil && !result.Value.Nil() {
-				logger.Info(ctx, "Detected in-page recording start request")
+				// 解析请求类型
+				resultMap, ok := result.Value.Val().(map[string]interface{})
+				if !ok {
+					continue
+				}
 
-				// 获取当前页面URL
-				info, err := page.Info()
-				if err == nil {
-					// 获取当前语言设置
-					currentLang := m.currentLanguage
-					if currentLang == "" {
-						currentLang = "zh-CN"
-					}
-					// 开始录制
-					if err := m.recorder.StartRecording(ctx, page, info.URL, currentLang); err != nil {
-						logger.Error(ctx, "Failed to start recording from in-page request: %v", err)
+				reqType, _ := resultMap["type"].(string)
+				
+				if reqType == "start_recording" {
+					logger.Info(ctx, "Detected in-page recording start request")
+
+					// 获取当前页面URL
+					info, err := page.Info()
+					if err == nil {
+						// 获取当前语言设置
+						currentLang := m.currentLanguage
+						if currentLang == "" {
+							currentLang = "zh-CN"
+						}
+						// 开始录制
+						if err := m.recorder.StartRecording(ctx, page, info.URL, currentLang); err != nil {
+							logger.Error(ctx, "Failed to start recording from in-page request: %v", err)
+						} else {
+							logger.Info(ctx, "✓ Recording started from in-page button")
+							// 通知页面显示录制UI
+							_, _ = page.Eval(`() => {
+								window.__isRecordingActive__ = true;
+								if (typeof createRecorderUI === 'function') createRecorderUI();
+								if (typeof createHighlightElement === 'function') createHighlightElement();
+							}`)
+						}
 					} else {
-						logger.Info(ctx, "✓ Recording started from in-page button")
-						// 通知页面显示录制UI
-						_, _ = page.Eval(`() => {
-							window.__isRecordingActive__ = true;
-							if (typeof createRecorderUI === 'function') createRecorderUI();
-							if (typeof createHighlightElement === 'function') createHighlightElement();
-						}`)
+						logger.Error(ctx, "Failed to get page info for in-page recording start: %v", err)
 					}
-				} else {
-					logger.Error(ctx, "Failed to get page info for in-page recording start: %v", err)
+				} else if reqType == "screenshot" {
+					logger.Info(ctx, "Detected in-page screenshot request")
+					
+					// 提取截图请求数据（仅用于日志）
+					data, _ := resultMap["data"].(map[string]interface{})
+					mode, _ := data["mode"].(string)
+					
+					if mode == "" {
+						mode = "viewport"
+					}
+					
+					// 注意：不在后端添加 action，因为前端已经通过 recordAction() 添加了
+					// 停止录制时会从前端的 window.__recordedActions__ 同步过来
+					// 这样避免重复添加截图操作
+					logger.Info(ctx, "Screenshot action will be synced from frontend: mode=%s", mode)
 				}
 			}
 

@@ -60,6 +60,11 @@ type ScriptAction struct {
 	Status int    `json:"status,omitempty"` // HTTP状态码
 	XHRID  string `json:"xhr_id,omitempty"` // XHR请求唯一标识符
 
+	// 截图相关字段（用于 screenshot 类型）
+	ScreenshotMode   string `json:"screenshot_mode,omitempty"`   // viewport, fullpage, region
+	ScreenshotWidth  int    `json:"screenshot_width,omitempty"`  // 截图区域宽度（region模式）
+	ScreenshotHeight int    `json:"screenshot_height,omitempty"` // 截图区域高度（region模式）
+
 	Condition *ActionCondition `json:"condition,omitempty"`
 
 	// =========================
@@ -81,33 +86,39 @@ type ScriptAction struct {
 
 func (a *ScriptAction) CopyWithoutSemanticInfo() *ScriptAction {
 	return &ScriptAction{
-		Type:          a.Type,
-		Timestamp:     a.Timestamp,
-		Selector:      a.Selector,
-		XPath:         a.XPath,
-		Value:         a.Value,
-		URL:           a.URL,
-		Duration:      a.Duration,
-		X:             a.X,
-		Y:             a.Y,
-		Text:          a.Text,
-		TagName:       a.TagName,
-		Attrs:         a.Attrs,
-		Key:           a.Key,
-		ExtractType:   a.ExtractType,
-		AttributeName: a.AttributeName,
-		JSCode:        a.JSCode,
-		VariableName:  a.VariableName,
-		ExtractedData: a.ExtractedData,
-		FilePaths:     a.FilePaths,
-		FileNames:     a.FileNames,
-		Description:   a.Description,
-		Multiple:      a.Multiple,
-		Accept:        a.Accept,
-		Remark:        a.Remark,
-		ScrollX:       a.ScrollX,
-		ScrollY:       a.ScrollY,
-		Condition:     a.Condition,
+		Type:             a.Type,
+		Timestamp:        a.Timestamp,
+		Selector:         a.Selector,
+		XPath:            a.XPath,
+		Value:            a.Value,
+		URL:              a.URL,
+		Duration:         a.Duration,
+		X:                a.X,
+		Y:                a.Y,
+		Text:             a.Text,
+		TagName:          a.TagName,
+		Attrs:            a.Attrs,
+		Key:              a.Key,
+		ExtractType:      a.ExtractType,
+		AttributeName:    a.AttributeName,
+		JSCode:           a.JSCode,
+		VariableName:     a.VariableName,
+		ExtractedData:    a.ExtractedData,
+		FilePaths:        a.FilePaths,
+		FileNames:        a.FileNames,
+		Description:      a.Description,
+		Multiple:         a.Multiple,
+		Accept:           a.Accept,
+		Remark:           a.Remark,
+		ScrollX:          a.ScrollX,
+		ScrollY:          a.ScrollY,
+		Method:           a.Method,
+		Status:           a.Status,
+		XHRID:            a.XHRID,
+		ScreenshotMode:   a.ScreenshotMode,
+		ScreenshotWidth:  a.ScreenshotWidth,
+		ScreenshotHeight: a.ScreenshotHeight,
+		Condition:        a.Condition,
 	}
 }
 

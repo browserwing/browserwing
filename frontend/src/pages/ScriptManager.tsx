@@ -4005,6 +4005,65 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
             {action.type === 'screenshot' && (
               <>
                 <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.screenshotMode')}</label>
+                  <select
+                    value={action.screenshot_mode || 'viewport'}
+                    onChange={(e) => onUpdate(index, 'screenshot_mode', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="viewport">{t('script.action.screenshotModeViewport')}</option>
+                    <option value="fullpage">{t('script.action.screenshotModeFullpage')}</option>
+                    <option value="region">{t('script.action.screenshotModeRegion')}</option>
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('script.action.screenshotModeHint')}</p>
+                </div>
+
+                {action.screenshot_mode === 'region' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">X</label>
+                      <input
+                        type="number"
+                        value={action.x || 0}
+                        onChange={(e) => onUpdate(index, 'x', parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Y</label>
+                      <input
+                        type="number"
+                        value={action.y || 0}
+                        onChange={(e) => onUpdate(index, 'y', parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.width')}</label>
+                      <input
+                        type="number"
+                        value={action.screenshot_width || 0}
+                        onChange={(e) => onUpdate(index, 'screenshot_width', parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="800"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.height')}</label>
+                      <input
+                        type="number"
+                        value={action.screenshot_height || 0}
+                        onChange={(e) => onUpdate(index, 'screenshot_height', parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="600"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.variableName')} ({t('script.action.optional')})</label>
                   <input
                     type="text"
@@ -4013,7 +4072,7 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg font-mono bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="screenshot_0"
                   />
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('script.action.variableHint')}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('script.action.variableHint')}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.description')} ({t('script.action.optional')})</label>
@@ -4460,14 +4519,31 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
         )}
         {action.type === 'screenshot' && (
           <>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="font-medium">{t('script.action.screenshotMode')}</span>{' '}
+              <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-sm">
+                {action.screenshot_mode === 'viewport' && t('script.action.screenshotModeViewport')}
+                {action.screenshot_mode === 'fullpage' && t('script.action.screenshotModeFullpage')}
+                {action.screenshot_mode === 'region' && t('script.action.screenshotModeRegion')}
+                {!action.screenshot_mode && t('script.action.screenshotModeViewport')}
+              </code>
+            </div>
+            {action.screenshot_mode === 'region' && (
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                <span className="font-medium">{t('script.action.region')}:</span>{' '}
+                <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-sm">
+                  X: {action.x || 0}, Y: {action.y || 0}, {t('script.action.width')}: {action.screenshot_width || 0}, {t('script.action.height')}: {action.screenshot_height || 0}
+                </code>
+              </div>
+            )}
             {action.variable_name && (
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 <span className="font-medium">{t('script.action.variableName')}</span>{' '}
-                <code className="bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 px-2 py-1 rounded text-sm">{action.variable_name}</code>
+                <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-sm">{action.variable_name}</code>
               </div>
             )}
             {action.description && (
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 <span className="font-medium">{t('script.action.description')}</span>{' '}
                 <span className="text-gray-800 dark:text-gray-200">{action.description}</span>
               </div>

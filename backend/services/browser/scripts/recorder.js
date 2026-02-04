@@ -353,6 +353,37 @@ if (window.__browserwingRecorder__) {
 		}
 	};
 	
+	// 截图按钮 - 黑白灰极简风格
+	var screenshotBtn = document.createElement('button');
+	screenshotBtn.id = '__browserwing_screenshot_btn__';
+	screenshotBtn.style.cssText = 'flex:1;padding:8px 14px;background:#18181b;color:white;border:1.5px solid rgba(255,255,255,0.1);border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:-0.01em;transition:all 0.25s cubic-bezier(0.4,0,0.2,1);box-shadow:0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;';
+	screenshotBtn.textContent = '{{SCREENSHOT}}';
+	
+	screenshotBtn.onmouseover = function() {
+		this.style.background = '#27272a';
+		this.style.borderColor = 'rgba(255,255,255,0.15)';
+		this.style.transform = 'translateY(-1px)';
+		this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.25)';
+	};
+	screenshotBtn.onmouseout = function() {
+		this.style.background = '#18181b';
+		this.style.borderColor = 'rgba(255,255,255,0.1)';
+		this.style.transform = 'translateY(0)';
+		this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)';
+	};
+	screenshotBtn.onclick = function(e) {
+		if (panel.__isDragging) return;
+		
+		// 显示截图类型选择菜单
+		var screenshotMenu = window.__recorderUI__.screenshotMenu;
+		screenshotMenu.style.display = 'block';
+		
+		// 计算菜单位置（在按钮下方）
+		var btnRect = this.getBoundingClientRect();
+		screenshotMenu.style.left = btnRect.left + 'px';
+		screenshotMenu.style.top = (btnRect.bottom + 5) + 'px';
+	};
+	
 	// XHR监听按钮 - 黑白灰极简风格
 	var xhrBtn = document.createElement('button');
 	xhrBtn.id = '__browserwing_xhr_btn__';
@@ -389,12 +420,13 @@ if (window.__browserwingRecorder__) {
 		}
 	};
 	
-	// 第一排：抓取和AI提取
+	// 第一排：抓取、AI提取和AI填表（3个按钮）
 	buttonRow1.appendChild(extractBtn);
 	buttonRow1.appendChild(aiExtractBtn);
+	buttonRow1.appendChild(aiFormFillBtn);
 	
-	// 第二排：AI填表和XHR监听
-	buttonRow2.appendChild(aiFormFillBtn);
+	// 第二排：截图和XHR监听（2个按钮）
+	buttonRow2.appendChild(screenshotBtn);
 	buttonRow2.appendChild(xhrBtn);
 	
 	buttonArea.appendChild(buttonRow1);
@@ -555,6 +587,167 @@ if (window.__browserwingRecorder__) {
 			menu.appendChild(item);
 		}
 		
+		// 创建截图类型选择菜单
+		var screenshotMenu = document.createElement('div');
+		screenshotMenu.id = '__browserwing_screenshot_menu__';
+		screenshotMenu.style.cssText = 'display:none;position:fixed;background:white;border:1px solid rgba(0,0,0,0.08);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.04);z-index:1000000;padding:6px;min-width:180px;backdrop-filter:blur(10px);';
+		
+		var screenshotMenuItems = [
+			{mode: 'viewport', label: '{{SCREENSHOT_VIEWPORT}}'},
+			{mode: 'fullpage', label: '{{SCREENSHOT_FULLPAGE}}'},
+			{mode: 'region', label: '{{SCREENSHOT_REGION}}'}
+		];
+		
+		for (var j = 0; j < screenshotMenuItems.length; j++) {
+			var screenshotItem = document.createElement('div');
+			screenshotItem.setAttribute('data-mode', screenshotMenuItems[j].mode);
+			screenshotItem.style.cssText = 'padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;border-radius:8px;color:#334155;letter-spacing:-0.01em;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);';
+			screenshotItem.textContent = screenshotMenuItems[j].label;
+			screenshotItem.onmouseover = function() { this.style.background = '#f1f5f9'; this.style.color = '#0f172a'; };
+			screenshotItem.onmouseout = function() { this.style.background = 'transparent'; this.style.color = '#334155'; };
+			
+			screenshotItem.onclick = function() {
+				var mode = this.getAttribute('data-mode');
+				screenshotMenu.style.display = 'none';
+				handleScreenshot(mode);
+			};
+			
+			screenshotMenu.appendChild(screenshotItem);
+		}
+		
+		// 截图处理函数
+		function handleScreenshot(mode) {
+			if (mode === 'region') {
+				// 自由截图模式：启动区域选择
+				startRegionSelection();
+			} else {
+				// 直接触发截图
+				var timestamp = Date.now();
+				window.__screenshotRequest__ = {
+					timestamp: timestamp,
+					mode: mode
+				};
+				console.log('[BrowserWing] Screenshot request:', mode);
+				
+				// 立即在前端记录这个操作
+				var action = {
+					type: 'screenshot',
+					timestamp: timestamp,
+					screenshot_mode: mode
+				};
+				recordAction(action);
+			}
+		}
+		
+		// 区域选择功能
+		function startRegionSelection() {
+			// 创建遮罩层
+			var overlay = document.createElement('div');
+			overlay.id = '__browserwing_selection_overlay__';
+			overlay.className = '__browserwing-protected__';
+			overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:2147483646;cursor:crosshair;';
+			
+			var selectionBox = document.createElement('div');
+			selectionBox.className = '__browserwing-protected__';
+			selectionBox.style.cssText = 'position:absolute;border:2px dashed #6366f1;background:rgba(99,102,241,0.1);display:none;';
+			
+			var tooltip = document.createElement('div');
+			tooltip.className = '__browserwing-protected__';
+			tooltip.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:white;padding:8px 16px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:13px;color:#0f172a;z-index:2147483647;';
+			tooltip.textContent = '{{SCREENSHOT_REGION_HINT}}';
+			
+			overlay.appendChild(selectionBox);
+			overlay.appendChild(tooltip);
+			document.body.appendChild(overlay);
+			
+			var startX, startY, isSelecting = false;
+			
+			overlay.addEventListener('mousedown', function(e) {
+				isSelecting = true;
+				startX = e.clientX;
+				startY = e.clientY;
+				selectionBox.style.display = 'block';
+				selectionBox.style.left = startX + 'px';
+				selectionBox.style.top = startY + 'px';
+				selectionBox.style.width = '0px';
+				selectionBox.style.height = '0px';
+			});
+			
+			overlay.addEventListener('mousemove', function(e) {
+				if (!isSelecting) return;
+				
+				var currentX = e.clientX;
+				var currentY = e.clientY;
+				var width = Math.abs(currentX - startX);
+				var height = Math.abs(currentY - startY);
+				var left = Math.min(startX, currentX);
+				var top = Math.min(startY, currentY);
+				
+				selectionBox.style.left = left + 'px';
+				selectionBox.style.top = top + 'px';
+				selectionBox.style.width = width + 'px';
+				selectionBox.style.height = height + 'px';
+			});
+			
+			overlay.addEventListener('mouseup', function(e) {
+				if (!isSelecting) return;
+				isSelecting = false;
+				
+				var currentX = e.clientX;
+				var currentY = e.clientY;
+				var width = Math.abs(currentX - startX);
+				var height = Math.abs(currentY - startY);
+				var left = Math.min(startX, currentX);
+				var top = Math.min(startY, currentY);
+				
+				// 移除遮罩
+				if (document.body.contains(overlay)) {
+					document.body.removeChild(overlay);
+				}
+				
+				// 如果选区太小，忽略
+				if (width < 10 || height < 10) {
+					console.log('[BrowserWing] Selection too small, ignored');
+					return;
+				}
+				
+				// 发送截图请求
+				var timestamp = Date.now();
+				window.__screenshotRequest__ = {
+					timestamp: timestamp,
+					mode: 'region',
+					x: left,
+					y: top,
+					width: width,
+					height: height
+				};
+				console.log('[BrowserWing] Region screenshot request:', { x: left, y: top, width: width, height: height });
+				
+				// 立即在前端记录这个操作
+				var action = {
+					type: 'screenshot',
+					timestamp: timestamp,
+					screenshot_mode: 'region',
+					x: left,
+					y: top,
+					screenshot_width: width,
+					screenshot_height: height
+				};
+				recordAction(action);
+			});
+			
+			// ESC取消
+			var cancelHandler = function(e) {
+				if (e.key === 'Escape') {
+					if (document.body.contains(overlay)) {
+						document.body.removeChild(overlay);
+					}
+					document.removeEventListener('keydown', cancelHandler);
+				}
+			};
+			document.addEventListener('keydown', cancelHandler);
+		}
+		
 		// 添加 CSS 动画
 		var style = document.createElement('style');
 		style.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}';
@@ -562,6 +755,7 @@ if (window.__browserwingRecorder__) {
 		
 		document.body.appendChild(panel);
 		document.body.appendChild(menu);
+		document.body.appendChild(screenshotMenu);
 		
 	window.__recorderUI__ = {
 		panel: panel,
@@ -572,11 +766,13 @@ if (window.__browserwingRecorder__) {
 		extractBtn: extractBtn,
 		aiExtractBtn: aiExtractBtn,
 		aiFormFillBtn: aiFormFillBtn,
+		screenshotBtn: screenshotBtn,
 		xhrBtn: xhrBtn,
 		actionList: actionList,
 		emptyState: emptyState,
 		currentAction: currentAction,
 		menu: menu,
+		screenshotMenu: screenshotMenu,
 		stopRecordingBtn: stopRecordingBtn
 	};
 	};
@@ -787,6 +983,8 @@ if (window.__browserwingRecorder__) {
 			typeText = 'Sleep';
 		} else if (action.type === 'execute_js') {
 			typeText = 'Execute JS';
+		} else if (action.type === 'screenshot') {
+			typeText = 'Screenshot';
 		}
 		typeLabel.textContent = '#' + (index + 1) + ' ' + typeText.charAt(0).toUpperCase() + typeText.slice(1);
 		
@@ -857,6 +1055,19 @@ if (window.__browserwingRecorder__) {
 			detailText = '⏱ {{WAIT_PREFIX}}' + (action.duration / 1000).toFixed(1) + ' {{SECONDS_UNIT}}';
 			if (action.description) {
 				detailText = action.description;
+			}
+		} else if (action.type === 'screenshot') {
+			// 特殊处理 screenshot action
+			var mode = action.screenshot_mode || 'viewport';
+			if (mode === 'viewport') {
+				detailText = '{{SCREENSHOT_VIEWPORT}}';
+			} else if (mode === 'fullpage') {
+				detailText = '{{SCREENSHOT_FULLPAGE}}';
+			} else if (mode === 'region') {
+				detailText = '{{SCREENSHOT_REGION}} (' + action.x + ', ' + action.y + ', ' + action.screenshot_width + 'x' + action.screenshot_height + ')';
+			}
+			if (action.variable_name) {
+				detailText += ' → ' + escapeHtml(action.variable_name);
 			}
 		} else {
 			// 优先显示 xpath，其次显示 selector
@@ -2609,6 +2820,8 @@ if (window.__browserwingRecorder__) {
 		if (target.id && target.id.indexOf('__browserwing_') === 0) return;
 		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
 		if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
+		if (target.closest && target.closest('#__browserwing_screenshot_menu__')) return;
+		if (target.closest && target.closest('#__browserwing_selection_overlay__')) return;
 		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
 			
 			// 如果在 AI 填充表单模式下，阻止默认行为并调用 AI 生成
@@ -3241,6 +3454,15 @@ if (window.__browserwingRecorder__) {
 				// 如果点击的不是菜单项，关闭菜单
 				if (!e.target.closest('#__browserwing_extract_menu__')) {
 					menu.style.display = 'none';
+				}
+			}
+			
+			var screenshotMenu = window.__recorderUI__.screenshotMenu;
+			if (screenshotMenu && screenshotMenu.style.display !== 'none') {
+				// 如果点击的不是截图菜单项，关闭菜单
+				if (!e.target.closest('#__browserwing_screenshot_menu__') && 
+				    !e.target.closest('#__browserwing_screenshot_btn__')) {
+					screenshotMenu.style.display = 'none';
 				}
 			}
 		}
