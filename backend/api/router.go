@@ -63,6 +63,7 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			prompts.POST("", handler.CreatePrompt)
 			prompts.PUT("/:id", handler.UpdatePrompt)
 			prompts.DELETE("/:id", handler.DeletePrompt)
+			prompts.POST("/:id/reset", handler.ResetPrompt) // 重置系统提示词
 		}
 
 		// 浏览器相关

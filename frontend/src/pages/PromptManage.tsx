@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api, { Prompt } from '../api/client'
-import { BookText, Plus, Edit2, Trash2, Save, X, Shield, ChevronDown, ChevronUp } from 'lucide-react'
+import { BookText, Plus, Edit2, Trash2, Save, X, Shield, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
 import Toast from '../components/Toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useLanguage } from '../i18n'
@@ -15,6 +15,7 @@ export default function PromptManage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [showModal, setShowModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; promptId: string | null; prompt: Prompt | null }>({ show: false, promptId: null, prompt: null })
+  const [resetConfirm, setResetConfirm] = useState<{ show: boolean; promptId: string | null; prompt: Prompt | null }>({ show: false, promptId: null, prompt: null })
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info')
@@ -120,6 +121,30 @@ export default function PromptManage() {
     }
   }
 
+  const handleReset = async () => {
+    if (!resetConfirm.promptId || !resetConfirm.prompt) return
+
+    // 只有系统提示词才能重置
+    if (resetConfirm.prompt.type !== 'system') {
+      showMessage(t('prompt.resetError'), 'error')
+      setResetConfirm({ show: false, promptId: null, prompt: null })
+      return
+    }
+
+    try {
+      setLoading(true)
+      await api.resetPrompt(resetConfirm.promptId)
+      await loadPrompts()
+      showMessage(t('prompt.resetSuccess'), 'success')
+    } catch (err) {
+      showMessage(t('prompt.resetError'), 'error')
+      console.error(err)
+    } finally {
+      setLoading(false)
+      setResetConfirm({ show: false, promptId: null, prompt: null })
+    }
+  }
+
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
       const newSet = new Set(prev)
@@ -222,6 +247,15 @@ export default function PromptManage() {
                         >
                           {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                         </button>
+                        {prompt.type === 'system' && (
+                          <button
+                            onClick={() => setResetConfirm({ show: true, promptId: prompt.id, prompt })}
+                            className="p-2.5 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-xl transition-all hover:scale-110 active:scale-95"
+                            title={t('prompt.resetToDefault')}
+                          >
+                            <RotateCcw className="w-5 h-5" />
+                          </button>
+                        )}
                         <button
                     onClick={() => handleEdit(prompt)}
                           className="p-2.5 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-xl transition-all hover:scale-110 active:scale-95"
@@ -384,6 +418,18 @@ export default function PromptManage() {
           cancelText={t('common.cancel')}
           onConfirm={handleDelete}
           onCancel={() => setDeleteConfirm({ show: false, promptId: null, prompt: null })}
+        />
+      )}
+
+      {/* Reset Confirmation Dialog */}
+      {resetConfirm.show && (
+        <ConfirmDialog
+          title={t('prompt.resetConfirmTitle')}
+          message={t('prompt.resetConfirm')}
+          confirmText={t('prompt.reset')}
+          cancelText={t('common.cancel')}
+          onConfirm={handleReset}
+          onCancel={() => setResetConfirm({ show: false, promptId: null, prompt: null })}
         />
       )}
     </>

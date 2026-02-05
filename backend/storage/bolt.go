@@ -578,6 +578,55 @@ func (b *BoltDB) DeletePrompt(id string) error {
 	})
 }
 
+// CheckAndUpdateSystemPrompts 检查并更新系统提示词
+// 只更新用户未手动修改过且版本落后的系统prompt
+func (b *BoltDB) CheckAndUpdateSystemPrompts() error {
+	return b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(promptsBucket)
+		
+		// 遍历所有系统prompt
+		for _, systemPrompt := range models.SystemPrompts {
+			// 获取数据库中的prompt
+			data := bucket.Get([]byte(systemPrompt.ID))
+			
+			if data == nil {
+				// 数据库中不存在，直接保存新的
+				promptData, err := json.Marshal(systemPrompt)
+				if err != nil {
+					return err
+				}
+				if err := bucket.Put([]byte(systemPrompt.ID), promptData); err != nil {
+					return err
+				}
+				continue
+			}
+			
+			// 解析数据库中的prompt
+			var dbPrompt models.Prompt
+			if err := json.Unmarshal(data, &dbPrompt); err != nil {
+				return err
+			}
+			
+			// 检查是否需要更新
+			if dbPrompt.NeedsUpdate(systemPrompt) {
+				// 保留原始的CreatedAt，更新其他字段
+				systemPrompt.CreatedAt = dbPrompt.CreatedAt
+				systemPrompt.UpdatedAt = time.Now()
+				
+				promptData, err := json.Marshal(systemPrompt)
+				if err != nil {
+					return err
+				}
+				if err := bucket.Put([]byte(systemPrompt.ID), promptData); err != nil {
+					return err
+				}
+			}
+		}
+		
+		return nil
+	})
+}
+
 // ============= 脚本执行记录相关方法 =============
 
 // SaveScriptExecution 保存脚本执行记录

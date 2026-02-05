@@ -577,6 +577,9 @@ export const api = {
   deletePrompt: (id: string) =>
     client.delete(`/prompts/${id}`),
 
+  resetPrompt: (id: string) =>
+    client.post<{ data: Prompt; message: string }>(`/prompts/${id}/reset`),
+
   // 浏览器相关
   startBrowser: () =>
     client.post<{ message: string; status: any }>('/browser/start'),

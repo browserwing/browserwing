@@ -1454,6 +1454,44 @@ func (h *Handler) DeletePrompt(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "success.promptDeleted"})
 }
 
+// ResetPrompt 重置系统提示词为默认值
+func (h *Handler) ResetPrompt(c *gin.Context) {
+	id := c.Param("id")
+
+	// 检查是否是系统提示词
+	prompt, err := h.db.GetPrompt(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.promptNotFound"})
+		return
+	}
+
+	if prompt.Type != models.PromptTypeSystem {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error.onlySystemPromptCanReset"})
+		return
+	}
+
+	// 获取最新的系统提示词
+	latestPrompt := models.GetSystemPromptByID(id)
+	if latestPrompt == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.systemPromptNotFound"})
+		return
+	}
+
+	// 重置为最新版本，保留原始CreatedAt
+	latestPrompt.CreatedAt = prompt.CreatedAt
+	latestPrompt.UpdatedAt = prompt.CreatedAt // 重置后UpdatedAt等于CreatedAt，表示未修改
+
+	if err := h.db.SavePrompt(latestPrompt); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.resetPromptFailed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "success.promptReset",
+		"data":    latestPrompt,
+	})
+}
+
 // ============= 脚本批量操作相关 API =============
 
 // BatchSetGroup 批量设置脚本分组

@@ -91,6 +91,13 @@ func main() {
 
 	log.Println("✓ Database initialization successful")
 
+	// 检查并更新系统提示词（自动升级未修改的prompt）
+	if err := db.CheckAndUpdateSystemPrompts(); err != nil {
+		log.Printf("Warning: Failed to update system prompts: %v", err)
+	} else {
+		log.Println("✓ System prompts checked and updated")
+	}
+
 	// 初始化默认浏览器实例
 	err = initDefaultBrowserInstance(db, cfg)
 	if err != nil {

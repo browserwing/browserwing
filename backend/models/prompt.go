@@ -24,6 +24,7 @@ type Prompt struct {
 	Description string     `json:"description"` // 提示词描述
 	Content     string     `json:"content"`     // 提示词内容
 	Type        PromptType `json:"type"`        // 提示词类型: system/custom
+	Version     int        `json:"version"`     // 版本号，用于追踪系统prompt更新
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
@@ -41,6 +42,7 @@ var (
 		ID:          SystemPromptExtractorID,
 		Name:        "JS Data Extraction Prompt",
 		Description: "Extract structured data from web pages",
+		Version:     3, // 版本号，更新内容时需递增
 		Content: `You are a professional data extraction expert. Please analyze the HTML code below and generate a JavaScript function to extract structured data.
 
 Requirements:
@@ -53,19 +55,81 @@ Requirements:
 7. Return only JavaScript code without any explanations
 8. Do not use function declarations, must use arrow function IIFE format
 
+**Data Validation (CRITICAL):**
+9. **Filter out invalid data**: Before adding an item to the result array, validate that essential fields are not empty
+   - Identify the most important fields (e.g., title, url, name, id)
+   - Skip items where key fields are empty or only contain whitespace
+   - Use conditional checks to ensure data quality
+   - Example: ` + "`" + `if (!item.title || !item.url) continue;` + "`" + ` or ` + "`" + `if (item.title && item.url) items.push(item);` + "`" + `
+
+**Pagination Handling (if pagination component exists):**
+10. If HTML contains pagination components (next page button, page numbers, etc.), generate code to handle pagination:
+    - Click the next page button/link programmatically
+    - **CRITICAL**: After clicking, wait for data to refresh (check if new data differs from previous page)
+    - Use a comparison mechanism to detect data changes (e.g., compare first item's text content)
+    - Implement retry logic with timeout to avoid infinite loops
+    - Aggregate data from all pages before returning final result
+    - Example waiting logic: 
+      ` + "`" + `await new Promise(resolve => setTimeout(resolve, 1000))` + "`" + ` then verify data changed
+    - If data hasn't changed after multiple checks, assume no more pages and stop
+
 Example output format (must be an Immediately Invoked Function Expression):
 ` + "```" + `javascript
 (() => {
-  const items = [];
-  const elements = document.querySelectorAll('.item-selector');
-  elements.forEach(el => {
-    items.push({
-      title: el.querySelector('.title')?.textContent?.trim() || '',
-      url: el.querySelector('a')?.href || '',
-      image: el.querySelector('img')?.src || ''
+  const extractPageData = () => {
+    const items = [];
+    const elements = document.querySelectorAll('.item-selector');
+    elements.forEach(el => {
+      const item = {
+        title: el.querySelector('.title')?.textContent?.trim() || '',
+        url: el.querySelector('a')?.href || '',
+        image: el.querySelector('img')?.src || ''
+      };
+      
+      // Validate: only add items with essential fields (title and url)
+      if (item.title && item.url) {
+        items.push(item);
+      }
     });
-  });
-  return items;
+    return items;
+  };
+
+  // Example with pagination (if pagination exists)
+  const paginationClick = async (pageNumber) => {
+    const prevData = extractPageData();
+    const nextButton = document.querySelector('.pagination .next');
+    if (!nextButton) return [];
+    
+    nextButton.click();
+    
+    // Wait for data to refresh (check if data changed)
+    for (let i = 0; i < 50; i++) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const newData = extractPageData();
+      // Compare first item to detect change
+      if (newData.length > 0 && prevData.length > 0 && 
+          newData[0].title !== prevData[0].title) {
+        return newData;
+      }
+    }
+    return []; // Timeout, no new data
+  };
+
+  const getAllPagesData = async () => {
+    let allData = [...extractPageData()];
+    const totalPages = document.querySelectorAll('.pagination .page').length;
+    
+    for (let i = 2; i <= totalPages; i++) {
+      const pageData = await paginationClick(i);
+      if (pageData.length === 0) break; // No more data
+      allData = [...allData, ...pageData];
+    }
+    
+    return allData;
+  };
+
+  // If pagination exists, call getAllPagesData(), otherwise just extractPageData()
+  return getAllPagesData();
 })()
 ` + "```" + `
 `,
@@ -78,6 +142,7 @@ Example output format (must be an Immediately Invoked Function Expression):
 		ID:          SystemPromptFormFillerID,
 		Name:        "JS Form Filling Prompt",
 		Description: "Fill HTML form fields with data",
+		Version:     1, // 版本号
 		Type:        PromptTypeSystem,
 		Content: `You are a professional form filling expert. Please analyze the HTML form code below and generate a JavaScript function to fill form fields.
 
@@ -114,6 +179,7 @@ Example output format (must be an Immediately Invoked Function Expression):
 		ID:          SystemPromptAIAgentID,
 		Name:        "AI Agent System Prompt",
 		Description: "AI agent for user interaction",
+		Version:     1, // 版本号
 		Type:        PromptTypeSystem,
 		Content: `You are an AI assistant with access to tools.
 
@@ -137,6 +203,7 @@ Tool usage rules:
 		ID:          SystemPromptGetMCPInfoID,
 		Name:        "Get MCP Info Prompt",
 		Description: "Generate MCP server command configuration",
+		Version:     1, // 版本号
 		Type:        PromptTypeSystem,
 		Content: `Please analyze the following script information and generate an MCP (Model Context Protocol) command configuration.
 
@@ -170,3 +237,37 @@ Requirements:
 		UpdatedAt: time.Now(),
 	}
 )
+
+// IsUserModified 判断用户是否手动修改过prompt
+// 如果 UpdatedAt 和 CreatedAt 相同（或差距在1秒内），说明用户没有修改过
+func (p *Prompt) IsUserModified() bool {
+	diff := p.UpdatedAt.Sub(p.CreatedAt)
+	return diff.Abs() > time.Second
+}
+
+// NeedsUpdate 判断系统prompt是否需要更新
+// 返回 true 表示数据库中的版本落后，需要更新
+func (p *Prompt) NeedsUpdate(latestPrompt *Prompt) bool {
+	// 只有系统prompt才能自动更新
+	if p.Type != PromptTypeSystem {
+		return false
+	}
+
+	// 如果用户手动修改过，不自动更新
+	if p.IsUserModified() {
+		return false
+	}
+
+	// 版本号落后，需要更新
+	return p.Version < latestPrompt.Version
+}
+
+// GetSystemPromptByID 根据ID获取最新的系统prompt
+func GetSystemPromptByID(id string) *Prompt {
+	for _, prompt := range SystemPrompts {
+		if prompt.ID == id {
+			return prompt
+		}
+	}
+	return nil
+}

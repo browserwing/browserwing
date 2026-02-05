@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,6 +33,32 @@ var floatButtonScript string
 
 //go:embed scripts/xhr_interceptor.js
 var xhrInterceptorScriptForManager string
+
+// parseProxyURL 解析代理 URL，提取认证信息和地址
+// 输入: http://user:pass@host:port 或 socks5://user:pass@host:port
+// 返回: (proxyAddr, username, password, error)
+// proxyAddr 格式: protocol://host:port
+func parseProxyURL(proxyURL string) (string, string, string, error) {
+	if proxyURL == "" {
+		return "", "", "", nil
+	}
+
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return "", "", "", fmt.Errorf("invalid proxy URL: %w", err)
+	}
+
+	var username, password string
+	if u.User != nil {
+		username = u.User.Username()
+		password, _ = u.User.Password()
+	}
+
+	// 重建不带认证信息的代理地址
+	proxyAddr := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+
+	return proxyAddr, username, password, nil
+}
 
 // resolveWebSocketURL 从 HTTP control URL 解析 WebSocket URL
 // 如果输入已经是 ws:// 或 wss:// URL，则直接返回
@@ -169,6 +196,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	var url string
 	var browser *rod.Browser
+	var proxyUsername, proxyPassword string // 代理认证信息
 
 	// 检查是否配置了远程 Chrome URL
 	if m.config.Browser != nil && m.config.Browser.ControlURL != "" {
@@ -206,9 +234,24 @@ func (m *Manager) Start(ctx context.Context) error {
 			Devtools(false).
 			Leakless(false)
 
+		// 代理配置
 		if defaultConfig.Proxy != "" {
-			l = l.Proxy(defaultConfig.Proxy)
-			logger.Info(ctx, fmt.Sprintf("Using proxy: %s", defaultConfig.Proxy))
+			// 解析代理 URL，提取认证信息
+			proxyAddr, username, password, err := parseProxyURL(defaultConfig.Proxy)
+			if err != nil {
+				logger.Warn(ctx, "Failed to parse proxy URL: %v", err)
+			} else {
+				// 设置代理地址（不包含用户名密码）
+				l = l.Proxy(proxyAddr)
+				proxyUsername = username
+				proxyPassword = password
+
+				if username != "" {
+					logger.Info(ctx, fmt.Sprintf("Using proxy: %s (with authentication)", proxyAddr))
+				} else {
+					logger.Info(ctx, fmt.Sprintf("Using proxy: %s", proxyAddr))
+				}
+			}
 		}
 
 		// 打印启动参数
@@ -317,6 +360,12 @@ func (m *Manager) Start(ctx context.Context) error {
 	}
 	if err := browser.Connect(); err != nil {
 		return fmt.Errorf("failed to connect browser: %w", err)
+	}
+
+	// 如果代理需要认证，启动认证处理
+	if proxyUsername != "" && proxyPassword != "" {
+		logger.Info(ctx, "Setting up proxy authentication handler...")
+		go browser.HandleAuth(proxyUsername, proxyPassword)
 	}
 
 	// 获取并显示浏览器版本信息
@@ -1570,6 +1619,7 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 	var browser *rod.Browser
 	var launcherObj *launcher.Launcher
 	var url string
+	var proxyUsername, proxyPassword string // 代理认证信息
 
 	if instance.Type == "remote" {
 		// 远程模式
@@ -1605,8 +1655,22 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 
 		// 设置代理
 		if instance.Proxy != "" {
-			l = l.Proxy(instance.Proxy)
-			logger.Info(ctx, "Using proxy: %s", instance.Proxy)
+			// 解析代理 URL，提取认证信息
+			proxyAddr, username, password, err := parseProxyURL(instance.Proxy)
+			if err != nil {
+				logger.Warn(ctx, "Failed to parse proxy URL: %v", err)
+			} else {
+				// 设置代理地址（不包含用户名密码）
+				l = l.Proxy(proxyAddr)
+				proxyUsername = username
+				proxyPassword = password
+
+				if username != "" {
+					logger.Info(ctx, "Using proxy: %s (with authentication)", proxyAddr)
+				} else {
+					logger.Info(ctx, "Using proxy: %s", proxyAddr)
+				}
+			}
 		}
 
 		// 设置启动参数
@@ -1709,6 +1773,12 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 			launcherObj.Kill()
 		}
 		return fmt.Errorf("failed to connect browser: %w", err)
+	}
+
+	// 如果代理需要认证，启动认证处理
+	if proxyUsername != "" && proxyPassword != "" {
+		logger.Info(ctx, "Setting up proxy authentication handler...")
+		go browser.HandleAuth(proxyUsername, proxyPassword)
 	}
 
 	// 关键：在浏览器连接后立即设置XHR拦截器，确保所有页面（包括后续打开的）都会自动监听XHR
