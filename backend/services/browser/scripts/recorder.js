@@ -661,6 +661,11 @@ if (window.__browserwingRecorder__) {
 		
 		// 区域选择功能
 		function startRegionSelection() {
+			// 隐藏录制控制面板，避免遮挡截图区域
+			if (window.__recorderUI__ && window.__recorderUI__.panel) {
+				window.__recorderUI__.panel.style.display = 'none';
+			}
+			
 			// 创建遮罩层
 			var overlay = document.createElement('div');
 			overlay.id = '__browserwing_selection_overlay__';
@@ -725,6 +730,11 @@ if (window.__browserwingRecorder__) {
 					document.body.removeChild(overlay);
 				}
 				
+				// 恢复显示录制控制面板
+				if (window.__recorderUI__ && window.__recorderUI__.panel) {
+					window.__recorderUI__.panel.style.display = 'block';
+				}
+				
 				// 如果选区太小，忽略
 				if (width < 10 || height < 10) {
 					console.log('[BrowserWing] Selection too small, ignored');
@@ -761,6 +771,10 @@ if (window.__browserwingRecorder__) {
 				if (e.key === 'Escape') {
 					if (document.body.contains(overlay)) {
 						document.body.removeChild(overlay);
+					}
+					// 恢复显示录制控制面板
+					if (window.__recorderUI__ && window.__recorderUI__.panel) {
+						window.__recorderUI__.panel.style.display = 'block';
 					}
 					document.removeEventListener('keydown', cancelHandler);
 				}

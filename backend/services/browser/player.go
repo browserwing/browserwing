@@ -2621,6 +2621,14 @@ func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action m
 	// 等待页面稳定
 	time.Sleep(500 * time.Millisecond)
 
+	// 截图前隐藏AI控制指示器，避免被截入图片
+	_, _ = page.Eval(`() => {
+		const indicator = document.getElementById('browserwing-ai-indicator');
+		if (indicator) {
+			indicator.style.display = 'none';
+		}
+	}`)
+
 	var screenshot []byte
 	var err error
 
@@ -2666,6 +2674,14 @@ func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action m
 	default:
 		return fmt.Errorf("unsupported screenshot mode: %s", mode)
 	}
+
+	// 截图完成后恢复显示AI控制指示器
+	_, _ = page.Eval(`() => {
+		const indicator = document.getElementById('browserwing-ai-indicator');
+		if (indicator) {
+			indicator.style.display = 'block';
+		}
+	}`)
 
 	// 确保下载目录存在
 	if p.downloadPath == "" {
