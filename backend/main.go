@@ -160,6 +160,9 @@ func main() {
 		log.Println("✓ Agent manager initialized successfully")
 	}
 
+	// 将 Agent 管理器注入到浏览器管理器
+	browserManager.SetAgentManager(agentManager)
+
 	// 创建HTTP处理器
 	handler := api.NewHandler(db, browserManager, cfg, llmManager)
 

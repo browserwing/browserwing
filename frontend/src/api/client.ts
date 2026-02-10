@@ -269,6 +269,10 @@ export interface ScriptAction {
   screenshot_width?: number
   screenshot_height?: number
 
+  // AI 控制相关字段（用于 ai_control 类型）
+  ai_control_prompt?: string   // AI 控制的提示词
+  ai_control_xpath?: string    // 可选的元素 XPath（用于提示词上下文）
+
   // 语义信息字段（用于自愈）
   intent?: {
     verb?: string

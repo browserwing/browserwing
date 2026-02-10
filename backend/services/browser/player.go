@@ -30,6 +30,13 @@ import (
 var indicatorScript string
 
 // Player 脚本回放器
+// BrowserManagerInterface 定义 Browser 管理器需要的接口
+// 避免循环依赖
+type BrowserManagerInterface interface {
+	SetActivePage(page *rod.Page)
+	GetActivePage() *rod.Page
+}
+
 type Player struct {
 	extractedData     map[string]interface{}          // 存储抓取的数据
 	successCount      int                             // 成功步骤数
@@ -48,6 +55,8 @@ type Player struct {
 	currentLang       string                          // 当前语言设置
 	currentActions    []models.ScriptAction           // 当前执行的脚本动作列表
 	currentStepIndex  int                             // 当前执行到的步骤索引
+	agentManager      AgentManagerInterface           // Agent 管理器（用于 AI 控制功能）
+	browserManager    BrowserManagerInterface         // Browser 管理器（用于同步活跃页面）
 }
 
 // highlightElement 高亮显示元素
@@ -353,6 +362,7 @@ func getI18nText(key, lang string) string {
 			"action.switch_tab":        "切换标签页",
 			"action.switch_active_tab": "切换到活跃标签页",
 			"action.capture_xhr":       "捕获XHR请求",
+			"action.ai_control":        "AI控制",
 		},
 		"zh-TW": {
 			// AI 控制指示器
@@ -382,6 +392,7 @@ func getI18nText(key, lang string) string {
 			"action.switch_tab":        "切換標籤頁",
 			"action.switch_active_tab": "切換到活躍標籤頁",
 			"action.capture_xhr":       "捕獲XHR請求",
+			"action.ai_control":        "AI控制",
 		},
 		"en": {
 			// AI Control Indicator
@@ -411,6 +422,7 @@ func getI18nText(key, lang string) string {
 			"action.switch_tab":        "Switch Tab",
 			"action.switch_active_tab": "Switch to Active Tab",
 			"action.capture_xhr":       "Capture XHR Request",
+			"action.ai_control":        "AI Control",
 		},
 	}
 
@@ -1190,6 +1202,8 @@ func (p *Player) executeAction(ctx context.Context, page *rod.Page, action model
 		return p.executeScreenshot(ctx, activePage, action)
 	case "capture_xhr":
 		return p.executeCaptureXHR(ctx, activePage, action)
+	case "ai_control":
+		return p.executeAIControl(ctx, activePage, action)
 	default:
 		logger.Warn(ctx, "Unknown action type: %s", action.Type)
 		return nil
@@ -2615,7 +2629,7 @@ func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action m
 	if mode == "" {
 		mode = "viewport" // 默认视口截图
 	}
-	
+
 	logger.Info(ctx, "Taking screenshot: mode=%s", mode)
 
 	// 等待页面稳定
@@ -2668,7 +2682,7 @@ func (p *Player) executeScreenshot(ctx context.Context, page *rod.Page, action m
 		if err != nil {
 			return fmt.Errorf("failed to take region screenshot: %w", err)
 		}
-		logger.Info(ctx, "Region screenshot captured: x=%d, y=%d, w=%d, h=%d", 
+		logger.Info(ctx, "Region screenshot captured: x=%d, y=%d, w=%d, h=%d",
 			action.X, action.Y, action.ScreenshotWidth, action.ScreenshotHeight)
 
 	default:
@@ -3169,5 +3183,183 @@ func (p *Player) executeCaptureXHR(ctx context.Context, page *rod.Page, action m
 
 		// 等待后重试
 		time.Sleep(pollInterval)
+	}
+}
+
+// executeAIControl 执行 AI 控制动作
+// 使用录制时保存的提示词和可选的元素 XPath 来启动一个 AI Agent
+// Agent 会根据提示词自动操作当前页面
+func (p *Player) executeAIControl(ctx context.Context, page *rod.Page, action models.ScriptAction) error {
+	if p.agentManager == nil {
+		return fmt.Errorf("agent manager is not available")
+	}
+
+	userTask := action.AIControlPrompt
+	if userTask == "" {
+		return fmt.Errorf("AI control prompt is empty")
+	}
+
+	logger.Info(ctx, "[executeAIControl] Executing AI control action with user task: %s", userTask)
+
+	// 关键修复：同步当前页面到 Browser Manager 的 activePage
+	// 这样 Executor 的 GetActivePage() 才能获取到正确的页面
+	if p.browserManager != nil {
+		logger.Info(ctx, "[executeAIControl] Syncing current page to Browser Manager's activePage")
+		p.browserManager.SetActivePage(page)
+
+		// 验证设置是否成功
+		if activePage := p.browserManager.GetActivePage(); activePage == page {
+			logger.Info(ctx, "[executeAIControl] ✓ Successfully synced activePage to Browser Manager")
+		} else {
+			logger.Warn(ctx, "[executeAIControl] ⚠️  Failed to sync activePage - Executor tools may not work correctly")
+		}
+	} else {
+		logger.Warn(ctx, "[executeAIControl] ⚠️  Browser Manager not set - Executor tools may not work correctly")
+	}
+
+	// 获取当前页面信息
+	var currentURL string
+	pageInfo, err := page.Info()
+	if err == nil && pageInfo != nil {
+		currentURL = pageInfo.URL
+		logger.Info(ctx, "[executeAIControl] Current page URL: %s, Title: %s", currentURL, pageInfo.Title)
+	} else {
+		currentURL = "unknown"
+		logger.Warn(ctx, "[executeAIControl] Failed to get page info: %v", err)
+	}
+
+	// 构建完整的提示词，包含上下文信息
+	var promptBuilder strings.Builder
+
+	// 1. 页面上下文
+	promptBuilder.WriteString(fmt.Sprintf("Current active browser page URL: %s\n\n", currentURL))
+
+	// 2. 简要说明（工具详情会自动在上下文中）
+	promptBuilder.WriteString("You have access to browser automation tools for interacting with the page.\n")
+	promptBuilder.WriteString("Use the available tools to help the user complete the following task:\n\n")
+
+	// 3. 用户任务
+	promptBuilder.WriteString(userTask)
+
+	// 4. 如果有元素 XPath，添加到上下文
+	if action.AIControlXPath != "" {
+		logger.Info(ctx, "AI control target element XPath: %s", action.AIControlXPath)
+		// XPath信息已经包含在userTask中（格式为 "任务描述 (xpath: xxx)"），无需重复添加
+	}
+
+	prompt := promptBuilder.String()
+	logger.Debug(ctx, "Full AI control prompt: %s", prompt)
+
+	// 创建一个唯一的会话ID用于这次 AI 控制
+	// SendMessage 会自动创建会话（如果不存在）
+	sessionID := fmt.Sprintf("ai_control_%d", time.Now().UnixNano())
+
+	// 创建流式输出通道（使用 any 类型以匹配接口）
+	streamChan := make(chan any, 100)
+
+	// 完成标志和错误通道
+	doneChan := make(chan error, 1)
+	hasContent := false
+
+	// 创建一个带超时的 context 用于 AI 控制执行
+	// 5分钟超时，足够完成大多数自动化任务
+	aiCtx, aiCancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer aiCancel()
+
+	// 在后台接收并记录流式输出
+	go func() {
+		for chunk := range streamChan {
+			// 尝试将 chunk 转换为 map 来处理
+			// 由于 AgentManager 实际发送的是 StreamChunk 结构体
+			// 我们需要使用类型断言或反射来处理
+			switch v := chunk.(type) {
+			case map[string]interface{}:
+				if chunkType, ok := v["type"].(string); ok {
+					if chunkType == "content" || chunkType == "message" {
+						if content, ok := v["content"].(string); ok && content != "" {
+							hasContent = true
+							logger.Info(ctx, "AI control output: %s", content)
+						}
+					} else if chunkType == "error" {
+						if errMsg, ok := v["error"].(string); ok {
+							logger.Error(ctx, "AI control error: %s", errMsg)
+						}
+					} else if chunkType == "done" || chunkType == "complete" {
+						logger.Info(ctx, "AI control stream completed")
+					}
+				}
+			default:
+				// 对于其他类型，简单记录
+				logger.Debug(ctx, "AI control stream: %v", v)
+			}
+		}
+	}()
+
+	// 在后台执行 AI 控制
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error(ctx, "AI control panic recovered: %v", r)
+				doneChan <- fmt.Errorf("AI control panic: %v", r)
+			}
+			close(doneChan)
+		}()
+
+		logger.Info(ctx, "Starting AI control task execution with session: %s", sessionID)
+
+		// 使用带超时的 context 调用 SendMessageInterface
+		// 这样可以确保即使工具调用卡住，也能在超时后返回
+		err := p.agentManager.SendMessageInterface(aiCtx, sessionID, prompt, streamChan)
+
+		if err != nil {
+			logger.Error(ctx, "AI control task execution error: %v", err)
+		} else {
+			logger.Info(ctx, "AI control task execution completed without error")
+		}
+
+		doneChan <- err
+	}()
+
+	// 等待执行完成或超时
+	select {
+	case err, ok := <-doneChan:
+		// 注意：不要在这里关闭 streamChan！
+		// streamChan 会由 adapter.go 的 goroutine 通过 defer 自动关闭
+		time.Sleep(100 * time.Millisecond) // 等待流处理完成
+
+		if !ok {
+			// doneChan 被关闭但没有收到错误，可能是 panic 后恢复
+			logger.Error(ctx, "AI control execution interrupted unexpectedly")
+			return fmt.Errorf("AI control execution interrupted")
+		}
+
+		if err != nil {
+			logger.Error(ctx, "AI control execution failed: %v", err)
+			return fmt.Errorf("AI control failed: %w", err)
+		}
+
+		if hasContent {
+			logger.Info(ctx, "✓ AI control completed successfully")
+			return nil
+		}
+
+		// 即使没有内容输出，只要没有错误就认为成功
+		logger.Info(ctx, "✓ AI control completed (no visible output)")
+		return nil
+
+	case <-aiCtx.Done():
+		// Context 超时或取消
+		// 注意：不要在这里关闭 streamChan！
+		// streamChan 会由 adapter.go 的 goroutine 通过 defer 自动关闭
+		logger.Warn(ctx, "AI control context done, waiting for cleanup...")
+		time.Sleep(100 * time.Millisecond) // 等待流处理完成
+
+		if aiCtx.Err() == context.DeadlineExceeded {
+			logger.Error(ctx, "❌ AI control execution timeout after 5 minutes - task took too long")
+			return fmt.Errorf("AI control execution timeout (5 minutes)")
+		}
+
+		logger.Error(ctx, "❌ AI control cancelled: %v", aiCtx.Err())
+		return fmt.Errorf("AI control cancelled: %w", aiCtx.Err())
 	}
 }

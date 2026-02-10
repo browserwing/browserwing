@@ -11,10 +11,13 @@ if (window.__browserwingRecorder__) {
 	window.__menuTrigger__ = null; // 菜单触发方式: 'button' 或 'contextmenu'
 	window.__aiExtractMode__ = false; // AI提取模式标志
 	window.__aiFormFillMode__ = false; // AI填充表单模式标志
+	window.__aiControlMode__ = false; // AI控制模式标志
 	window.__aiExtractControlPanel__ = null; // AI抓取控制面板
+	window.__aiControlPanel__ = null; // AI控制面板
 	window.__aiExtractDataRegions__ = []; // 已选择的数据区域
 	window.__aiExtractPaginationRegion__ = null; // 已选择的分页区域
 	window.__aiExtractSelectingType__ = null; // 当前正在选择的类型: 'data' 或 'pagination'
+	window.__aiControlSelectedElement__ = null; // AI控制模式选中的元素
 	window.__recorderUI__ = null; // 录制器 UI 元素
 	window.__highlightElement__ = null; // 高亮元素
 	window.__highlightLabel__ = null; // 高亮标签元素
@@ -611,7 +614,8 @@ if (window.__browserwingRecorder__) {
 		
 		var aiModeMenuItems = [
 			{mode: 'extract', label: '{{AI_EXTRACT}}'},
-			{mode: 'formfill', label: '{{AI_FORMFILL}}'}
+			{mode: 'formfill', label: '{{AI_FORMFILL}}'},
+			{mode: 'control', label: '{{AI_CONTROL}}'}
 		];
 		
 		for (var k = 0; k < aiModeMenuItems.length; k++) {
@@ -629,6 +633,8 @@ if (window.__browserwingRecorder__) {
 					toggleAIExtractMode();
 				} else if (mode === 'formfill') {
 					toggleAIFormFillMode();
+				} else if (mode === 'control') {
+					toggleAIControlMode();
 				}
 			};
 			
@@ -1020,6 +1026,8 @@ if (window.__browserwingRecorder__) {
 			typeText = 'Execute JS';
 		} else if (action.type === 'screenshot') {
 			typeText = 'Screenshot';
+		} else if (action.type === 'ai_control') {
+			typeText = 'AI Control';
 		}
 		typeLabel.textContent = '#' + (index + 1) + ' ' + typeText.charAt(0).toUpperCase() + typeText.slice(1);
 		
@@ -1127,6 +1135,19 @@ if (window.__browserwingRecorder__) {
 			}
 			if (action.variable_name) {
 				detailText += ' → ' + escapeHtml(action.variable_name);
+			}
+		} else if (action.type === 'ai_control') {
+			// 特殊处理 ai_control action
+			if (action.ai_control_prompt) {
+				var prompt = action.ai_control_prompt;
+				// 移除xpath部分以便更清晰地显示
+				var xpathMatch = prompt.match(/\(xpath:\s*[^)]+\)/);
+				if (xpathMatch) {
+					prompt = prompt.replace(xpathMatch[0], '').trim();
+				}
+				detailText = escapeHtml(prompt.substring(0, 60)) + (prompt.length > 60 ? '...' : '');
+			} else {
+				detailText = 'AI Control Task';
 			}
 		} else {
 			// 优先显示 xpath，其次显示 selector
@@ -1703,6 +1724,9 @@ if (window.__browserwingRecorder__) {
 			}
 			if (window.__aiExtractMode__) {
 				toggleAIExtractMode();
+			}
+			if (window.__aiControlMode__) {
+				toggleAIControlMode();
 			}
 			
 			// 开启 AI 填充表单模式
@@ -2289,6 +2313,9 @@ if (window.__browserwingRecorder__) {
 			if (window.__aiFormFillMode__) {
 				toggleAIFormFillMode();
 			}
+			if (window.__aiControlMode__) {
+				toggleAIControlMode();
+			}
 			
 			// 显示AI控制面板而不是直接进入选择模式
 			createAIExtractControlPanel();
@@ -2301,6 +2328,435 @@ if (window.__browserwingRecorder__) {
 			hideHighlight();
 			console.log('[BrowserWing] AI Extract mode disabled');
 		}
+	};
+	
+	// 切换 AI 控制模式
+	var toggleAIControlMode = function() {
+		window.__aiControlMode__ = !window.__aiControlMode__;
+		
+		if (window.__aiControlMode__) {
+			// 关闭其他模式
+			if (window.__extractMode__) {
+				toggleExtractMode();
+			}
+			if (window.__aiFormFillMode__) {
+				toggleAIFormFillMode();
+			}
+			if (window.__aiExtractMode__) {
+				toggleAIExtractMode();
+			}
+			
+			// 显示AI控制弹框
+			createAIControlPanel();
+			console.log('[BrowserWing] AI Control mode enabled');
+		} else {
+			// 关闭 AI 控制模式
+			closeAIControlPanel();
+			document.body.style.cursor = 'default';
+			window.__aiControlSelectedElement__ = null;
+			hideHighlight();
+			console.log('[BrowserWing] AI Control mode disabled');
+		}
+	};
+	
+	// 创建AI控制面板
+	var createAIControlPanel = function() {
+		// 如果已存在，先移除
+		if (window.__aiControlPanel__) {
+			window.__aiControlPanel__.remove();
+			window.__aiControlPanel__ = null;
+		}
+		
+		// 重置选择状态
+		window.__aiControlSelectedElement__ = null;
+		
+		// 创建遮罩层
+		var overlay = document.createElement('div');
+		overlay.className = '__browserwing-protected__';
+		overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:999998;backdrop-filter:blur(2px);';
+		
+		// 创建弹框容器
+		var dialog = document.createElement('div');
+		dialog.className = '__browserwing-protected__';
+		dialog.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.15);z-index:999999;padding:0;width:500px;max-width:90%;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Helvetica, Arial, sans-serif;';
+		
+		// 标题栏
+		var header = document.createElement('div');
+		header.className = '__browserwing-protected__';
+		header.style.cssText = 'padding:20px 24px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;';
+		
+		var title = document.createElement('div');
+		title.className = '__browserwing-protected__';
+		title.style.cssText = 'font-size:16px;font-weight:700;color:#0f172a;letter-spacing:-0.02em;';
+		title.textContent = '{{AI_CONTROL_TITLE}}';
+		
+		var closeBtn = document.createElement('button');
+		closeBtn.className = '__browserwing-protected__';
+		closeBtn.style.cssText = 'background:transparent;border:none;cursor:pointer;color:#94a3b8;font-size:24px;line-height:1;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;transition:color 0.2s;';
+		closeBtn.textContent = '×';
+		closeBtn.onmouseover = function() { this.style.color = '#1e293b'; };
+		closeBtn.onmouseout = function() { this.style.color = '#94a3b8'; };
+		closeBtn.onclick = function() {
+			toggleAIControlMode();
+		};
+		
+		header.appendChild(title);
+		header.appendChild(closeBtn);
+		
+		// 内容区域
+		var content = document.createElement('div');
+		content.className = '__browserwing-protected__';
+		content.style.cssText = 'padding:24px;';
+		
+		// 说明文本
+		var description = document.createElement('div');
+		description.className = '__browserwing-protected__';
+		description.style.cssText = 'font-size:14px;color:#64748b;line-height:1.6;margin-bottom:20px;';
+		description.textContent = '{{AI_CONTROL_DESCRIPTION}}';
+		
+		// 提示词输入区域
+		var promptLabel = document.createElement('div');
+		promptLabel.className = '__browserwing-protected__';
+		promptLabel.style.cssText = 'font-size:13px;font-weight:600;color:#334155;margin-bottom:8px;letter-spacing:-0.01em;';
+		promptLabel.textContent = '{{AI_CONTROL_PROMPT_LABEL}}';
+		
+		// 元素选择按钮（放在输入框上面）
+		var selectElementBtn = document.createElement('button');
+		selectElementBtn.className = '__browserwing-protected__';
+		selectElementBtn.style.cssText = 'margin-bottom:8px;padding:6px 12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:#64748b;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px;';
+		selectElementBtn.innerHTML = '<svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg><span>{{AI_CONTROL_SELECT_ELEMENT}}</span>';
+		selectElementBtn.onmouseover = function() { this.style.background = '#f1f5f9'; this.style.borderColor = '#cbd5e1'; this.style.color = '#334155'; };
+		selectElementBtn.onmouseout = function() { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; this.style.color = '#64748b'; };
+		selectElementBtn.onclick = function() {
+			// 隐藏弹框，进入元素选择模式
+			overlay.style.display = 'none';
+			if (window.__recorderUI__ && window.__recorderUI__.panel) {
+				window.__recorderUI__.panel.style.display = 'none';
+			}
+			document.body.style.cursor = 'crosshair';
+			showCurrentAction('{{AI_CONTROL_SELECTING}}');
+		};
+		
+		// 使用 contenteditable 的 div 代替 textarea，支持内嵌HTML元素
+		var promptInput = document.createElement('div');
+		promptInput.id = '__ai_control_prompt_input__';
+		promptInput.className = '__browserwing-protected__';
+		promptInput.contentEditable = 'true';
+		promptInput.setAttribute('data-placeholder', '{{AI_CONTROL_PROMPT_PLACEHOLDER}}');
+		promptInput.style.cssText = 'width:100%;min-height:100px;padding:12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;color:#0f172a;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;transition:all 0.2s;box-sizing:border-box;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;line-height:1.6;';
+		promptInput.onfocus = function() { this.style.borderColor = '#64748b'; this.style.boxShadow = '0 0 0 2px rgba(100, 116, 139, 0.1)'; };
+		promptInput.onblur = function() { this.style.borderColor = '#e2e8f0'; this.style.boxShadow = 'none'; };
+		
+		// 添加样式：空内容时显示placeholder
+		var style = document.createElement('style');
+		style.textContent = '#__ai_control_prompt_input__:empty:before { content: attr(data-placeholder); color: #94a3b8; }';
+		document.head.appendChild(style);
+		
+		// 已选择元素显示（隐藏，不再使用）
+		var selectedElementDisplay = document.createElement('div');
+		selectedElementDisplay.id = '__ai_control_selected_element__';
+		selectedElementDisplay.className = '__browserwing-protected__';
+		selectedElementDisplay.style.cssText = 'display:none;';
+		
+		// 底部按钮区域
+		var footer = document.createElement('div');
+		footer.className = '__browserwing-protected__';
+		footer.style.cssText = 'padding:20px 24px;border-top:1px solid #e2e8f0;display:flex;gap:12px;justify-content:flex-end;';
+		
+		var cancelBtn = document.createElement('button');
+		cancelBtn.className = '__browserwing-protected__';
+		cancelBtn.style.cssText = 'padding:10px 20px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;color:#64748b;transition:all 0.2s;';
+		cancelBtn.textContent = '{{CANCEL}}';
+		cancelBtn.onmouseover = function() { this.style.background = '#f1f5f9'; this.style.borderColor = '#cbd5e1'; this.style.color = '#334155'; };
+		cancelBtn.onmouseout = function() { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; this.style.color = '#64748b'; };
+		cancelBtn.onclick = function() {
+			toggleAIControlMode();
+		};
+		
+		var confirmBtn = document.createElement('button');
+		confirmBtn.className = '__browserwing-protected__';
+		confirmBtn.style.cssText = 'padding:10px 20px;background:#0f172a;border:1.5px solid #0f172a;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;color:white;transition:all 0.2s;';
+		confirmBtn.textContent = '{{CONFIRM}}';
+		confirmBtn.onmouseover = function() { this.style.background = '#1e293b'; this.style.borderColor = '#1e293b'; };
+		confirmBtn.onmouseout = function() { this.style.background = '#0f172a'; this.style.borderColor = '#0f172a'; };
+		confirmBtn.onclick = function() {
+			handleAIControlConfirm();
+		};
+		
+		footer.appendChild(cancelBtn);
+		footer.appendChild(confirmBtn);
+		
+		content.appendChild(description);
+		content.appendChild(promptLabel);
+		content.appendChild(selectElementBtn);
+		content.appendChild(promptInput);
+		content.appendChild(selectedElementDisplay);
+		
+		dialog.appendChild(header);
+		dialog.appendChild(content);
+		dialog.appendChild(footer);
+		
+		overlay.appendChild(dialog);
+		document.body.appendChild(overlay);
+		
+		window.__aiControlPanel__ = overlay;
+		
+		console.log('[BrowserWing] AI Control Panel created');
+	};
+	
+	// 关闭AI控制面板
+	var closeAIControlPanel = function() {
+		if (window.__aiControlPanel__) {
+			window.__aiControlPanel__.remove();
+			window.__aiControlPanel__ = null;
+		}
+		
+		// 重置选择状态
+		window.__aiControlSelectedElement__ = null;
+		
+		// 退出AI控制模式
+		if (window.__aiControlMode__) {
+			window.__aiControlMode__ = false;
+		}
+		
+		console.log('[BrowserWing] AI Control Panel closed');
+	};
+	
+	// 处理AI控制模式的元素选择点击
+	var handleAIControlSelectClick = function(element) {
+		if (!element) return false;
+		
+		var selectors = getSelector(element);
+		
+		// 检查是否应该使用 full xpath（判断是否有过长的属性）
+		var shouldUseFullXPath = false;
+		var longAttributeThreshold = 50; // 属性值超过50个字符认为过长
+		
+		// 检查常见的可能过长的属性
+		var checkAttributes = ['placeholder', 'title', 'aria-label', 'data-testid', 'data-id'];
+		for (var i = 0; i < checkAttributes.length; i++) {
+			var attrName = checkAttributes[i];
+			var attrValue = element.getAttribute(attrName);
+			if (attrValue && attrValue.length > longAttributeThreshold) {
+				shouldUseFullXPath = true;
+				console.log('[BrowserWing] Detected long attribute ' + attrName + ' (' + attrValue.length + ' chars), using full XPath');
+				break;
+			}
+		}
+		
+		// 如果需要使用 full xpath，重新生成
+		var finalXPath = selectors.xpath;
+		if (shouldUseFullXPath) {
+			finalXPath = getFullXPath(element);
+		}
+		
+		window.__aiControlSelectedElement__ = {
+			element: element,
+			xpath: finalXPath,
+			css: selectors.css,
+			tagName: element.tagName ? element.tagName.toLowerCase() : ''
+		};
+		
+		// 恢复面板显示
+		if (window.__aiControlPanel__) {
+			window.__aiControlPanel__.style.display = 'block';
+		}
+		
+		// 恢复录制面板显示
+		if (window.__recorderUI__ && window.__recorderUI__.panel) {
+			window.__recorderUI__.panel.style.display = 'block';
+		}
+		
+		document.body.style.cursor = 'default';
+		
+		// 在光标位置插入XPath标签到可编辑div中
+		var promptInput = document.getElementById('__ai_control_prompt_input__');
+		if (promptInput) {
+			// 创建XPath标签元素
+			var xpathTag = document.createElement('span');
+			xpathTag.className = '__browserwing-protected__ __xpath_tag__';
+			xpathTag.contentEditable = 'false'; // 标签不可编辑
+			xpathTag.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;font-size:11px;color:#475569;margin:0 2px;cursor:default;vertical-align:middle;position:relative;';
+			xpathTag.setAttribute('data-xpath', finalXPath);
+			
+			// 显示截断的xpath
+			var displayXPath = finalXPath.length > 25 ? finalXPath.substring(0, 25) + '...' : finalXPath;
+			xpathTag.innerHTML = '<svg style="width:10px;height:10px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5l7 7-7 7"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;">' + displayXPath + '</span>';
+			
+			// 创建删除按钮
+			var removeBtn = document.createElement('span');
+			removeBtn.className = '__browserwing-protected__';
+			removeBtn.style.cssText = 'margin-left:2px;cursor:pointer;color:#94a3b8;font-size:14px;line-height:1;';
+			removeBtn.innerHTML = '×';
+			removeBtn.onclick = function(e) {
+				e.stopPropagation();
+				e.preventDefault();
+				// 删除标签时，需要更新全局状态
+				var allTags = promptInput.querySelectorAll('.__xpath_tag__');
+				if (allTags.length === 1) {
+					window.__aiControlSelectedElement__ = null;
+				}
+				xpathTag.remove();
+			};
+			xpathTag.appendChild(removeBtn);
+			
+			// 创建悬停提示 - 使用fixed定位，挂载到body上
+			var tooltip = document.createElement('div');
+			tooltip.className = '__browserwing-protected__';
+			tooltip.style.cssText = 'display:none;position:fixed;padding:6px 10px;background:#1e293b;color:white;font-size:11px;border-radius:6px;white-space:pre-wrap;max-width:400px;word-break:break-all;z-index:1000000;box-shadow:0 4px 12px rgba(0,0,0,0.2);pointer-events:none;';
+			tooltip.textContent = finalXPath;
+			document.body.appendChild(tooltip);
+			
+			// 鼠标进入时显示并定位tooltip
+			xpathTag.onmouseenter = function() {
+				var rect = xpathTag.getBoundingClientRect();
+				tooltip.style.display = 'block';
+				// 定位到标签上方
+				tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+				tooltip.style.top = (rect.top - 8) + 'px';
+				tooltip.style.transform = 'translate(-50%, -100%)';
+			};
+			xpathTag.onmouseleave = function() { 
+				tooltip.style.display = 'none';
+			};
+			
+			// 当标签被删除时，同时删除tooltip
+			var originalRemove = xpathTag.remove;
+			xpathTag.remove = function() {
+				if (tooltip && tooltip.parentNode) {
+					tooltip.remove();
+				}
+				originalRemove.call(this);
+			};
+			
+			// 获取当前选区和光标位置
+			var selection = window.getSelection();
+			var range;
+			
+			if (selection.rangeCount > 0 && promptInput.contains(selection.anchorNode)) {
+				// 如果有选区且在输入框内，在光标位置插入
+				range = selection.getRangeAt(0);
+				range.deleteContents();
+				range.insertNode(xpathTag);
+				
+				// 在标签后添加一个空格，方便继续输入
+				var space = document.createTextNode(' ');
+				range.collapse(false);
+				range.insertNode(space);
+				
+				// 将光标移到空格后
+				range.setStartAfter(space);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+			} else {
+				// 如果没有选区，追加到末尾
+				promptInput.appendChild(xpathTag);
+				promptInput.appendChild(document.createTextNode(' '));
+			}
+			
+			// 聚焦到输入框
+			promptInput.focus();
+		}
+		
+		showCurrentAction('{{ELEMENT_SELECTED}}');
+		return true;
+	};
+	
+	// 处理AI控制确认
+	var handleAIControlConfirm = function() {
+		// 临时禁用录制，防止触发input事件
+		var wasRecording = window.__isRecordingActive__;
+		window.__isRecordingActive__ = false;
+		
+		var promptInput = document.getElementById('__ai_control_prompt_input__');
+		if (!promptInput) {
+			window.__isRecordingActive__ = wasRecording;
+			return;
+		}
+		
+		// 从 contenteditable div 中提取纯文本和XPath标签
+		var textParts = [];
+		var xpathValues = [];
+		
+		// 遍历所有子节点
+		var nodes = promptInput.childNodes;
+		for (var i = 0; i < nodes.length; i++) {
+			var node = nodes[i];
+			if (node.nodeType === Node.TEXT_NODE) {
+				// 文本节点
+				textParts.push(node.textContent);
+			} else if (node.nodeType === Node.ELEMENT_NODE) {
+				if (node.classList && node.classList.contains('__xpath_tag__')) {
+					// XPath标签
+					var xpath = node.getAttribute('data-xpath');
+					if (xpath) {
+						textParts.push('(xpath: ' + xpath + ')');
+						xpathValues.push(xpath);
+					}
+				} else {
+					// 其他元素，提取文本内容
+					textParts.push(node.textContent);
+				}
+			}
+		}
+		
+		var userPrompt = textParts.join('').trim();
+		
+		if (!userPrompt) {
+			window.__isRecordingActive__ = wasRecording; // 恢复录制状态
+			alert('{{AI_CONTROL_PROMPT_REQUIRED}}');
+			return;
+		}
+		
+		// 先失去焦点，避免触发input事件
+		if (promptInput) {
+			promptInput.blur();
+		}
+		
+		// 关闭控制面板
+		if (window.__aiControlPanel__) {
+			window.__aiControlPanel__.remove();
+			window.__aiControlPanel__ = null;
+		}
+		
+		// 使用第一个XPath（如果有多个的话）
+		var elementXPath = xpathValues.length > 0 ? xpathValues[0] : '';
+		
+		var action = {
+			type: 'ai_control',
+			timestamp: Date.now(),
+			ai_control_prompt: userPrompt,
+			ai_control_xpath: elementXPath,
+			description: 'AI控制: ' + userPrompt.substring(0, 50) + (userPrompt.length > 50 ? '...' : '')
+		};
+		
+		window.__recordedActions__.push(action);
+		
+		// 同步到 sessionStorage
+		try {
+			sessionStorage.setItem('__browserwing_actions__', JSON.stringify(window.__recordedActions__));
+		} catch (e) {
+			console.error('[BrowserWing] sessionStorage save error:', e);
+		}
+		
+		updateActionCount();
+		addActionToList(action, window.__recordedActions__.length - 1);
+		showCurrentAction('{{AI_CONTROL_ADDED}}');
+		console.log('[BrowserWing] AI control action added:', action);
+		
+		// 清理
+		window.__aiControlSelectedElement__ = null;
+		
+		// 恢复录制状态
+		window.__isRecordingActive__ = wasRecording;
+		
+		// 自动退出 AI 控制模式
+		setTimeout(function() {
+			if (window.__aiControlMode__) {
+				toggleAIControlMode();
+			}
+		}, 1000);
 	};
 	
 	// 处理 AI 填充表单元素点击
@@ -3522,9 +3978,12 @@ if (window.__browserwingRecorder__) {
 		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
 		if (target.closest && target.closest('#__browserwing_extract_menu__')) return;
 		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
-		// 忽略AI控制面板
+		// 忽略AI控制面板和XPath标签
 		if (target.className && target.className.indexOf('__browserwing-protected__') !== -1) return;
+		if (target.className && target.className.indexOf('__xpath_tag__') !== -1) return;
+		if (target.closest && target.closest('.__xpath_tag__')) return; // 忽略XPath标签内的所有子元素
 		if (window.__aiExtractControlPanel__ && target.closest && window.__aiExtractControlPanel__.contains(target)) return;
+		if (window.__aiControlPanel__ && target.closest && window.__aiControlPanel__.contains(target)) return;
 		
 		// 在选择区域模式下也显示高亮
 		if (window.__aiExtractSelectingType__) {
@@ -3568,29 +4027,45 @@ if (window.__browserwingRecorder__) {
 		if (target.className && target.className.indexOf('__browserwing-protected__') !== -1) return;
 		if (window.__aiExtractControlPanel__ && target.closest && window.__aiExtractControlPanel__.contains(target)) return;
 			
-			// 如果在 AI 填充表单模式下，阻止默认行为并调用 AI 生成（不录制）
-			if (window.__aiFormFillMode__) {
-				e.preventDefault();
-				e.stopPropagation();
-				handleAIFormFillClick(target);
+		// 如果在 AI 填充表单模式下，阻止默认行为并调用 AI 生成（不录制）
+		if (window.__aiFormFillMode__) {
+			e.preventDefault();
+			e.stopPropagation();
+			handleAIFormFillClick(target);
+			return false;
+		}
+		
+		// 如果在 AI 控制模式下且面板被隐藏（正在选择元素），阻止默认行为并记录选择
+		if (window.__aiControlMode__ && window.__aiControlPanel__ && window.__aiControlPanel__.style.display === 'none') {
+			e.preventDefault();
+			e.stopPropagation();
+			var handled = handleAIControlSelectClick(target);
+			if (handled) {
 				return false;
 			}
-			
-			// 如果在 AI 提取模式下的区域选择状态（不录制）
-			if (window.__aiExtractMode__ && window.__aiExtractSelectingType__) {
-				e.preventDefault();
-				e.stopPropagation();
-				var handled = handleRegionSelectClick(target);
-				if (handled) {
-					return false;
-				}
+		}
+		
+		// 如果在 AI 控制模式下但面板打开中（不录制）
+		if (window.__aiControlMode__) {
+			// 不录制操作，直接返回
+			return;
+		}
+		
+		// 如果在 AI 提取模式下的区域选择状态（不录制）
+		if (window.__aiExtractMode__ && window.__aiExtractSelectingType__) {
+			e.preventDefault();
+			e.stopPropagation();
+			var handled = handleRegionSelectClick(target);
+			if (handled) {
+				return false;
 			}
-			
-			// 如果在 AI 提取模式下但不在选择状态（面板打开中，不录制）
-			if (window.__aiExtractMode__) {
-				// 不录制操作，直接返回
-				return;
-			}
+		}
+		
+		// 如果在 AI 提取模式下但不在选择状态（面板打开中，不录制）
+		if (window.__aiExtractMode__) {
+			// 不录制操作，直接返回
+			return;
+		}
 			
 			// 如果在抓取模式下，阻止默认行为并记录抓取操作
 			if (window.__extractMode__) {
@@ -3780,13 +4255,17 @@ if (window.__browserwingRecorder__) {
 		if (!window.__isRecordingActive__) return;
 		
 		// 在AI模式下不录制输入
-		if (window.__aiExtractMode__ || window.__aiFormFillMode__) {
+		if (window.__aiExtractMode__ || window.__aiFormFillMode__ || window.__aiControlMode__) {
 			return;
 		}
 		
 		try {
 			var target = e.target || e.srcElement;
 			if (!target) return;
+			
+			// 忽略AI控制面板的输入框
+			if (target.id === '__ai_control_prompt_input__') return;
+			if (target.closest && target.closest('.__browserwing-protected__')) return;
 			
 			var tagName = target.tagName ? target.tagName.toUpperCase() : '';
 			var isContentEditable = target.contentEditable === 'true' || target.isContentEditable;
@@ -3852,6 +4331,10 @@ if (window.__browserwingRecorder__) {
 		try {
 			var target = e.target || e.srcElement;
 			if (!target) return;
+			
+			// 忽略AI控制面板的输入框
+			if (target.id === '__ai_control_prompt_input__') return;
+			if (target.closest && target.closest('.__browserwing-protected__')) return;
 			
 			var tagName = target.tagName ? target.tagName.toUpperCase() : '';
 			var isContentEditable = target.contentEditable === 'true' || target.isContentEditable;
@@ -4077,8 +4560,12 @@ if (window.__browserwingRecorder__) {
 			
 		// 忽略录制器 UI 自身的键盘事件
 		if (target.id && target.id.indexOf('__browserwing_') === 0) return;
+		if (target.id && target.id.indexOf('__ai_control_') === 0) return;
 		if (target.closest && target.closest('#__browserwing_recorder_panel__')) return;
 		if (target.closest && target.closest('#__browserwing_preview_dialog__')) return;
+		
+		// 在AI控制模式下不录制键盘事件
+		if (window.__aiControlMode__) return;
 			
 			var keyAction = null;
 			

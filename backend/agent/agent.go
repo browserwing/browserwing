@@ -1151,16 +1151,18 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 	session.UpdatedAt = time.Now()
 	am.mu.Unlock()
 
-	// 保存用户消息到数据库
-	dbUserMsg := &models.AgentMessage{
-		ID:        userMsg.ID,
-		SessionID: sessionID,
-		Role:      userMsg.Role,
-		Content:   userMsg.Content,
-		Timestamp: userMsg.Timestamp,
-	}
-	if err := am.db.SaveAgentMessage(dbUserMsg); err != nil {
-		logger.Warn(am.ctx, "Failed to save user message to database: %v", err)
+	// 保存用户消息到数据库（跳过AI控制临时会话）
+	if len(sessionID) < 11 || sessionID[:11] != "ai_control_" {
+		dbUserMsg := &models.AgentMessage{
+			ID:        userMsg.ID,
+			SessionID: sessionID,
+			Role:      userMsg.Role,
+			Content:   userMsg.Content,
+			Timestamp: userMsg.Timestamp,
+		}
+		if err := am.db.SaveAgentMessage(dbUserMsg); err != nil {
+			logger.Warn(am.ctx, "Failed to save user message to database: %v", err)
+		}
 	}
 
 	// 确保 Agent 实例已创建（按需创建）
@@ -1291,16 +1293,19 @@ func (am *AgentManager) SendMessage(ctx context.Context, sessionID, userMessage 
 		session.UpdatedAt = time.Now()
 		am.mu.Unlock()
 
-		dbAssistantMsg := &models.AgentMessage{
-			ID:        assistantMsg.ID,
-			SessionID: sessionID,
-			Role:      assistantMsg.Role,
-			Content:   assistantMsg.Content,
-			Timestamp: assistantMsg.Timestamp,
-			ToolCalls: []map[string]interface{}{},
-		}
-		if err := am.db.SaveAgentMessage(dbAssistantMsg); err != nil {
-			logger.Warn(am.ctx, "Failed to save assistant message to database: %v", err)
+		// 保存到数据库（跳过AI控制临时会话）
+		if len(sessionID) < 11 || sessionID[:11] != "ai_control_" {
+			dbAssistantMsg := &models.AgentMessage{
+				ID:        assistantMsg.ID,
+				SessionID: sessionID,
+				Role:      assistantMsg.Role,
+				Content:   assistantMsg.Content,
+				Timestamp: assistantMsg.Timestamp,
+				ToolCalls: []map[string]interface{}{},
+			}
+			if err := am.db.SaveAgentMessage(dbAssistantMsg); err != nil {
+				logger.Warn(am.ctx, "Failed to save assistant message to database: %v", err)
+			}
 		}
 
 		return nil
@@ -1540,27 +1545,30 @@ processingComplete:
 			"timestamp":    tc.Timestamp.Format(time.RFC3339),
 		})
 	}
-	dbAssistantMsg := &models.AgentMessage{
-		ID:        assistantMsg.ID,
-		SessionID: sessionID,
-		Role:      assistantMsg.Role,
-		Content:   assistantMsg.Content,
-		Timestamp: assistantMsg.Timestamp,
-		ToolCalls: toolCallsData,
-	}
-	if err := am.db.SaveAgentMessage(dbAssistantMsg); err != nil {
-		logger.Warn(am.ctx, "Failed to save assistant message to database: %v", err)
-	}
+	// 保存助手消息到数据库（跳过AI控制临时会话）
+	if len(sessionID) < 11 || sessionID[:11] != "ai_control_" {
+		dbAssistantMsg := &models.AgentMessage{
+			ID:        assistantMsg.ID,
+			SessionID: sessionID,
+			Role:      assistantMsg.Role,
+			Content:   assistantMsg.Content,
+			Timestamp: assistantMsg.Timestamp,
+			ToolCalls: toolCallsData,
+		}
+		if err := am.db.SaveAgentMessage(dbAssistantMsg); err != nil {
+			logger.Warn(am.ctx, "Failed to save assistant message to database: %v", err)
+		}
 
-	// 更新会话时间戳
-	dbSession := &models.AgentSession{
-		ID:          sessionID,
-		LLMConfigID: session.LLMConfigID, // ✅ 保留 LLMConfigID
-		CreatedAt:   session.CreatedAt,
-		UpdatedAt:   session.UpdatedAt,
-	}
-	if err := am.db.SaveAgentSession(dbSession); err != nil {
-		logger.Warn(am.ctx, "Failed to update session timestamp: %v", err)
+		// 更新会话时间戳
+		dbSession := &models.AgentSession{
+			ID:          sessionID,
+			LLMConfigID: session.LLMConfigID, // ✅ 保留 LLMConfigID
+			CreatedAt:   session.CreatedAt,
+			UpdatedAt:   session.UpdatedAt,
+		}
+		if err := am.db.SaveAgentSession(dbSession); err != nil {
+			logger.Warn(am.ctx, "Failed to update session timestamp: %v", err)
+		}
 	}
 
 	// 发送完成信号
@@ -1579,6 +1587,11 @@ func (am *AgentManager) ListSessions() []*ChatSession {
 
 	sessions := make([]*ChatSession, 0, len(am.sessions))
 	for _, session := range am.sessions {
+		// 过滤掉脚本回放时创建的AI控制临时会话
+		// 这些会话ID以"ai_control_"开头，不应该显示在前端
+		if len(session.ID) >= 11 && session.ID[:11] == "ai_control_" {
+			continue
+		}
 		sessions = append(sessions, session)
 	}
 
@@ -1638,6 +1651,24 @@ func (am *AgentManager) Stop() {
 	}
 
 	am.cancel()
+}
+
+// SendMessageGeneric 是 SendMessage 的泛型包装版本
+// 用于适配外部接口，接收 chan<- any 并转换为内部使用的 chan<- StreamChunk
+func (am *AgentManager) SendMessageGeneric(ctx context.Context, sessionID, userMessage string, streamChan chan<- any) error {
+	// 创建一个内部的 StreamChunk 通道
+	internalChan := make(chan StreamChunk, 100)
+	
+	// 启动一个 goroutine 来转换通道类型
+	go func() {
+		defer close(streamChan)
+		for chunk := range internalChan {
+			streamChan <- chunk
+		}
+	}()
+	
+	// 调用原始的 SendMessage 方法
+	return am.SendMessage(ctx, sessionID, userMessage, internalChan)
 }
 
 type AgentLogger struct {

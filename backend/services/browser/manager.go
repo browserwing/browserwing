@@ -96,6 +96,16 @@ func resolveWebSocketURL(controlURL string) (string, error) {
 	return result.WebSocketDebuggerURL, nil
 }
 
+// AgentManagerInterface 定义 Agent 管理器需要的接口
+// 避免直接依赖 agent 包
+type AgentManagerInterface interface {
+	// SendMessageInterface 发送消息并流式返回响应
+	// sessionID: 会话ID，如果不存在会自动创建
+	// userMessage: 用户输入的消息
+	// streamChan: 用于接收流式响应块的通道
+	SendMessageInterface(ctx context.Context, sessionID, userMessage string, streamChan chan<- any) error
+}
+
 // BrowserInstanceRuntime 浏览器实例运行时信息
 type BrowserInstanceRuntime struct {
 	instance   *models.BrowserInstance // 实例配置
@@ -107,11 +117,12 @@ type BrowserInstanceRuntime struct {
 
 // Manager 浏览器管理器
 type Manager struct {
-	config     *config.Config
-	db         *storage.BoltDB
-	llmManager *llm.Manager
-	mu         sync.Mutex
-	recorder   *Recorder
+	config       *config.Config
+	db           *storage.BoltDB
+	llmManager   *llm.Manager
+	agentManager AgentManagerInterface // Agent 管理器接口（用于 AI 控制功能）
+	mu           sync.Mutex
+	recorder     *Recorder
 
 	// 多实例管理
 	instances         map[string]*BrowserInstanceRuntime // 实例 ID -> 运行时信息
@@ -155,6 +166,11 @@ func NewManager(cfg *config.Config, db *storage.BoltDB, llmManager *llm.Manager)
 		recorder:   recorder,
 		instances:  make(map[string]*BrowserInstanceRuntime),
 	}
+}
+
+// SetAgentManager 设置 Agent 管理器
+func (m *Manager) SetAgentManager(agentManager AgentManagerInterface) {
+	m.agentManager = agentManager
 }
 
 // Start 启动浏览器
@@ -565,6 +581,13 @@ func (m *Manager) GetActivePage() *rod.Page {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.activePage
+}
+
+// SetActivePage 设置当前活动页面（用于脚本回放等场景）
+func (m *Manager) SetActivePage(page *rod.Page) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.activePage = page
 }
 
 // CloseActivePage 关闭当前活动页面
@@ -1085,6 +1108,8 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script, instanc
 		currentLang = "zh-CN" // 默认简体中文
 	}
 	player := NewPlayer(currentLang)
+	player.agentManager = m.agentManager     // 设置 Agent 管理器用于 AI 控制功能
+	player.browserManager = m                // 设置 Browser 管理器用于同步活跃页面
 
 	// 设置下载路径并启动下载监听
 	if m.downloadPath != "" {

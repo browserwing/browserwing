@@ -20,7 +20,7 @@ type ScriptAction struct {
 	// =========================
 	// 原有字段（保持不变）
 	// =========================
-	Type      string            `json:"type"`      // click, input, select, navigate, wait, sleep, extract_text, extract_attribute, extract_html, execute_js, upload_file, scroll, keyboard, open_tab, switch_tab, switch_active_tab
+	Type      string            `json:"type"`      // click, input, select, navigate, wait, sleep, extract_text, extract_attribute, extract_html, execute_js, upload_file, scroll, keyboard, open_tab, switch_tab, switch_active_tab, ai_control
 	Timestamp int64             `json:"timestamp"` // 时间戳（毫秒）
 	Selector  string            `json:"selector"`  // CSS选择器
 	XPath     string            `json:"xpath"`     // XPath选择器（更可靠）
@@ -64,6 +64,10 @@ type ScriptAction struct {
 	ScreenshotMode   string `json:"screenshot_mode,omitempty"`   // viewport, fullpage, region
 	ScreenshotWidth  int    `json:"screenshot_width,omitempty"`  // 截图区域宽度（region模式）
 	ScreenshotHeight int    `json:"screenshot_height,omitempty"` // 截图区域高度（region模式）
+
+	// AI控制相关字段（用于 ai_control 类型）
+	AIControlPrompt string `json:"ai_control_prompt,omitempty"` // AI控制的提示词
+	AIControlXPath  string `json:"ai_control_xpath,omitempty"`  // 可选的元素XPath（用于提示词上下文）
 
 	Condition *ActionCondition `json:"condition,omitempty"`
 
@@ -118,6 +122,8 @@ func (a *ScriptAction) CopyWithoutSemanticInfo() *ScriptAction {
 		ScreenshotMode:   a.ScreenshotMode,
 		ScreenshotWidth:  a.ScreenshotWidth,
 		ScreenshotHeight: a.ScreenshotHeight,
+		AIControlPrompt:  a.AIControlPrompt,
+		AIControlXPath:   a.AIControlXPath,
 		Condition:        a.Condition,
 	}
 }

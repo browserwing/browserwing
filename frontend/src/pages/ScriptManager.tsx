@@ -782,6 +782,12 @@ export default function ScriptManager() {
       newAction.description = t('script.action.screenshotDefault')
     }
 
+    // 为 AI 控制类型设置默认值
+    if (type === 'ai_control') {
+      newAction.ai_control_prompt = ''
+      newAction.ai_control_xpath = ''
+    }
+
     // 为打开新标签页类型设置默认值
     if (type === 'open_tab') {
       newAction.url = 'https://'
@@ -1407,6 +1413,7 @@ export default function ScriptManager() {
                           <button onClick={() => { handleAddAction('upload_file'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('upload_file')}</button>
                           <button onClick={() => { handleAddAction('keyboard'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('keyboard')}</button>
                           <button onClick={() => { handleAddAction('screenshot'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('screenshot')}</button>
+                          <button onClick={() => { handleAddAction('ai_control'); setShowFloatingAddActionMenu(false); }} className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">{t('ai_control')}</button>
                         </div>
                       </div>
                       <div className="px-3 py-2">
@@ -2517,6 +2524,15 @@ export default function ScriptManager() {
                                               >
                                                 {t('screenshot')}
                                               </button>
+                                                <button
+                                                  onClick={() => {
+                                                    handleAddAction('ai_control')
+                                                    setShowAddActionMenu(false)
+                                                  }}
+                                                  className="px-3 py-2 text-xs text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                                >
+                                                  {t('ai_control')}
+                                                </button>
                                             </div>
                                           </div>
 
@@ -3739,7 +3755,8 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
               action.type !== 'open_tab' &&
               action.type !== 'switch_active_tab' &&
               action.type !== 'screenshot' &&
-              action.type !== 'capture_xhr' && (
+              action.type !== 'capture_xhr' &&
+              action.type !== 'ai_control' && (
                 <>
                   <div>
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.selector')}</label>
@@ -4050,6 +4067,19 @@ function SortableActionItem({ id, action, index, onUpdate, onDelete, onDuplicate
             {action.type === 'switch_active_tab' && (
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('script.action.switchActiveTab')}</label>
+              </div>
+            )}
+            {action.type === 'ai_control' && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{t('script.action.aiControlPrompt')}</label>
+                <textarea
+                  value={action.ai_control_prompt || ''}
+                  onChange={(e) => onUpdate(index, 'ai_control_prompt', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={6}
+                  placeholder={t('script.action.aiControlPromptPlaceholder')}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('script.action.aiControlPromptHint')}</p>
               </div>
             )}
             {action.type === 'screenshot' && (
@@ -4566,6 +4596,22 @@ function ActionItemView({ action, index }: ActionItemViewProps) {
           <div className="text-sm text-gray-600 dark:text-gray-400">
             <span className="font-medium">{t('script.action.switchActiveTab')}</span>
           </div>
+        )}
+        {action.type === 'ai_control' && (
+          <>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="font-medium">{t('script.action.aiControlPrompt')}</span>
+              <div className="bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded-lg mt-1 text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-200">
+                {action.ai_control_prompt || '-'}
+              </div>
+            </div>
+            {action.ai_control_xpath && (
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                <span className="font-medium">{t('script.action.aiControlXPath')}</span>{' '}
+                <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-sm break-all">{action.ai_control_xpath}</code>
+              </div>
+            )}
+          </>
         )}
         {action.type === 'screenshot' && (
           <>
