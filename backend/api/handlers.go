@@ -737,7 +737,7 @@ func (h *Handler) PlayScript(c *gin.Context) {
 		// 如果没有请求体或解析失败,使用空参数
 		req.Params = make(map[string]string)
 	}
-	if instanceID == "" && req.InstanceID != "" {
+	if req.InstanceID != "" {
 		instanceID = req.InstanceID
 	}
 
