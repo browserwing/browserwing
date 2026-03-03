@@ -5940,6 +5940,45 @@ func (h *Handler) ToggleScheduledTask(c *gin.Context) {
 	})
 }
 
+// RunScheduledTaskNow 立即执行定时任务
+func (h *Handler) RunScheduledTaskNow(c *gin.Context) {
+	id := c.Param("id")
+
+	if _, err := h.db.GetScheduledTask(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "error.taskNotFound"})
+		return
+	}
+
+	if h.scheduler == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.schedulerNotAvailable"})
+		return
+	}
+
+	type SchedulerRunner interface {
+		RunTaskNow(string) (*models.TaskExecution, error)
+	}
+
+	scheduler, ok := h.scheduler.(SchedulerRunner)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error.schedulerNotAvailable"})
+		return
+	}
+
+	execution, runErr := scheduler.RunTaskNow(id)
+	if runErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "error.taskRunFailed",
+			"details": runErr.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "success.taskRunCompleted",
+		"execution": execution,
+	})
+}
+
 // ================== Task Executions API ==================
 
 // ListTaskExecutions 列出任务执行记录

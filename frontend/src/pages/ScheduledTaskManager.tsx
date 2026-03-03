@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, Plus, Edit2, Trash2, Power, PowerOff, History, Calendar, Timer, Code, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Clock, Plus, Edit2, Trash2, Power, PowerOff, History, Calendar, Timer, Code, ChevronDown, ChevronUp, X, Play, FolderOutput, Loader2 } from 'lucide-react'
 import { useLanguage } from '../i18n'
 import * as api from '../api/client'
 import type { ScheduledTask, TaskExecution, Script, LLMConfig } from '../api/client'
@@ -29,6 +29,9 @@ export default function ScheduledTaskManager() {
   const [showDeleteExecutionConfirm, setShowDeleteExecutionConfirm] = useState(false)
   const [executionToDelete, setExecutionToDelete] = useState<string | null>(null)
 
+  // 立即执行相关
+  const [runningTasks, setRunningTasks] = useState<Set<string>>(new Set())
+
   // UI状态
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
@@ -51,6 +54,7 @@ export default function ScheduledTaskManager() {
     agent_prompt: '',
     agent_llm_id: '',
     browser_instance_id: '',
+    result_dir: '',
   })
 
   // 选择器数据
@@ -187,6 +191,7 @@ export default function ScheduledTaskManager() {
       agent_prompt: '',
       agent_llm_id: '',
       browser_instance_id: '',
+      result_dir: '',
     })
     setShowTaskDialog(true)
   }
@@ -205,6 +210,7 @@ export default function ScheduledTaskManager() {
       agent_prompt: task.agent_prompt || '',
       agent_llm_id: task.agent_llm_id || '',
       browser_instance_id: task.browser_instance_id || '',
+      result_dir: task.result_dir || '',
     })
     setShowTaskDialog(true)
   }
@@ -232,6 +238,27 @@ export default function ScheduledTaskManager() {
       loadTasks()
     } catch (error: any) {
       showMessage(t(error.response?.data?.error || 'error.operationFailed'), 'error')
+    }
+  }
+
+  const handleRunTaskNow = async (task: ScheduledTask) => {
+    setRunningTasks(prev => new Set(prev).add(task.id))
+    try {
+      const result = await api.runScheduledTaskNow(task.id)
+      if (result.execution?.success) {
+        showMessage(t('task.runNow.success'), 'success')
+      } else {
+        showMessage(t('task.runNow.failed') + (result.execution?.error_msg ? `: ${result.execution.error_msg}` : ''), 'error')
+      }
+      loadTasks()
+    } catch (error: any) {
+      showMessage(t(error.response?.data?.error || 'error.taskRunFailed'), 'error')
+    } finally {
+      setRunningTasks(prev => {
+        const next = new Set(prev)
+        next.delete(task.id)
+        return next
+      })
     }
   }
 
@@ -502,6 +529,18 @@ export default function ScheduledTaskManager() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-1 ml-4">
+                      <button
+                        onClick={() => handleRunTaskNow(task)}
+                        disabled={runningTasks.has(task.id)}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={t('task.runNow')}
+                      >
+                        {runningTasks.has(task.id) ? (
+                          <Loader2 className="w-4 h-4 text-gray-500 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleToggleTask(task)}
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -862,6 +901,21 @@ export default function ScheduledTaskManager() {
                   </div>
                 </>
               )}
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300 flex items-center space-x-2">
+                  <FolderOutput className="w-4 h-4" />
+                  <span>{t('task.resultDir')}</span>
+                </label>
+                <input
+                  type="text"
+                  value={taskForm.result_dir}
+                  onChange={(e) => setTaskForm({ ...taskForm, result_dir: e.target.value })}
+                  placeholder={t('task.resultDir.placeholder')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-500">{t('task.resultDir.hint')}</p>
+              </div>
 
               <div className="flex items-center space-x-2">
                 <input

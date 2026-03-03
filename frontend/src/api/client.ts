@@ -981,6 +981,7 @@ export interface ScheduledTask {
   agent_llm_id?: string
   agent_llm_name?: string
   agent_session_id?: string
+  result_dir?: string
   last_execution_time?: string
   next_execution_time?: string
   last_execution_status?: 'success' | 'failed'
@@ -1040,6 +1041,11 @@ export const deleteScheduledTask = async (id: string): Promise<void> => {
 export const toggleScheduledTask = async (id: string): Promise<ScheduledTask> => {
   const response = await client.post(`/scheduled-tasks/${id}/toggle`)
   return response.data.task
+}
+
+export const runScheduledTaskNow = async (id: string): Promise<{ message: string; execution: TaskExecution }> => {
+  const response = await client.post(`/scheduled-tasks/${id}/run`)
+  return response.data
 }
 
 // 任务执行记录 API

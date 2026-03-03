@@ -703,14 +703,24 @@ func (m *Manager) Status() map[string]interface{} {
 func (m *Manager) setPageWindow(page *rod.Page) {
 	ctx := context.Background()
 
-	// 获取屏幕尺寸
+	const (
+		defaultWindowWidth   = 1400
+		defaultWindowHeight  = 900
+		defaultViewportWidth = 1280
+		defaultViewportHeight = 800
+		minScreenWidth       = 1024
+		minScreenHeight      = 768
+	)
+
+	var windowWidth, windowHeight int
+	var viewportWidth, viewportHeight int
+
 	screenInfo, err := page.Eval(`() => ({
 		width: window.screen.availWidth,
 		height: window.screen.availHeight
 	})`)
 
-	var windowWidth, windowHeight int
-	var viewportWidth, viewportHeight int
+	useDefault := true
 
 	if err == nil && screenInfo != nil {
 		if info, ok := screenInfo.Value.Val().(map[string]interface{}); ok {
@@ -719,40 +729,37 @@ func (m *Manager) setPageWindow(page *rod.Page) {
 
 			logger.Info(ctx, "Detected screen size: %dx%d", screenWidth, screenHeight)
 
-			// 窗口大小设置为屏幕大小的 90%
-			windowWidth = int(float64(screenWidth) * 0.9)
-			windowHeight = int(float64(screenHeight) * 0.9)
-
-			// viewport 大小为窗口大小减去浏览器边框和工具栏 (约 120 像素宽度, 100 像素高度)
-			viewportWidth = windowWidth - 120
-			viewportHeight = windowHeight - 100
-
-			logger.Info(ctx, "Calculated window size: %dx%d", windowWidth, windowHeight)
-			logger.Info(ctx, "Calculated viewport size: %dx%d", viewportWidth, viewportHeight)
-		} else {
-			logger.Warn(ctx, "Failed to parse screen info, using default sizes")
-			windowWidth = 1400
-			windowHeight = 900
-			viewportWidth = 1280
-			viewportHeight = 800
+			if screenWidth >= minScreenWidth && screenHeight >= minScreenHeight {
+				windowWidth = int(float64(screenWidth) * 0.9)
+				windowHeight = int(float64(screenHeight) * 0.9)
+				viewportWidth = windowWidth - 120
+				viewportHeight = windowHeight - 100
+				useDefault = false
+			} else {
+				logger.Warn(ctx, "Screen size %dx%d is too small (likely headless/virtual), using default viewport", screenWidth, screenHeight)
+			}
 		}
 	} else {
-		logger.Warn(ctx, "Failed to get screen size: %v, using default sizes", err)
-		windowWidth = 1400
-		windowHeight = 900
-		viewportWidth = 1280
-		viewportHeight = 800
+		logger.Warn(ctx, "Failed to get screen size: %v", err)
 	}
 
-	// 设置浏览器窗口（外壳）
+	if useDefault {
+		windowWidth = defaultWindowWidth
+		windowHeight = defaultWindowHeight
+		viewportWidth = defaultViewportWidth
+		viewportHeight = defaultViewportHeight
+	}
+
+	logger.Info(ctx, "Calculated window size: %dx%d", windowWidth, windowHeight)
+	logger.Info(ctx, "Calculated viewport size: %dx%d", viewportWidth, viewportHeight)
+
 	page.MustSetWindow(0, 0, windowWidth, windowHeight)
 
-	// 设置页面 viewport（CSS 布局尺寸）
 	page.MustSetViewport(
-		viewportWidth,  // width
-		viewportHeight, // height
-		1,              // deviceScaleFactor
-		false,          // desktop
+		viewportWidth,
+		viewportHeight,
+		1,
+		false,
 	)
 }
 

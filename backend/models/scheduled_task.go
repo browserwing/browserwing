@@ -52,6 +52,9 @@ type ScheduledTask struct {
 	AgentLLMName  string `json:"agent_llm_name,omitempty"`  // LLM 配置名称（冗余字段）
 	AgentSessionID string `json:"agent_session_id,omitempty"` // 关联的会话 ID（如果需要上下文）
 
+	// 结果文件配置
+	ResultDir string `json:"result_dir,omitempty"` // 结果保存目录（为空则不保存到文件）
+
 	// 执行状态
 	LastExecutionTime *time.Time `json:"last_execution_time,omitempty"` // 上次执行时间
 	NextExecutionTime *time.Time `json:"next_execution_time,omitempty"` // 下次执行时间

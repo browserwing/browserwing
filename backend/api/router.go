@@ -166,6 +166,7 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 			scheduledTasks.PUT("/:id", handler.UpdateScheduledTask)      // 更新定时任务
 			scheduledTasks.DELETE("/:id", handler.DeleteScheduledTask)   // 删除定时任务
 			scheduledTasks.POST("/:id/toggle", handler.ToggleScheduledTask) // 启用/禁用定时任务
+			scheduledTasks.POST("/:id/run", handler.RunScheduledTaskNow)    // 立即执行定时任务
 		}
 
 		// 任务执行记录相关

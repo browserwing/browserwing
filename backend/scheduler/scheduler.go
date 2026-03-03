@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -303,11 +305,136 @@ func (s *Scheduler) executeTask(task *models.ScheduledTask) {
 		log.Printf("[Scheduler] Failed to save execution record: %v", err)
 	}
 
+	// 保存结果数据到文件
+	if task.ResultDir != "" && resultData != nil {
+		s.saveResultToFile(task, execution)
+	}
+
 	// 更新任务统计
 	s.updateTaskStats(task, execution.Success)
 
 	// 更新下次执行时间（对于重复任务）
 	s.updateNextExecutionTime(task)
+}
+
+// RunTaskNow 立即执行任务（不影响定时调度）
+func (s *Scheduler) RunTaskNow(taskID string) (*models.TaskExecution, error) {
+	task, err := s.db.GetScheduledTask(taskID)
+	if err != nil {
+		return nil, fmt.Errorf("task not found: %w", err)
+	}
+
+	log.Printf("[Scheduler] Running task immediately: %s (%s)", task.ID, task.Name)
+
+	execution := &models.TaskExecution{
+		ID:            generateID(),
+		TaskID:        task.ID,
+		TaskName:      task.Name,
+		StartTime:     time.Now(),
+		ExecutionType: task.ExecutionType,
+		CreatedAt:     time.Now(),
+	}
+
+	var resultData map[string]interface{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	switch task.ExecutionType {
+	case models.ExecutionTypeScript:
+		execution.ScriptID = task.ScriptID
+		resultData, err = s.executor.ExecuteScript(ctx, task)
+	case models.ExecutionTypeAgent:
+		execution.AgentSessionID = task.AgentSessionID
+		resultData, err = s.executor.ExecuteAgent(ctx, task)
+	default:
+		err = fmt.Errorf("unknown execution type: %s", task.ExecutionType)
+	}
+
+	execution.EndTime = time.Now()
+	execution.Duration = execution.EndTime.Sub(execution.StartTime).Milliseconds()
+	execution.Success = err == nil
+	execution.ResultData = resultData
+
+	if err != nil {
+		execution.ErrorMsg = err.Error()
+		execution.Message = fmt.Sprintf("task.messages.failed: %v", err)
+		log.Printf("[Scheduler] Immediate task %s failed: %v", task.Name, err)
+	} else {
+		execution.Message = "task.messages.success"
+		log.Printf("[Scheduler] Immediate task %s completed successfully", task.Name)
+	}
+
+	if err := s.db.CreateTaskExecution(execution); err != nil {
+		log.Printf("[Scheduler] Failed to save execution record: %v", err)
+	}
+
+	if task.ResultDir != "" && resultData != nil {
+		s.saveResultToFile(task, execution)
+	}
+
+	s.updateTaskStats(task, execution.Success)
+
+	return execution, nil
+}
+
+// saveResultToFile 将执行结果保存到文件（目录 + 任务名_时间戳.json）
+func (s *Scheduler) saveResultToFile(task *models.ScheduledTask, execution *models.TaskExecution) {
+	if task.ResultDir == "" || execution.ResultData == nil {
+		return
+	}
+
+	if err := os.MkdirAll(task.ResultDir, 0o755); err != nil {
+		log.Printf("[Scheduler] Failed to create result directory %s: %v", task.ResultDir, err)
+		return
+	}
+
+	safeName := sanitizeFileName(task.Name)
+	timestamp := execution.StartTime.Format("20060102_150405")
+	fileName := fmt.Sprintf("%s_%s.json", safeName, timestamp)
+	fullPath := filepath.Join(task.ResultDir, fileName)
+
+	data, err := json.MarshalIndent(map[string]interface{}{
+		"task_id":        task.ID,
+		"task_name":      task.Name,
+		"execution_id":   execution.ID,
+		"execution_time": execution.StartTime.Format(time.RFC3339),
+		"success":        execution.Success,
+		"duration_ms":    execution.Duration,
+		"result_data":    execution.ResultData,
+	}, "", "  ")
+	if err != nil {
+		log.Printf("[Scheduler] Failed to marshal result data: %v", err)
+		return
+	}
+
+	if err := os.WriteFile(fullPath, data, 0o644); err != nil {
+		log.Printf("[Scheduler] Failed to write result to file %s: %v", fullPath, err)
+		return
+	}
+
+	log.Printf("[Scheduler] Result saved to file: %s", fullPath)
+}
+
+// sanitizeFileName 清理文件名中的非法字符
+func sanitizeFileName(name string) string {
+	var result []rune
+	for _, r := range name {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'):
+			result = append(result, r)
+		case r == '-' || r == '_' || r == '.':
+			result = append(result, r)
+		case r >= 0x4e00 && r <= 0x9fff:
+			result = append(result, r)
+		default:
+			result = append(result, '_')
+		}
+	}
+	if len(result) == 0 {
+		return "task"
+	}
+	return string(result)
 }
 
 // updateTaskStats 更新任务统计信息
