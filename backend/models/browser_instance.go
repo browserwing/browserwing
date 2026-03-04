@@ -24,6 +24,7 @@ type BrowserInstance struct {
 	UserAgent  string   `json:"user_agent,omitempty"`  // User Agent
 	UseStealth *bool    `json:"use_stealth,omitempty"` // 是否使用 Stealth 模式
 	Headless   *bool    `json:"headless,omitempty"`    // 是否使用 Headless 模式
+	NoSandbox  *bool    `json:"no_sandbox,omitempty"`  // 是否禁用沙箱模式
 	LaunchArgs []string `json:"launch_args,omitempty"` // 启动参数
 	Proxy      string   `json:"proxy,omitempty"`       // 代理地址
 

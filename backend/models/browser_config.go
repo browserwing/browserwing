@@ -16,6 +16,7 @@ type BrowserConfig struct {
 	UserAgent  string   `json:"user_agent"`  // User Agent，为空使用默认
 	UseStealth *bool    `json:"use_stealth"` // 是否使用 Stealth 模式，nil表示使用默认
 	Headless   *bool    `json:"headless"`    // 是否使用 Headless 模式，nil表示使用默认(false)
+	NoSandbox  *bool    `json:"no_sandbox"`  // 是否禁用沙箱模式，nil表示使用默认（Linux默认true）
 	LaunchArgs []string `json:"launch_args"` // 启动参数，为空使用默认
 	Proxy      string   `json:"proxy"`       // 代理地址，为空使用默认
 

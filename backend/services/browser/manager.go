@@ -297,6 +297,12 @@ func (m *Manager) Start(ctx context.Context) error {
 			Devtools(false).
 			Leakless(false)
 
+		// NoSandbox 配置
+		if defaultConfig.NoSandbox != nil && *defaultConfig.NoSandbox {
+			l = l.NoSandbox(true)
+			logger.Info(ctx, "NoSandbox enabled by configuration")
+		}
+
 		// 代理配置
 		if defaultConfig.Proxy != "" {
 			// 解析代理 URL，提取认证信息
@@ -1509,14 +1515,17 @@ func (m *Manager) getDefaultBrowserConfig() *models.BrowserConfig {
 	// 如果是无GUI环境（Docker、Linux服务器等），默认使用 headless 模式
 	headless := isHeadlessEnvironment()
 
+	// Linux 下默认启用 NoSandbox，避免权限问题导致启动失败
+	noSandbox := runtime.GOOS == "linux"
+
 	// 记录环境检测结果
 	osType := runtime.GOOS
 	display := os.Getenv("DISPLAY")
 	waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
 
 	logger.Info(context.Background(),
-		"detected browser environment: OS=%s, DISPLAY=%s, WAYLAND_DISPLAY=%s, headless=%v",
-		osType, display, waylandDisplay, headless)
+		"detected browser environment: OS=%s, DISPLAY=%s, WAYLAND_DISPLAY=%s, headless=%v, noSandbox=%v",
+		osType, display, waylandDisplay, headless, noSandbox)
 
 	return &models.BrowserConfig{
 		ID:          "default",
@@ -1526,6 +1535,7 @@ func (m *Manager) getDefaultBrowserConfig() *models.BrowserConfig {
 		UserAgent:   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
 		UseStealth:  &useStealth,
 		Headless:    &headless,
+		NoSandbox:   &noSandbox,
 		LaunchArgs: []string{
 			"disable-blink-features=AutomationControlled",
 			"excludeSwitches=enable-automation",
@@ -1965,6 +1975,16 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 			Headless(headless).
 			Devtools(false).
 			Leakless(false)
+
+		// NoSandbox 配置：优先使用实例配置，否则回退到默认配置
+		noSandbox := instance.NoSandbox
+		if noSandbox == nil && m.defaultBrowserConfig != nil {
+			noSandbox = m.defaultBrowserConfig.NoSandbox
+		}
+		if noSandbox != nil && *noSandbox {
+			l = l.NoSandbox(true)
+			logger.Info(ctx, "NoSandbox enabled by configuration")
+		}
 
 		// 设置代理
 		if instance.Proxy != "" {
