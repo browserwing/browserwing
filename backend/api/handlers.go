@@ -46,6 +46,13 @@ type Handler struct {
 	agentManager   interface{}    // Agent 管理器（用于 LLM 配置更新后的热加载）
 	scheduler      interface{}    // 定时任务调度器
 	explorer       *browser.Explorer  // AI 探索器
+	versionInfo    VersionInfo
+}
+
+type VersionInfo struct {
+	Version   string `json:"version"`
+	BuildTime string `json:"build_time"`
+	GoVersion string `json:"go_version"`
 }
 
 func NewHandler(
@@ -62,6 +69,18 @@ func NewHandler(
 		llmManager:     llmMgr,
 		mcpServer:      nil, // 将在主程序中设置
 	}
+}
+
+func (h *Handler) SetVersionInfo(version, buildTime, goVersion string) {
+	h.versionInfo = VersionInfo{
+		Version:   version,
+		BuildTime: buildTime,
+		GoVersion: goVersion,
+	}
+}
+
+func (h *Handler) GetVersionInfo(c *gin.Context) {
+	c.JSON(http.StatusOK, h.versionInfo)
 }
 
 // ============= 浏览器控制相关 API =============

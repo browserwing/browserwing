@@ -32,6 +32,7 @@ export default function BrowserInstanceManager() {
     user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
     use_stealth: null as boolean | null,
     headless: null as boolean | null,
+    no_sandbox: null as boolean | null,
     launch_args: [] as string[],
     proxy: '',
     is_default: false,
@@ -182,6 +183,7 @@ export default function BrowserInstanceManager() {
       user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
       use_stealth: null,
       headless: null,
+      no_sandbox: null,
       launch_args: [],
       proxy: '',
       is_default: false,
@@ -201,6 +203,7 @@ export default function BrowserInstanceManager() {
       user_agent: instance.user_agent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
       use_stealth: instance.use_stealth ?? null,
       headless: instance.headless ?? null,
+      no_sandbox: instance.no_sandbox ?? null,
       launch_args: instance.launch_args || [],
       proxy: instance.proxy || '',
       is_default: instance.is_default,
@@ -538,6 +541,31 @@ export default function BrowserInstanceManager() {
                     <option value="enabled">{t('browser.config.headlessEnabled')}</option>
                     <option value="disabled">{t('browser.config.headlessDisabledOption')}</option>
                   </select>
+                </div>
+
+                {/* NoSandbox */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {t('browser.config.noSandboxMode')}
+                  </label>
+                  <select
+                    value={instanceForm.no_sandbox === null ? 'default' : (instanceForm.no_sandbox ? 'enabled' : 'disabled')}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setInstanceForm({
+                        ...instanceForm,
+                        no_sandbox: value === 'default' ? null : value === 'enabled'
+                      })
+                    }}
+                    className="input w-full"
+                  >
+                    <option value="default">{t('browser.config.noSandboxDefault')}</option>
+                    <option value="enabled">{t('browser.config.noSandboxEnabled')}</option>
+                    <option value="disabled">{t('browser.config.noSandboxDisabledOption')}</option>
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {t('browser.config.noSandboxHint')}
+                  </p>
                 </div>
               </div>
 

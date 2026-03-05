@@ -42,6 +42,9 @@ func SetupRouter(handler *Handler, agentHandler interface{}, frontendFS fs.FS, e
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// 版本信息（无需认证）
+	r.GET("/api/v1/version", handler.GetVersionInfo)
+
 	r.Static("/files/recordings", "./recordings")
 
 	// 认证相关API（不需要认证）

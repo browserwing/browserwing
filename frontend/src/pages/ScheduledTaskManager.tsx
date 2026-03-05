@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, Plus, Edit2, Trash2, Power, PowerOff, History, Calendar, Timer, Code, ChevronDown, ChevronUp, X, Play, FolderOutput, Loader2 } from 'lucide-react'
+import { Clock, Plus, Edit2, Trash2, Power, PowerOff, History, Calendar, Timer, Code, ChevronDown, ChevronUp, X, Play, FolderOutput, Loader2, CheckSquare, Square } from 'lucide-react'
 import { useLanguage } from '../i18n'
 import * as api from '../api/client'
 import type { ScheduledTask, TaskExecution, Script, LLMConfig } from '../api/client'
@@ -28,6 +28,8 @@ export default function ScheduledTaskManager() {
   const [executionPage, setExecutionPage] = useState(1)
   const [showDeleteExecutionConfirm, setShowDeleteExecutionConfirm] = useState(false)
   const [executionToDelete, setExecutionToDelete] = useState<string | null>(null)
+  const [selectedExecutions, setSelectedExecutions] = useState<Set<string>>(new Set())
+  const [showBatchDeleteExecutionsConfirm, setShowBatchDeleteExecutionsConfirm] = useState(false)
 
   // 立即执行相关
   const [runningTasks, setRunningTasks] = useState<Set<string>>(new Set())
@@ -313,6 +315,47 @@ export default function ScheduledTaskManager() {
       loadExecutions()
     } catch (error: any) {
       showMessage(t(error.response?.data?.error || 'error.deleteFailed'), 'error')
+    }
+  }
+
+  const handleBatchDeleteExecutions = () => {
+    if (selectedExecutions.size === 0) {
+      showMessage(t('execution.messages.selectAtLeastOne'), 'info')
+      return
+    }
+    setShowBatchDeleteExecutionsConfirm(true)
+  }
+
+  const confirmBatchDeleteExecutions = async () => {
+    try {
+      setLoading(true)
+      setShowBatchDeleteExecutionsConfirm(false)
+      await api.batchDeleteTaskExecutions(Array.from(selectedExecutions))
+      showMessage(t('execution.messages.batchDeleteSuccess', { count: selectedExecutions.size.toString() }), 'success')
+      setSelectedExecutions(new Set())
+      await loadExecutions()
+    } catch (error: any) {
+      showMessage(error.response?.data?.error || t('error.deleteFailed'), 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleExecutionSelection = (executionId: string) => {
+    const newSelected = new Set(selectedExecutions)
+    if (newSelected.has(executionId)) {
+      newSelected.delete(executionId)
+    } else {
+      newSelected.add(executionId)
+    }
+    setSelectedExecutions(newSelected)
+  }
+
+  const toggleSelectAllExecutions = () => {
+    if (selectedExecutions.size === executions.length) {
+      setSelectedExecutions(new Set())
+    } else {
+      setSelectedExecutions(new Set(executions.map(e => e.id)))
     }
   }
 
@@ -605,6 +648,18 @@ export default function ScheduledTaskManager() {
           {/* Filters */}
           <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-4">
+              <button
+                onClick={toggleSelectAllExecutions}
+                className="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                title={selectedExecutions.size === executions.length && executions.length > 0 ? t('script.card.deselectAll') : t('script.card.selectAll')}
+              >
+                {selectedExecutions.size === executions.length && executions.length > 0 ? (
+                  <CheckSquare className="w-5 h-5 text-gray-900 dark:text-gray-100" />
+                ) : (
+                  <Square className="w-5 h-5" />
+                )}
+              </button>
+
               <div className="relative">
                 <input
                   type="text"
@@ -647,6 +702,22 @@ export default function ScheduledTaskManager() {
                 </button>
               )}
             </div>
+
+            {selectedExecutions.size > 0 && (
+              <div className="flex items-center space-x-3">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {t('execution.selected', { count: selectedExecutions.size.toString() })}
+                </span>
+                <button
+                  onClick={handleBatchDeleteExecutions}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
+                  disabled={loading}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{t('execution.batchDelete')}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Execution List */}
@@ -725,7 +796,18 @@ export default function ScheduledTaskManager() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center ml-4">
+                    <div className="flex items-center space-x-1 ml-4">
+                      <button
+                        onClick={() => toggleExecutionSelection(execution.id)}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        title={selectedExecutions.has(execution.id) ? t('script.card.deselect') : t('script.card.select')}
+                      >
+                        {selectedExecutions.has(execution.id) ? (
+                          <CheckSquare className="w-4 h-4 text-gray-900 dark:text-gray-100" />
+                        ) : (
+                          <Square className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                        )}
+                      </button>
                       <button
                         onClick={() => {
                           setExecutionToDelete(execution.id)
@@ -970,6 +1052,18 @@ export default function ScheduledTaskManager() {
           cancelText={t('common.cancel')}
           onConfirm={handleDeleteExecution}
           onCancel={() => setShowDeleteExecutionConfirm(false)}
+        />
+      )}
+
+      {/* Batch Delete Executions Confirmation Dialog */}
+      {showBatchDeleteExecutionsConfirm && (
+        <ConfirmDialog
+          title={t('execution.batchDeleteTitle')}
+          message={t('execution.batchDeleteConfirm', { count: selectedExecutions.size.toString() })}
+          confirmText={t('common.delete')}
+          cancelText={t('common.cancel')}
+          onConfirm={confirmBatchDeleteExecutions}
+          onCancel={() => setShowBatchDeleteExecutionsConfirm(false)}
         />
       )}
 

@@ -141,6 +141,7 @@ export interface BrowserConfig {
   user_agent: string
   use_stealth: boolean | null  // null表示使用默认值
   headless: boolean | null     // null表示使用默认值(false)
+  no_sandbox: boolean | null   // null表示使用默认值(Linux默认true)
   launch_args: string[]
   is_default: boolean
   created_at: string
@@ -163,6 +164,7 @@ export interface BrowserInstance {
   user_agent?: string
   use_stealth?: boolean | null
   headless?: boolean | null
+  no_sandbox?: boolean | null
   launch_args?: string[]
   proxy?: string
   created_at: string
@@ -1075,6 +1077,14 @@ export const batchDeleteTaskExecutions = async (ids: string[]): Promise<void> =>
   await client.post('/task-executions/batch/delete', { ids })
 }
 
+export interface AppVersionInfo {
+  version: string
+  build_time: string
+  go_version: string
+}
 
-
+export const getAppVersion = async (): Promise<AppVersionInfo> => {
+  const response = await client.get('/version')
+  return response.data
+}
 

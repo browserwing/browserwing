@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { CURRENT_VERSION, fetchLatestVersion, hasNewVersion, isVersionDismissed, dismissVersion, VersionInfo } from '../utils/version'
 import VersionUpdateDialog from './VersionUpdateDialog'
-import { logout, checkAuth } from '../api/client'
+import { logout, checkAuth, getAppVersion } from '../api/client'
 
 export default function Layout() {
   const location = useLocation()
@@ -18,6 +18,7 @@ export default function Layout() {
   const [latestVersionInfo, setLatestVersionInfo] = useState<VersionInfo | null>(null)
   const [authEnabled, setAuthEnabled] = useState(false)
   const [username, setUsername] = useState<string>('')
+  const [appVersion, setAppVersion] = useState<string>(CURRENT_VERSION)
   const langMenuRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
@@ -65,6 +66,17 @@ export default function Layout() {
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // 从后端获取实际版本号
+  useEffect(() => {
+    getAppVersion()
+      .then(info => {
+        if (info.version) {
+          setAppVersion(info.version)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   // 检查版本更新
@@ -244,7 +256,7 @@ export default function Layout() {
             <div className="flex items-center space-x-4">
               <p>{t('layout.copyright')}</p>
               <span className="text-gray-400 dark:text-gray-600">•</span>
-              <p className="text-sm">{t('layout.version')} {CURRENT_VERSION}</p>
+              <p className="text-sm">{t('layout.version')} {appVersion}</p>
             </div>
             <div className="flex items-center space-x-6">
               <a href="https://github.com/browserwing/browserwing" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">{t('layout.github')}</a>

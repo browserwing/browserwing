@@ -74,6 +74,7 @@ export default function BrowserManager() {
     user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
     use_stealth: null as boolean | null,
     headless: null as boolean | null,
+    no_sandbox: null as boolean | null,
     launch_args: [] as string[],
     is_default: false,
   })
@@ -574,6 +575,7 @@ export default function BrowserManager() {
                   user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
                   use_stealth: null,
                   headless: null,
+                  no_sandbox: null,
                   launch_args: [],
                   is_default: false,
                 })
@@ -1023,6 +1025,9 @@ export default function BrowserManager() {
                             {config.headless === false && (
                               <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">{t('browser.config.headlessDisabled')}</span>
                             )}
+                            {config.no_sandbox === true && (
+                              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">{t('browser.config.noSandbox')}</span>
+                            )}
                             {config.url_pattern && (
                               <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-mono">
                                 {config.url_pattern}
@@ -1048,6 +1053,7 @@ export default function BrowserManager() {
                                 user_agent: config.user_agent,
                                 use_stealth: config.use_stealth,
                                 headless: config.headless,
+                                no_sandbox: config.no_sandbox,
                                 launch_args: config.launch_args || [],
                                 is_default: config.is_default,
                               })
@@ -1198,6 +1204,31 @@ export default function BrowserManager() {
                   </select>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {t('browser.config.headlessHint')}
+                  </p>
+                </div>
+
+                {/* NoSandbox 模式 */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {t('browser.config.noSandboxMode')}
+                  </label>
+                  <select
+                    value={configForm.no_sandbox === null ? 'default' : (configForm.no_sandbox ? 'enabled' : 'disabled')}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setConfigForm({
+                        ...configForm,
+                        no_sandbox: value === 'default' ? null : value === 'enabled'
+                      })
+                    }}
+                    className="input w-full"
+                  >
+                    <option value="default">{t('browser.config.noSandboxDefault')}</option>
+                    <option value="enabled">{t('browser.config.noSandboxEnabled')}</option>
+                    <option value="disabled">{t('browser.config.noSandboxDisabledOption')}</option>
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {t('browser.config.noSandboxHint')}
                   </p>
                 </div>
 

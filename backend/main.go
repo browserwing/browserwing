@@ -172,6 +172,9 @@ func main() {
 	// 创建HTTP处理器
 	handler := api.NewHandler(db, browserManager, cfg, llmManager)
 
+	// 注入版本信息
+	handler.SetVersionInfo(Version, BuildTime, GoVersion)
+
 	// 将 MCP 服务器实例注入到 Handler
 	handler.SetMCPServer(mcpServer)
 

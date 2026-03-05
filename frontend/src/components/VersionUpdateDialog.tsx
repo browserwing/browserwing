@@ -26,7 +26,12 @@ export default function VersionUpdateDialog({ versionInfo, onClose, onDismiss }:
               </div>
               <div>
                 <h3 className="text-lg font-semibold">{t('version.newVersionAvailable')}</h3>
-                <p className="text-sm text-white/80">Version {versionInfo.version}</p>
+                <p className="text-sm text-white/80">
+                  Version {versionInfo.version}
+                  {versionInfo.channel === 'beta' && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-white/20 rounded text-xs font-medium">BETA</span>
+                  )}
+                </p>
               </div>
             </div>
             <button
