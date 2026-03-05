@@ -48,6 +48,7 @@ func NewExtractor(cfg *config.LLMConfig, db *storage.BoltDB) (*Extractor, error)
 		APIKey:   cfg.APIKey,
 		Provider: llmhub.Provider(cfg.Provider),
 		Model:    cfg.Model,
+		BaseURL:  cfg.BaseURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM client: %w", err)
