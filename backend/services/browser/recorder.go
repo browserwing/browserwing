@@ -783,31 +783,50 @@ func (r *Recorder) injectIframeRecorders(ctx context.Context, page *rod.Page) {
 
 	// 为每个 iframe 注入脚本
 	for i, iframeElement := range iframes {
-		// 获取 iframe 的页面上下文
-		frame, err := iframeElement.Frame()
-		if err != nil {
-			logger.Warn(ctx, "Failed to get Frame for iframe #%d: %v", i, err)
-			continue
-		}
+		r.safeInjectIframeScript(ctx, iframeElement, i)
+	}
+}
 
-		// 等待 iframe 加载
-		if err := frame.WaitLoad(); err != nil {
-			logger.Warn(ctx, "Failed to wait for iframe #%d to load: %v", i, err)
+// safeInjectIframeScript 安全地向单个 iframe 注入录制脚本，
+// 通过 recover 防止 rod 在 iframe 已被卸载/detach 时触发 panic。
+func (r *Recorder) safeInjectIframeScript(ctx context.Context, iframeElement *rod.Element, index int) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logger.Warn(ctx, "Recovered from panic while injecting script into iframe #%d: %v", index, rec)
 		}
+	}()
 
-		// 在 iframe 的页面上下文中注入录制脚本（使用本地化版本）
-		localizedIframeScript := ReplaceI18nPlaceholders(iframeRecorderScript, r.language, RecorderI18n)
-		_, err = frame.Eval(`() => { ` + localizedIframeScript + ` return true; }`)
-		if err != nil {
-			logger.Warn(ctx, "Failed to inject script into iframe #%d: %v", i, err)
-		} else {
-			logger.Info(ctx, "✓ Recording script injected into iframe #%d successfully", i)
-		}
+	frame, err := iframeElement.Frame()
+	if err != nil {
+		logger.Warn(ctx, "Failed to get Frame for iframe #%d: %v", index, err)
+		return
+	}
+	if frame == nil {
+		logger.Warn(ctx, "Frame is nil for iframe #%d, skipping", index)
+		return
+	}
+
+	if err := frame.WaitLoad(); err != nil {
+		logger.Warn(ctx, "Failed to wait for iframe #%d to load: %v", index, err)
+	}
+
+	localizedIframeScript := ReplaceI18nPlaceholders(iframeRecorderScript, r.language, RecorderI18n)
+	_, err = frame.Eval(`() => { ` + localizedIframeScript + ` return true; }`)
+	if err != nil {
+		logger.Warn(ctx, "Failed to inject script into iframe #%d: %v", index, err)
+	} else {
+		logger.Info(ctx, "✓ Recording script injected into iframe #%d successfully", index)
 	}
 }
 
 // watchForNewIframes 监听新创建的 iframe 并自动注入录制脚本
 func (r *Recorder) watchForNewIframes(ctx context.Context, page *rod.Page) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logger.Warn(ctx, "Recovered from panic in watchForNewIframes: %v", rec)
+		}
+	}()
+
 	// 记录已经处理过的 iframe 数量
 	processedIframeCount := 0
 
@@ -835,28 +854,7 @@ func (r *Recorder) watchForNewIframes(ctx context.Context, page *rod.Page) {
 
 				// 为新的 iframe 注入脚本
 				for i := processedIframeCount; i < len(iframes); i++ {
-					iframeElement := iframes[i]
-
-					// 获取 iframe 的页面上下文
-					frame, err := iframeElement.Frame()
-					if err != nil {
-						logger.Warn(ctx, "Failed to get Frame for new iframe #%d: %v", i, err)
-						continue
-					}
-
-					// 等待 iframe 加载
-					if err := frame.WaitLoad(); err != nil {
-						logger.Warn(ctx, "Failed to wait for new iframe #%d to load: %v", i, err)
-					}
-
-					// 在 iframe 的页面上下文中注入录制脚本（使用本地化版本）
-					localizedIframeScript := ReplaceI18nPlaceholders(iframeRecorderScript, r.language, RecorderI18n)
-					_, err = frame.Eval(`() => { ` + localizedIframeScript + ` return true; }`)
-					if err != nil {
-						logger.Warn(ctx, "Failed to inject script into new iframe #%d: %v", i, err)
-					} else {
-						logger.Info(ctx, "✓ Recording script injected into new iframe #%d successfully", i)
-					}
+					r.safeInjectIframeScript(ctx, iframes[i], i)
 				}
 
 				processedIframeCount = len(iframes)
@@ -870,6 +868,12 @@ func (r *Recorder) watchForNewIframes(ctx context.Context, page *rod.Page) {
 
 // watchForPageNavigation 监听页面导航事件，在新页面自动重新注入录制脚本
 func (r *Recorder) watchForPageNavigation(ctx context.Context, page *rod.Page) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logger.Warn(ctx, "Recovered from panic in watchForPageNavigation: %v", rec)
+		}
+	}()
+
 	// 记录上一次的 URL
 	var lastURL string
 	result, err := page.Eval(`() => window.location.href`)
@@ -1003,6 +1007,12 @@ func (r *Recorder) GetStartURL() string {
 
 // watchForNewPages 监听新标签页的创建并自动注入录制脚本
 func (r *Recorder) watchForNewPages(ctx context.Context, mainPage *rod.Page) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logger.Warn(ctx, "Recovered from panic in watchForNewPages: %v", rec)
+		}
+	}()
+
 	// 获取浏览器实例
 	browser := mainPage.Browser()
 
@@ -1073,6 +1083,12 @@ func (r *Recorder) watchForNewPages(ctx context.Context, mainPage *rod.Page) {
 
 // injectRecordingScriptToPage 向指定页面注入录制脚本和UI面板
 func (r *Recorder) injectRecordingScriptToPage(ctx context.Context, page *rod.Page, targetID string) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logger.Warn(ctx, "Recovered from panic while injecting script to page %s: %v", targetID, rec)
+		}
+	}()
+
 	// 等待页面加载
 	if err := page.WaitLoad(); err != nil {
 		logger.Warn(ctx, "Failed to wait for new page to load: %v", err)
