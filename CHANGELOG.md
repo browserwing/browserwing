@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.0.1-beta.2] - 2026-03-06
+
+### 新增功能
+
+- **LLM BaseURL 支持**: LLM 客户端支持自定义 BaseURL，方便接入各种兼容 OpenAI 的服务
+- **版本信息接口**: 新增 `/version` 端点，可查看当前版本信息
+- **NoSandbox 配置**: 浏览器支持 NoSandbox 模式，适配容器化部署环境
+- **立即执行任务**: 调度器支持立即执行任务并保存结果
+
+### 优化改进
+
+- **Panic 恢复**: iframe 脚本注入和导航操作增加 panic 恢复机制，提升稳定性
+
 ## [v1.0.1-beta.1] - 2026-03-03
 
 ### 新增功能
