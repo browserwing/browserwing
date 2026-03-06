@@ -1897,6 +1897,20 @@ func (m *Manager) StartInstance(ctx context.Context, instanceID string) error {
 
 // startInstanceInternal 内部启动函数，调用者必须已持有锁
 func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) error {
+	// 空 instanceID 回退：优先使用当前实例，否则查找默认实例
+	if instanceID == "" {
+		if m.currentInstanceID != "" {
+			instanceID = m.currentInstanceID
+		} else {
+			defaultInst, err := m.db.GetDefaultBrowserInstance()
+			if err != nil {
+				return fmt.Errorf("no instance ID specified and no default instance found: %w", err)
+			}
+			instanceID = defaultInst.ID
+			logger.Info(ctx, "No instance ID specified, using default instance: %s (%s)", defaultInst.Name, defaultInst.ID)
+		}
+	}
+
 	// 检查实例是否已启动
 	if runtime, exists := m.instances[instanceID]; exists && runtime != nil {
 		return fmt.Errorf("instance %s is already running", instanceID)
