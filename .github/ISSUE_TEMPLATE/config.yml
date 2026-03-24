@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/browserwing/browserwing#readme
+    about: Check the README and setup guides before opening an issue
+  - name: Discussions
+    url: https://github.com/browserwing/browserwing/discussions
+    about: Ask questions and share ideas in GitHub Discussions
