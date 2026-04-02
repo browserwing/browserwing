@@ -4,10 +4,33 @@
 		return;
 	}
 	window.__browserwingIframeListener__ = true;
+
+	// 验证消息来源是否为当前页面的子 iframe
+	var isChildIframe = function(source) {
+		try {
+			var iframes = document.querySelectorAll('iframe');
+			for (var i = 0; i < iframes.length; i++) {
+				if (iframes[i].contentWindow === source) {
+					return true;
+				}
+			}
+		} catch (e) {
+			// 跨域 iframe 访问 contentWindow 可能抛出异常,
+			// 但 event.source 引用比较本身不会抛出异常
+			console.warn('[BrowserWing] iframe source check error:', e);
+		}
+		return false;
+	};
 	
 	window.addEventListener('message', function(event) {
 		try {
 			if (event.data && event.data.type === '__browserwing_iframe_action__') {
+				// 验证消息来源: 只接受来自当前页面子 iframe 的消息
+				if (!event.source || !isChildIframe(event.source)) {
+					console.warn('[BrowserWing] ⊘ Rejected iframe action from untrusted source');
+					return;
+				}
+
 				var action = event.data.action;
 				if (action && window.__recordedActions__) {
 					// 去重逻辑：检查最近的操作是否与当前操作重复
