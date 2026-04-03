@@ -9,12 +9,32 @@ const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 const os = require('os');
 
 const REPO = 'browserwing/browserwing';
 const VERSION = require('./package.json').version;
 const TAG = `v${VERSION}`;
+
+/**
+ * SHA-256 checksums for release archives.
+ *
+ * These MUST be updated every time a new release is published.
+ * Generate with:
+ *   shasum -a 256 browserwing-*.tar.gz browserwing-*.zip
+ *
+ * To skip verification (e.g. during local development), set the
+ * environment variable BROWSERWING_SKIP_CHECKSUM=1.
+ */
+const CHECKSUMS = {
+  'browserwing-darwin-amd64.tar.gz':  '',
+  'browserwing-darwin-arm64.tar.gz':  '',
+  'browserwing-linux-amd64.tar.gz':   '',
+  'browserwing-linux-arm64.tar.gz':   '',
+  'browserwing-windows-amd64.zip':    '',
+  'browserwing-windows-arm64.zip':    '',
+};
 
 // ANSI color codes
 const colors = {
@@ -220,6 +240,50 @@ function downloadFileOnce(url, dest) {
   });
 }
 
+/**
+ * Verify the SHA-256 checksum of a downloaded file.
+ *
+ * Throws if the computed hash does not match the expected value stored in
+ * CHECKSUMS.  When BROWSERWING_SKIP_CHECKSUM=1 is set or the expected hash
+ * is empty (not yet populated for this release) verification is skipped with
+ * a warning so that development builds still work.
+ */
+function verifyChecksum(filePath, archiveName) {
+  if (process.env.BROWSERWING_SKIP_CHECKSUM === '1') {
+    logWarning('Checksum verification skipped (BROWSERWING_SKIP_CHECKSUM=1)');
+    return;
+  }
+
+  const expectedHash = CHECKSUMS[archiveName];
+
+  if (!expectedHash) {
+    logWarning(
+      `No checksum available for ${archiveName}. ` +
+      'Integrity verification skipped — please update CHECKSUMS in install.js.'
+    );
+    return;
+  }
+
+  logInfo('Verifying archive integrity (SHA-256)...');
+
+  const fileBuffer = fs.readFileSync(filePath);
+  const actualHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+  if (actualHash !== expectedHash) {
+    // Remove the untrusted file immediately
+    try { fs.unlinkSync(filePath); } catch (_) { /* best effort */ }
+    throw new Error(
+      `Checksum mismatch for ${archiveName}!\n` +
+      `  Expected: ${expectedHash}\n` +
+      `  Actual:   ${actualHash}\n` +
+      'The downloaded file may have been tampered with. ' +
+      'Installation aborted for security.'
+    );
+  }
+
+  logInfo(`Checksum verified: ${actualHash}`);
+}
+
 // Extract archive
 function extractArchive(archivePath, destDir, isWindows) {
   logInfo('Extracting archive...');
@@ -301,6 +365,9 @@ async function install() {
 
     // Download archive
     await downloadFile(archiveName, archivePath);
+
+    // Verify integrity before extraction
+    verifyChecksum(archivePath, archiveName);
 
     // Extract archive
     extractArchive(archivePath, binDir, isWindows);
