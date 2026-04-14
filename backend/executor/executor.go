@@ -100,7 +100,7 @@ func (e *Executor) GetAccessibilitySnapshot(ctx context.Context) (*Accessibility
 	pageTarget := ""
 	if pageInfo != nil {
 		pageURL = pageInfo.URL
-		pageTarget = pageInfo.TargetID
+		pageTarget = string(pageInfo.TargetID) // Convert proto.TargetTargetID to string
 	}
 
 	// 检查缓存：TTL 有效 且 页面未切换（使用 URL + TargetID 比较而非指针）
