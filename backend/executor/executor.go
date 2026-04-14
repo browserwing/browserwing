@@ -19,13 +19,14 @@ type Executor struct {
 	ctx     context.Context
 
 	// RefID 缓存（用于稳定的元素引用）
-	refIDMutex     sync.RWMutex
-	refIDMap       map[string]*RefData // refID -> 语义化定位器数据
-	refIDCounter   int
-	refIDSnapshot  *AccessibilitySnapshot
-	refIDPage      *rod.Page // 缓存生成时的页面指针，用于检测页面切换
-	refIDTimestamp time.Time
-	refIDTTL       time.Duration
+	refIDMutex       sync.RWMutex
+	refIDMap         map[string]*RefData // refID -> 语义化定位器数据
+	refIDCounter     int
+	refIDSnapshot    *AccessibilitySnapshot
+	refIDPageURL     string    // 缓存生成时的页面URL，用于检测页面切换（比指针更可靠）
+	refIDPageTarget  string    // Chrome DevTools Protocol target ID
+	refIDTimestamp   time.Time
+	refIDTTL         time.Duration
 
 	Recorder *OperationRecorder
 }
@@ -77,7 +78,8 @@ func (e *Executor) InvalidateSnapshotCache() {
 	e.refIDMutex.Lock()
 	defer e.refIDMutex.Unlock()
 	e.refIDSnapshot = nil
-	e.refIDPage = nil
+	e.refIDPageURL = ""
+	e.refIDPageTarget = ""
 	e.refIDMap = make(map[string]*RefData)
 	e.refIDCounter = 0
 }
@@ -89,14 +91,27 @@ func (e *Executor) GetAccessibilitySnapshot(ctx context.Context) (*Accessibility
 		return nil, fmt.Errorf("no active page")
 	}
 
-	// 检查缓存：TTL 有效 且 页面未切换
+	// 获取页面标识信息（用于缓存验证）
+	pageInfo, err := page.Info()
+	if err != nil {
+		logger.Warn(ctx, "[GetAccessibilitySnapshot] Failed to get page info: %v", err)
+	}
+	pageURL := ""
+	pageTarget := ""
+	if pageInfo != nil {
+		pageURL = pageInfo.URL
+		pageTarget = pageInfo.TargetID
+	}
+
+	// 检查缓存：TTL 有效 且 页面未切换（使用 URL + TargetID 比较而非指针）
 	e.refIDMutex.RLock()
 	cacheValid := e.refIDSnapshot != nil &&
 		time.Since(e.refIDTimestamp) < e.refIDTTL &&
-		e.refIDPage == page
+		e.refIDPageURL == pageURL &&
+		e.refIDPageTarget == pageTarget
 	if cacheValid {
-		logger.Info(ctx, "[GetAccessibilitySnapshot] Using cached snapshot (age: %v, %d refs)", 
-			time.Since(e.refIDTimestamp), len(e.refIDMap))
+		logger.Info(ctx, "[GetAccessibilitySnapshot] Using cached snapshot (age: %v, %d refs, URL: %s)",
+			time.Since(e.refIDTimestamp), len(e.refIDMap), pageURL)
 		cachedSnapshot := e.refIDSnapshot
 		e.refIDMutex.RUnlock()
 		return cachedSnapshot, nil
@@ -104,7 +119,8 @@ func (e *Executor) GetAccessibilitySnapshot(ctx context.Context) (*Accessibility
 	e.refIDMutex.RUnlock()
 
 	// 获取新快照
-	logger.Info(ctx, "[GetAccessibilitySnapshot] Fetching new accessibility snapshot")
+	logger.Info(ctx, "[GetAccessibilitySnapshot] Fetching new accessibility snapshot (URL: %s, TargetID: %s)",
+		pageURL, pageTarget)
 	snapshot, err := GetAccessibilitySnapshot(ctx, page)
 	if err != nil {
 		return nil, err
@@ -118,7 +134,8 @@ func (e *Executor) GetAccessibilitySnapshot(ctx context.Context) (*Accessibility
 	e.refIDCounter = 0
 	e.assignRefIDs(snapshot)
 	e.refIDSnapshot = snapshot
-	e.refIDPage = page
+	e.refIDPageURL = pageURL
+	e.refIDPageTarget = pageTarget
 	e.refIDTimestamp = time.Now()
 
 	logger.Info(ctx, "[GetAccessibilitySnapshot] Cached new snapshot with %d refs (TTL: %v)",
