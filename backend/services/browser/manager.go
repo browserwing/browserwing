@@ -369,6 +369,11 @@ func (m *Manager) Start(ctx context.Context) error {
 
 					// 清理可能存在的锁文件（在启动前）
 					logger.Info(ctx, "Checking and cleaning up lock files before launch...")
+					// 首先尝试杀死可能存在的孤儿 Chrome 进程（重启后残留的进程）
+					if err := m.killOrphanedChromeForDir(ctx, userDataDir); err != nil {
+						logger.Warn(ctx, "Failed to kill orphaned Chrome processes: %v", err)
+					}
+					// 然后清理锁文件
 					if err := m.cleanupSingletonLock(ctx, userDataDir); err != nil {
 						logger.Warn(ctx, "Failed to cleanup singleton lock: %v", err)
 					}
@@ -1670,6 +1675,12 @@ func (m *Manager) KillOrphanedChromeProcesses(ctx context.Context) error {
 	if m.config.Browser != nil {
 		userDataDir = m.config.Browser.UserDataDir
 	}
+	return m.killOrphanedChromeForDir(ctx, userDataDir)
+}
+
+// killOrphanedChromeForDir kills orphaned Chrome processes for a specific user data directory.
+// This is the core function that can be called with any userDataDir parameter.
+func (m *Manager) killOrphanedChromeForDir(ctx context.Context, userDataDir string) error {
 	if userDataDir == "" {
 		return fmt.Errorf("user data dir is not configured")
 	}
@@ -2088,6 +2099,11 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 			} else {
 				// 主动清理可能存在的锁文件（在启动前）
 				logger.Info(ctx, "Checking and cleaning up lock files before launch...")
+				// 首先尝试杀死可能存在的孤儿 Chrome 进程（重启后残留的进程）
+				if err := m.killOrphanedChromeForDir(ctx, instance.UserDataDir); err != nil {
+					logger.Warn(ctx, "Failed to kill orphaned Chrome processes for instance: %v", err)
+				}
+				// 然后清理锁文件
 				if err := m.cleanupSingletonLock(ctx, instance.UserDataDir); err != nil {
 					logger.Warn(ctx, "Failed to cleanup singleton lock: %v", err)
 				}
