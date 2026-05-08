@@ -1,6 +1,6 @@
 {
   "name": "browserwing",
-  "version": "1.1.0",
+  "version": "1.1.1-beta.1",
   "description": "Turn any website into structured data with one command. Browser automation platform with 78 built-in scripts, CLI for AI agents, MCP & Skills support.",
   "keywords": [
     "browser",

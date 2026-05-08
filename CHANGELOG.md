@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.1-beta.1] - 2026-05-08
+
+### Fixed
+
+- **Anti-Throttling for All Modes**: Moved anti-throttling flags (disable-background-timer-throttling, disable-backgrounding-occluded-windows, disable-renderer-backgrounding) from headless-only to all browser modes — fixes WebSocket disconnection for background windows on Windows
+- **Export Tool Fields**: Added missing `FilePaths` and `Multiple` fields to export tool
+- **XHS Publish Selector**: Corrected selector priority and used clipboard paste for ProseMirror editors
+
+### Changed
+
+- **Built-in Script Deduplication**: Removed duplicate builtin-scripts from backend/
+- **SKILL.md Discovery**: Added skills.sh compatible SKILL.md for agent discovery
+- **CLI Coverage**: Added `exec` and `admin` subcommands for full API coverage
+
+### Contributors
+
+Thanks to all contributors who made this release possible:
+- @dev-browserwing
+
 ## [v1.1.0] - 2026-04-20
 
 ### Added
