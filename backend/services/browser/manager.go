@@ -1586,11 +1586,15 @@ func (m *Manager) getDefaultBrowserConfig() *models.BrowserConfig {
 		"start-maximized",
 	}
 
+	// 防止后台节流的关键参数（对所有模式都需要，特别是 Windows 上后台窗口会被节流导致 WebSocket 断开）
+	launchArgs = append(launchArgs,
+		"disable-background-timer-throttling",
+		"disable-backgrounding-occluded-windows",
+		"disable-renderer-backgrounding",
+	)
+
 	if headless {
 		launchArgs = append(launchArgs,
-			"disable-background-timer-throttling",
-			"disable-backgrounding-occluded-windows",
-			"disable-renderer-backgrounding",
 			"disable-ipc-flooding-protection",
 			"enable-features=NetworkService,NetworkServiceInProcess",
 		)
@@ -2131,17 +2135,23 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 			}
 		}
 
-		// headless 模式下追加防止后台节流的关键参数
+		// 防止后台节流的关键参数（对所有模式都需要，特别是 Windows 上后台窗口会被节流导致 WebSocket 断开）
+		antiThrottlingArgs := []string{
+			"disable-background-timer-throttling",
+			"disable-backgrounding-occluded-windows",
+			"disable-renderer-backgrounding",
+		}
+		launchArgs = append(launchArgs, antiThrottlingArgs...)
+		logger.Info(ctx, "Added anti-throttling flags for background stability")
+
+		// headless 模式下追加额外的优化参数
 		if headless {
 			headlessArgs := []string{
-				"disable-background-timer-throttling",
-				"disable-backgrounding-occluded-windows",
-				"disable-renderer-backgrounding",
 				"disable-ipc-flooding-protection",
 				"enable-features=NetworkService,NetworkServiceInProcess",
 			}
 			launchArgs = append(launchArgs, headlessArgs...)
-			logger.Info(ctx, "Headless mode detected, added anti-throttling flags")
+			logger.Info(ctx, "Headless mode detected, added additional headless flags")
 		}
 
 		for _, arg := range launchArgs {
@@ -2327,6 +2337,36 @@ func (m *Manager) startInstanceInternal(ctx context.Context, instanceID string) 
 	}
 	if err := grantPermissions.Call(browser); err != nil {
 		logger.Warn(ctx, "Failed to grant clipboard permissions: %v", err)
+	}
+
+	// 加载保存的 Cookie 到浏览器实例
+	if m.db != nil {
+		cookieStore, err := m.db.GetCookies("browser")
+		if err == nil && cookieStore != nil && len(cookieStore.Cookies) > 0 {
+			// 将 NetworkCookie 转换为 NetworkCookieParam
+			cookieParams := make([]*proto.NetworkCookieParam, 0, len(cookieStore.Cookies))
+			for _, cookie := range cookieStore.Cookies {
+				cookieParams = append(cookieParams, &proto.NetworkCookieParam{
+					Name:     cookie.Name,
+					Value:    cookie.Value,
+					Domain:   cookie.Domain,
+					Path:     cookie.Path,
+					Secure:   cookie.Secure,
+					HTTPOnly: cookie.HTTPOnly,
+					SameSite: cookie.SameSite,
+					Expires:  cookie.Expires,
+				})
+			}
+
+			// 设置 Cookie 到浏览器
+			if err := browser.SetCookies(cookieParams); err != nil {
+				logger.Warn(ctx, "Failed to set Cookie: %v", err)
+			} else {
+				logger.Info(ctx, "✓ Loaded %d saved Cookies to browser instance", len(cookieParams))
+			}
+		} else {
+			logger.Info(ctx, "No saved Cookies found")
+		}
 	}
 
 	// 创建运行时信息
