@@ -292,6 +292,54 @@ curl -X POST 'http://localhost:8080/api/v1/scripts/export/skill' \
 - Use semantic extraction for data parsing
 - Build agent-driven automation workflows
 
+### Using CloakBrowser for Advanced Stealth
+
+BrowserWing supports [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) — a stealth Chromium binary with source-level fingerprint patches that passes all major bot detection tests.
+
+**Why CloakBrowser?**
+- 49-57 C++ source-level patches (canvas, WebGL, audio, fonts, GPU, WebRTC, etc.)
+- Passes Cloudflare Turnstile, FingerprintJS, BrowserScan, reCAPTCHA v3
+- Works as a drop-in replacement for standard Chromium
+
+**Setup:**
+
+1. Install CloakBrowser:
+```bash
+pip install cloakbrowser
+python -c "from cloakbrowser import ensure_binary; ensure_binary()"
+```
+
+2. Launch CloakBrowser's `cloakserve` CDP server:
+```bash
+python /path/to/cloakbrowser/bin/cloakserve --port=9222 --headless=false
+```
+
+3. Configure BrowserWing to use CloakBrowser's CDP endpoint. Add to your `config.toml`:
+```toml
+[browser]
+ControlURL = "http://localhost:9222"
+```
+
+Or set the `BROWSER_CONTROL_URL` environment variable:
+```bash
+export BROWSER_CONTROL_URL="http://localhost:9222"
+browserwing --port 8080
+```
+
+4. **Important:** CloakBrowser handles fingerprint spoofing at the binary level, so BrowserWing's JS-level stealth mode will conflict with CloakBrowser's C++ patches. When using CloakBrowser, set `use_stealth = false` in your browser config or the `USE_STEALTH` environment variable to disable BrowserWing's JS stealth injection.
+
+**How it works:**
+- `cloakserve` is a CDP multiplexer that spawns one Chrome process per fingerprint seed
+- Each Chrome process has compiled-in fingerprint patches (no JS injection needed)
+- BrowserWing connects to `cloakserve` via HTTP, resolves the WebSocket URL automatically, and controls the browser via standard CDP
+- Cookie persistence and session management work the same as with regular Chrome
+
+**Key benefits:**
+- Stronger bot detection evasion than JS-level stealth injection
+- Consistent fingerprints across sessions (seed-based)
+- Native SOCKS5 proxy and geoip-based timezone/locale detection built-in
+- Works with Playwright, Puppeteer, LangChain, browser-use, and BrowserWing
+
 ### HTTP API Reference
 
 BrowserWing exposes 26+ RESTful endpoints for programmatic browser control:

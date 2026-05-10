@@ -282,6 +282,54 @@ curl -X POST 'http://localhost:8080/api/v1/scripts/export/skill' \
 - 使用语义提取进行数据解析
 - 构建智能体驱动的自动化工作流
 
+### 使用 CloakBrowser 实现高级反爬
+
+BrowserWing 支持集成 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) — 一个具有源码级指纹补丁的 stealth Chromium 二进制文件，可通过所有主流爬虫检测测试。
+
+**为什么使用 CloakBrowser？**
+- 49-57 个 C++ 源码级补丁（canvas、WebGL、audio、fonts、GPU、WebRTC 等）
+- 通过 Cloudflare Turnstile、FingerprintJS、BrowserScan、reCAPTCHA v3
+- 可作为标准 Chromium 的直接替代品
+
+**配置步骤：**
+
+1. 安装 CloakBrowser：
+```bash
+pip install cloakbrowser
+python -c "from cloakbrowser import ensure_binary; ensure_binary()"
+```
+
+2. 启动 CloakBrowser 的 `cloakserve` CDP 服务器：
+```bash
+python /path/to/cloakbrowser/bin/cloakserve --port=9222 --headless=false
+```
+
+3. 配置 BrowserWing 使用 CloakBrowser 的 CDP 端点。在 `config.toml` 中添加：
+```toml
+[browser]
+ControlURL = "http://localhost:9222"
+```
+
+或设置环境变量 `BROWSER_CONTROL_URL`：
+```bash
+export BROWSER_CONTROL_URL="http://localhost:9222"
+browserwing --port 8080
+```
+
+4. **重要提示：** CloakBrowser 在二进制层面处理指纹伪造，与 BrowserWing 的 JS 层 stealth 模式冲突。使用 CloakBrowser 时，请在浏览器配置中设置 `use_stealth = false`，或通过环境变量 `USE_STEALTH` 禁用 BrowserWing 的 JS stealth 注入。
+
+**工作原理：**
+- `cloakserve` 是一个 CDP 多路复用器，每个指纹 seed 对应一个独立的 Chrome 进程
+- 每个 Chrome 进程都内置了编译好的指纹补丁（无需 JS 注入）
+- BrowserWing 通过 HTTP 连接到 `cloakserve`，自动解析 WebSocket URL，通过标准 CDP 控制浏览器
+- Cookie 持久化和会话管理与普通 Chrome 相同
+
+**主要优势：**
+- 比 JS 级 stealth 注入更强的爬虫检测对抗能力
+- 基于 seed 的稳定指纹（跨会话一致）
+- 内置原生 SOCKS5 代理和基于 geoip 的时区/语言检测
+- 兼容 Playwright、Puppeteer、LangChain、browser-use 和 BrowserWing
+
 ### HTTP API 参考
 
 BrowserWing 提供 26+ 个 RESTful 端点用于编程式浏览器控制：
