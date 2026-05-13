@@ -1147,6 +1147,12 @@ func (m *Manager) PlayScript(ctx context.Context, script *models.Script, instanc
 			logger.Error(ctx, "Panic in PlayScript: %v", r)
 			err = fmt.Errorf("failed to play script: browser connection may be closed (panic: %v)", r)
 			result = nil
+		}
+
+		if err != nil && page != nil {
+			if closeErr := page.Close(); closeErr != nil {
+				logger.Warn(ctx, "Failed to close playback page after error: %v", closeErr)
+			}
 			page = nil
 		}
 	}()
