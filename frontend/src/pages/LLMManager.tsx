@@ -24,6 +24,7 @@ export default function LLMManager() {
     { value: 'together', label: 'together.ai', group: 'international' },
     { value: 'novita', label: 'novita.ai', group: 'international' },
     { value: 'openrouter', label: 'OpenRouter', group: 'international' },
+    { value: 'requesty', label: 'Requesty', group: 'international' },
 
     // 国内模型
     { value: 'qwen', label: '通义千问', group: 'domestic' },
