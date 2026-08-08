@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/browserwing-browserwing-badge.png)](https://mseep.ai/app/browserwing-browserwing)
+
 <p align="center">
   <img width="600" alt="BrowserWing" src="https://raw.githubusercontent.com/browserwing/browserwing/main/docs/assets/banner.svg">
 </p>
