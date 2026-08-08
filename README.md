@@ -43,7 +43,7 @@ browserwing run hackernews-top | jq '.[0:5]'
 
 [![Swiftproxy](assets/sponsors/swiftproxy-en.png)](https://www.swiftproxy.net/?ref=browserwing)
 
-Swiftproxy provides 90M+ clean residential and static residential proxies for AI agents, browser automation, web scraping, and multi-account workflows. With global IP coverage and stable sessions, Swiftproxy helps developers build reliable automation environments and reduce IP-related restrictions. Dynamic proxy traffic never expires until used, with free testing available. BrowserWing users can get **10% off with code `PROXY90`**.
+[Swiftproxy](https://www.swiftproxy.net/?ref=browserwing) provides 90M+ clean residential and static residential proxies for AI agents, browser automation, web scraping, and multi-account workflows. With global IP coverage and stable sessions, Swiftproxy helps developers build reliable automation environments and reduce IP-related restrictions. Dynamic proxy traffic never expires until used, with free testing available. BrowserWing users can get **10% off with code `PROXY90`**.
 
 ---
 

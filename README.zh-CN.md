@@ -57,7 +57,7 @@ browserwing run hackernews-top | jq '.[0:5]'
 
 [![Swiftproxy](assets/sponsors/swiftproxy-cn.png)](https://www.swiftproxy.net/?ref=browserwing)
 
-Swiftproxy 提供 9000万+ 高质量住宅代理和静态住宅代理,专为 AI Agent、浏览器自动化、网页数据采集和多账号管理场景打造。凭借全球 IP 覆盖、稳定会话和可靠的代理基础设施,Swiftproxy 帮助开发者构建更稳定的自动化环境,降低 IP 限制风险。动态住宅代理流量购买后不过期,使用前持续有效,并支持免费测试。BrowserWing 用户使用优惠码 **`PROXY90`** 可享 9 折优惠。
+[Swiftproxy](https://www.swiftproxy.net/?ref=browserwing) 提供 9000万+ 高质量住宅代理和静态住宅代理,专为 AI Agent、浏览器自动化、网页数据采集和多账号管理场景打造。凭借全球 IP 覆盖、稳定会话和可靠的代理基础设施,Swiftproxy 帮助开发者构建更稳定的自动化环境,降低 IP 限制风险。动态住宅代理流量购买后不过期,使用前持续有效,并支持免费测试。BrowserWing 用户使用优惠码 **`PROXY90`** 可享 9 折优惠。
 
 ---
 
