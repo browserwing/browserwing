@@ -389,7 +389,7 @@ CLI 使用结构化退出码，方便 AI Agent 集成：
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=browserwing/browserwing&type=Date)](https://star-history.com/#browserwing/browserwing&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=browserwing/browserwing&type=Date)](https://star-history.dera.page/#browserwing/browserwing&type=Date)
 
 ## 参与贡献
 

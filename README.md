@@ -399,7 +399,7 @@ Set `BROWSERWING_JSON_ERRORS=1` for machine-readable JSON error output on stderr
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=browserwing/browserwing&type=Date)](https://star-history.com/#browserwing/browserwing&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=browserwing/browserwing&type=Date)](https://star-history.dera.page/#browserwing/browserwing&type=Date)
 
 ## Contributing
 
