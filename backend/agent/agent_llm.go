@@ -322,6 +322,7 @@ func getProviderBaseURL(provider, customBaseURL string) string {
 		"together":   "https://api.together.xyz/v1",
 		"novita":     "https://api.novita.ai/v3/openai",
 		"openrouter": "https://openrouter.ai/api/v1",
+		"requesty":   "https://router.requesty.ai/v1",
 
 		// 国内模型
 		"qwen":        "https://dashscope.aliyuncs.com/compatible-mode/v1",
